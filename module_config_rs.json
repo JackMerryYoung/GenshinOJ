@@ -13,9 +13,7 @@
             "id": "db_connector",
             "enabled": true,
             "path": "db_connector.db_connector",
-            "dependencies": [
-                "global_message_queue"
-            ],
+            "dependencies": ["global_message_queue"],
             "unload_timeout": 0
         },
         "ws_server": {
@@ -23,10 +21,7 @@
             "id": "ws_server",
             "enabled": true,
             "path": "ws_server.ws_server",
-            "dependencies": [
-                "db_connector",
-                "global_message_queue"
-            ],
+            "dependencies": ["db_connector", "global_message_queue"],
             "unload_timeout": 0
         },
         "compilers_manager": {
@@ -42,10 +37,7 @@
             "id": "judge",
             "enabled": true,
             "path": "judge.judge",
-            "dependencies": [
-                "ws_server",
-                "compilers_manager"
-            ],
+            "dependencies": ["ws_server", "compilers_manager"],
             "unload_timeout": 0
         },
         "chat_server": {
@@ -53,9 +45,7 @@
             "id": "chat_server",
             "enabled": true,
             "path": "chat_server.chat_server",
-            "dependencies": [
-                "ws_server"
-            ],
+            "dependencies": ["ws_server"],
             "unload_timeout": 0
         },
         "music_player_server": {
@@ -63,9 +53,7 @@
             "id": "music_player_server",
             "enabled": false,
             "path": "music_player_server.music_player_server",
-            "dependencies": [
-                "ws_server"
-            ],
+            "dependencies": ["ws_server"],
             "unload_timeout": 0
         }
     }
