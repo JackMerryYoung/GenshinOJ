@@ -1,50 +1,38 @@
 {
+    "restricted_mode": true,
     "working_load": {
-        "global_message_queue": {
-            "name": "Global Message Queue",
-            "id": "global_message_queue",
-            "enabled": true,
-            "path": "global_message_queue.global_message_queue",
-            "dependencies": [],
-            "unload_timeout": 0
-        },
         "db_connector": {
             "name": "Database Connector",
             "id": "db_connector",
-            "enabled": true,
-            "path": "db_connector.db_connector",
-            "dependencies": ["global_message_queue"],
+            "enabled": false,
+            "dependencies": [],
             "unload_timeout": 0
         },
         "ws_server": {
             "name": "Websocket Server",
             "id": "ws_server",
             "enabled": true,
-            "path": "ws_server.ws_server",
-            "dependencies": ["db_connector", "global_message_queue"],
+            "dependencies": ["db_connector"],
             "unload_timeout": 0
         },
         "compilers_manager": {
             "name": "Compilers Manager",
             "id": "compilers_manager",
-            "enabled": true,
-            "path": "compilers_manager.compilers_manager",
+            "enabled": false,
             "dependencies": [],
             "unload_timeout": 0
         },
         "judge": {
             "name": "Judge",
             "id": "judge",
-            "enabled": true,
-            "path": "judge.judge",
+            "enabled": false,
             "dependencies": ["ws_server", "compilers_manager"],
             "unload_timeout": 0
         },
         "chat_server": {
             "name": "Chat Server",
             "id": "chat_server",
-            "enabled": true,
-            "path": "chat_server.chat_server",
+            "enabled": false,
             "dependencies": ["ws_server"],
             "unload_timeout": 0
         },
@@ -52,7 +40,6 @@
             "name": "Music Player Server",
             "id": "music_player_server",
             "enabled": false,
-            "path": "music_player_server.music_player_server",
             "dependencies": ["ws_server"],
             "unload_timeout": 0
         }
