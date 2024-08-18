@@ -12,7 +12,9 @@
             "name": "Websocket Server",
             "id": "ws_server",
             "enabled": true,
-            "dependencies": ["db_connector"],
+            "dependencies": [
+                "db_connector"
+            ],
             "unload_timeout": 0
         },
         "compilers_manager": {
@@ -26,21 +28,28 @@
             "name": "Judge",
             "id": "judge",
             "enabled": false,
-            "dependencies": ["ws_server", "compilers_manager"],
+            "dependencies": [
+                "ws_server",
+                "compilers_manager"
+            ],
             "unload_timeout": 0
         },
         "chat_server": {
             "name": "Chat Server",
             "id": "chat_server",
             "enabled": false,
-            "dependencies": ["ws_server"],
+            "dependencies": [
+                "ws_server"
+            ],
             "unload_timeout": 0
         },
         "music_player_server": {
             "name": "Music Player Server",
             "id": "music_player_server",
             "enabled": false,
-            "dependencies": ["ws_server"],
+            "dependencies": [
+                "ws_server"
+            ],
             "unload_timeout": 0
         }
     }

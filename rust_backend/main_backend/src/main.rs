@@ -1,22 +1,6 @@
 use dlopen2::wrapper::WrapperApi;
 use std::io::Read;
 
-struct Holder {
-    func: Box<dyn Fn() -> futures::future::BoxFuture<'static, ()>>
-}
-
-impl Holder {
-    fn new<F>(f: fn() -> F) -> Holder where F: futures::future::Future<Output = ()> + Send + 'static {
-        Holder {
-            func: Box::new(move || Box::pin(f())),
-        }
-    }
-
-    async fn run(&self) {
-        (self.func)().await;
-    }
-}
-
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 struct SingleModuleConfigJson {
     name: String,
@@ -34,12 +18,12 @@ struct ModuleConfigJson {
 
 #[derive(dlopen2::wrapper::WrapperApi)]
 struct ModuleInstance {
-    on_init: extern "Rust" fn() -> core::future::Future<Output = ()>,
-    on_unload: extern "Rust" fn() -> core::future::Future<Output = ()>,
+    on_init: extern "Rust" fn(tokio_runtime: &tokio::runtime::Runtime),
+    on_unload: extern "Rust" fn(),
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
+    let tokio_runtime: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
     let mut module_instances: Vec<dlopen2::wrapper::Container<ModuleInstance>> = vec![];
     let mut tmp: std::path::PathBuf = std::env::current_dir().unwrap();
     tmp.pop();
@@ -51,10 +35,10 @@ async fn main() {
         Ok(file) => file,
         Err(e) => {
             eprintln!(
-                "[MAIN_BACKEND] [Error] Failed to open module_config_rs.json from `{}`. Maybe the file doesn't exist?",
+                "[MAIN_BACKEND] [ERROR] Failed to open module_config_rs.json from `{}`. Maybe the file doesn't exist?",
                 module_config_json_file_path
             );
-            eprintln!("[MAIN_BACKEND] [Error] {}", e);
+            eprintln!("[MAIN_BACKEND] [ERROR] {}", e);
             return;
         }
     };
@@ -66,7 +50,7 @@ async fn main() {
         serde_json::from_str(module_config_json_string.as_str()).unwrap();
     for (name, config) in module_config_json.working_load {
         if config.enabled {
-            println!("[MAIN_BACKEND] [Info] Loading module {}...", name);
+            println!("[MAIN_BACKEND] [INFO] Loading module {}...", name);
             let path: String = String::from(tmp.to_str().unwrap())
                 + "/rust_backend/modules/"
                 + &config.id
@@ -78,22 +62,29 @@ async fn main() {
             match module {
                 Ok(module) => {
                     println!(
-                        "[MAIN_BACKEND] [Info] Successfully loaded module `{}` from `{}`.",
+                        "[MAIN_BACKEND] [INFO] Successfully loaded module `{}` from `{}`.",
                         name, &path
                     );
-                    Holder::new(module.on_init).run().await;
+                    module.on_init(&tokio_runtime);
                     module_instances.push(module);
                 }
                 Err(_e) => {
                     eprintln!(
-                        "[MAIN_BACKEND] [Error] Failed to load module `{}` from `{}`. Maybe the module file doesn't exist or is not a valid shared object?",
+                        "[MAIN_BACKEND] [ERROR] Failed to load module `{}` from `{}`. Maybe the module file doesn't exist or is not a valid shared object?",
                         name, &path
                     );
                     if module_config_json.restricted_mode {
-                        panic!("[MAIN_BACKEND] [Error] Due to the restricted mode, the server backend now is shutting down.");
+                        panic!("[MAIN_BACKEND] [ERROR] Due to the restricted mode, the server backend now is shutting down.");
                     }
                 }
             }
         }
     }
+
+    tokio_runtime.block_on(async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            println!("Waiting...");
+        }
+    });
 }
