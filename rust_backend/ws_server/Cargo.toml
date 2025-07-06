@@ -6,10 +6,17 @@ edition = "2021"
 [dependencies]
 axum = { version = "0.7.5", features = ["ws"] }
 tokio = { version = "1.39.2", features = ["full"] }
+tokio-websockets = { version = "0.11.4", features = ["ring", "server"] }
 async-ffi = { version = "0.5.0", features = ["macros"] }
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
 tower-http = { version = "0.5.2", features = ["trace"] }
+futures-core = "0.3.31"
+futures-sink = "0.3.31"
+simdutf8 = "0.1.5"
+bytes = "1.10.1"
+tokio-util = "0.7.15"
+futures-util = "0.3.31"
 
 [lib]
 crate-type = ["dylib"]

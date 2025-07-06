@@ -1,54 +1,50 @@
+#![feature(thread_id_value)]
+
 #[no_mangle]
-extern "Rust" fn on_init(tokio_runtime: &tokio::runtime::Runtime) {
-    println!("[WS_SERVER] [INFO] Initializing the Websocket server...");
-    tokio_runtime.block_on(async {
-        tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::DEBUG)
-            .init();
-        let app: axum::Router = axum::Router::new()
-            .route("/ws", axum::routing::get(ws_handler))
-            .layer(tower_http::trace::TraceLayer::new_for_http());
-        let listener_result: Result<tokio::net::TcpListener, std::io::Error> =
-            tokio::net::TcpListener::bind("0.0.0.0:9982").await;
-        let listener: tokio::net::TcpListener = match listener_result {
-            Ok(x) => {
-                println!("[WS_SERVER] [INFO] Initialized the Websocket server.");
-                x
-            }
-            Err(_e) => {
-                eprintln!(
-                    "[WS_SERVER] [ERROR] Encountered error when starting the Websocket server."
-                );
-                panic!();
-            }
-        };
-        axum::serve(listener, app).await.unwrap();
+pub extern "Rust" fn on_init(_rt: &'static tokio::runtime::Runtime) -> tokio::runtime::Runtime {
+    let ws_server_runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    ws_server_runtime.spawn(async move {
+        println!(
+            "[WS_SERVER] [INFO] [THREAD {}] Initializing the Websocket server...",
+            std::thread::current().id().as_u64()
+        );
+        let ws_server_app = axum::Router::new()
+            .route("/", axum::routing::get(|| async { "Hello, world!" }))
+            .route("/ws", axum::routing::get(ws_handler));
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:9983").await.unwrap();
+        axum::serve(listener, ws_server_app).await.unwrap();
     });
+    ws_server_runtime
 }
 
 #[no_mangle]
-extern "Rust" fn on_unload() {
-    println!("[WS_SERVER] [INFO] Unloading the Websocket server...");
-    println!("[WS_SERVER] [INFO] Unloaded the Websocket server.");
+pub extern "Rust" fn on_unload() {
+    println!(
+        "[WS_SERVER] [INFO] [THREAD {}] Unloading the Websocket server...",
+        std::thread::current().id().as_u64()
+    );
+    println!(
+        "[WS_SERVER] [INFO] [THREAD {}] Unloaded the Websocket server.",
+        std::thread::current().id().as_u64()
+    );
 }
 
-async fn ws_handler(ws: axum::extract::ws::WebSocketUpgrade) -> axum::response::Response {
-    ws.on_upgrade(ws_handle_socket)
+async fn ws_handler(ws_upgrade: axum::extract::ws::WebSocketUpgrade) -> axum::response::Response {
+    ws_upgrade.on_upgrade(ws_callback)
 }
 
-async fn ws_handle_socket(mut socket: axum::extract::ws::WebSocket) {
-    while let Some(msg) = socket.recv().await {
-        let msg: axum::extract::ws::Message = if let Ok(msg) = msg {
+async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
+    while let Some(msg) = ws.recv().await {
+        let msg = if let Ok(msg) = msg {
             msg
         } else {
             return;
         };
 
-        if let axum::extract::ws::Message::Text(text) = &msg {
-            println!("[WS_SERVER] [INFO] Echoed message: {}", text)
-        };
-
-        if socket.send(msg).await.is_err() {
+        if ws.send(msg).await.is_err() {
             return;
         }
     }
