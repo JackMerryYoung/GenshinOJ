@@ -11,7 +11,7 @@ static MAIN_TOKIO_RUNTIME: once_cell::sync::Lazy<tokio::runtime::Runtime> =
             .unwrap()
     });
 
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize)]
 struct SingleModuleConfigJson {
     name: String,
     id: String,
@@ -20,7 +20,7 @@ struct SingleModuleConfigJson {
     unload_timeout: usize,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize)]
 struct ModuleConfigJson {
     working_load: std::collections::HashMap<String, SingleModuleConfigJson>,
     restricted_mode: bool,
@@ -35,76 +35,17 @@ struct ModuleInstance {
 fn main() {
     let mut module_instances: Vec<dlopen2::wrapper::Container<ModuleInstance>> = vec![];
     let mut module_tokio_runtimes: Vec<tokio::runtime::Runtime> = vec![];
-    let mut tmp: std::path::PathBuf = std::env::current_dir().unwrap();
-    tmp.pop();
-    let module_config_json_file_path: String =
-        String::from(tmp.to_str().unwrap()) + "/module_config_rs.json";
-    let mut module_config_json_file: std::fs::File = match std::fs::File::open(
-        &module_config_json_file_path,
-    ) {
-        Ok(file) => file,
-        Err(e) => {
-            eprintln!(
-                "[MAIN_BACKEND] [ERROR] [THREAD {}] Failed to open module_config_rs.json from `{}`. Maybe the file doesn't exist?",
-                std::thread::current().id().as_u64(), module_config_json_file_path
-            );
-            eprintln!(
-                "[MAIN_BACKEND] [THREAD {}] [ERROR] {}",
-                std::thread::current().id().as_u64(),
-                e
-            );
-            return;
-        }
-    };
-    let mut module_config_json_string: String = String::new();
-    module_config_json_file
-        .read_to_string(&mut module_config_json_string)
-        .unwrap();
-    let module_config_json: ModuleConfigJson =
-        serde_json::from_str(module_config_json_string.as_str()).unwrap();
-    for (name, config) in module_config_json.working_load {
-        if config.enabled {
-            println!(
-                "[MAIN_BACKEND] [INFO] [THREAD {}] Loading module {}...",
-                std::thread::current().id().as_u64(),
-                name
-            );
-            let path: String = String::from(tmp.to_str().unwrap())
-                + "/rust_backend/modules/"
-                + &config.id
-                + "/lib"
-                + &config.id
-                + ".so";
-            let module: Result<dlopen2::wrapper::Container<ModuleInstance>, dlopen2::Error> =
-                unsafe { dlopen2::wrapper::Container::load(&path) };
-            match module {
-                Ok(module) => {
-                    println!(
-                        "[MAIN_BACKEND] [INFO] [THREAD {}] Successfully loaded module `{}` from `{}`.",
-                        std::thread::current().id().as_u64(), name, &path
-                    );
-
-                    module_tokio_runtimes.push(module.on_init(&MAIN_TOKIO_RUNTIME));
-                    module_instances.push(module);
-                }
-                Err(_e) => {
-                    eprintln!(
-                        "[MAIN_BACKEND] [ERROR] [THREAD {}] Failed to load module `{}` from `{}`. Maybe the module file doesn't exist or is not a valid shared object?",
-                        std::thread::current().id().as_u64(), name, &path
-                    );
-                    if module_config_json.restricted_mode {
-                        eprintln!("[MAIN_BACKEND] [ERROR] [THREAD {}] Due to the restricted mode, the server backend now is shutting down.", std::thread::current().id().as_u64());
-                        panic!();
-                    }
-                }
-            }
-        }
-    }
-
+    let module_config_json: ModuleConfigJson = parse_module_config_json(); // Parse from module config json string.
+    load_modules(
+        &mut module_instances,
+        &mut module_tokio_runtimes,
+        &module_config_json,
+    ); // Load modules.
     MAIN_TOKIO_RUNTIME.block_on(async {
+        // Wait fot Ctrl+C.
         tokio::signal::ctrl_c().await.unwrap();
         for module in &module_instances {
-            module.on_unload();
+            module.on_unload(); // Unload each module.
         }
         println!(
             "[MAIN_BACKEND] [INFO] [THREAD {}] Successfully unloaded all the modules.",
@@ -116,4 +57,96 @@ fn main() {
         );
         std::process::exit(0);
     });
+}
+
+fn get_parent_path() -> String {
+    // Get the parent path
+    let mut pwd: std::path::PathBuf = std::env::current_dir().unwrap();
+    pwd.pop();
+    String::from(pwd.to_str().unwrap())
+}
+
+fn parse_module_config_json() -> ModuleConfigJson {
+    let mut module_config_json_string: String = String::new();
+    let module_config_json_file_path: String = get_parent_path() + "/module_config_rs.json";
+    let mut module_config_json_file: std::fs::File = match std::fs::File::open(
+        &module_config_json_file_path,
+    ) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!(
+                "[MAIN_BACKEND] [ERROR] [THREAD {}] Failed to open module_config_rs.json from `{}`. Maybe the file doesn't exist?",
+                std::thread::current().id().as_u64(),
+                module_config_json_file_path
+            );
+            eprintln!(
+                "[MAIN_BACKEND] [THREAD {}] [ERROR] {}",
+                std::thread::current().id().as_u64(),
+                e
+            );
+            panic!();
+        }
+    };
+    module_config_json_file
+        .read_to_string(&mut module_config_json_string)
+        .unwrap(); // Read module config json file to string.
+
+    serde_json::from_str(module_config_json_string.as_str()).unwrap()
+}
+
+fn load_modules(
+    module_instances: &mut Vec<dlopen2::wrapper::Container<ModuleInstance>>,
+    module_tokio_runtimes: &mut Vec<tokio::runtime::Runtime>,
+    module_config_json: &ModuleConfigJson,
+) {
+    // Load modules
+    for (name, config) in &module_config_json.working_load {
+        if config.enabled {
+            println!(
+                "[MAIN_BACKEND] [INFO] [THREAD {}] Loading module {}...",
+                std::thread::current().id().as_u64(),
+                name
+            );
+
+            let module_library_file_path: String = get_parent_path()
+                + "/rust_backend/modules/"
+                + &config.id
+                + "/lib"
+                + &config.id
+                + ".so"; // Get the path of the module.
+
+            let module: Result<dlopen2::wrapper::Container<ModuleInstance>, dlopen2::Error> =
+                unsafe { dlopen2::wrapper::Container::load(&module_library_file_path) }; // Load the module.
+
+            match module {
+                Ok(module) => {
+                    println!(
+                        "[MAIN_BACKEND] [INFO] [THREAD {}] Successfully loaded module `{}` from `{}`.",
+                        std::thread::current().id().as_u64(),
+                        name,
+                        &module_library_file_path
+                    );
+
+                    module_tokio_runtimes.push(module.on_init(&MAIN_TOKIO_RUNTIME)); // Save the Tokio runtime.
+                    module_instances.push(module); // Save the module instance.
+                }
+                Err(_) => {
+                    eprintln!(
+                        "[MAIN_BACKEND] [ERROR] [THREAD {}] Failed to load module `{}` from `{}`. Maybe the module file doesn't exist or is not a valid shared object?",
+                        std::thread::current().id().as_u64(),
+                        name,
+                        &module_library_file_path
+                    );
+
+                    if module_config_json.restricted_mode {
+                        eprintln!(
+                            "[MAIN_BACKEND] [ERROR] [THREAD {}] Due to the restricted mode, the server backend now is shutting down.",
+                            std::thread::current().id().as_u64()
+                        );
+                        panic!();
+                    }
+                }
+            }
+        }
+    }
 }

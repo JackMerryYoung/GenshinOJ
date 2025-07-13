@@ -1,3 +1,15 @@
 [workspace]
-members = ["main_backend", "ws_server"]
+members = [
+    "main_backend",
+    "ws_server",
+    "./ws_server_applications/simple_ws_server_application",
+]
 resolver = "2"
+
+[profile.dev]
+opt-level = 1
+[profile.dev.package."*"]
+opt-level = 1
+
+[profile.release]
+lto = true
