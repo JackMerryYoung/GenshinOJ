@@ -1,0 +1,12 @@
+{
+    "restricted_mode": true,
+    "ws_server_applications": {
+        "simple_ws_server_application": {
+            "name": "Simple Websocket Server Application",
+            "id": "simple_ws_server_application",
+            "enabled": true,
+            "dependencies": [],
+            "unload_timeout": 0
+        }
+    }
+}

@@ -1,0 +1,10 @@
+[package]
+name = "simple_ws_server_application"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.46.1", features = ["full"] }
+
+[lib]
+crate-type = ["dylib"]
