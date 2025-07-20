@@ -108,7 +108,7 @@ class db_connector:
                 port=DATABASE_PORT,
                 database="GenshinOJ",
             )
-            self.log("初始化完毕！")
+            self.log("Initialization finished!")
 
         # Get MySQL's version
         self.database_cursor = self.database.cursor()

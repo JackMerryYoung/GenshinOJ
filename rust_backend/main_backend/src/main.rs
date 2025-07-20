@@ -1,4 +1,5 @@
 #![feature(thread_id_value)]
+#![allow(clippy::type_complexity)]
 
 use dlopen2::wrapper::WrapperApi;
 use std::io::Read;
@@ -26,37 +27,103 @@ struct ModuleConfigJson {
     restricted_mode: bool,
 }
 
+type AsyncModifiable<T> = std::sync::Arc<tokio::sync::Mutex<T>>;
+
 #[derive(dlopen2::wrapper::WrapperApi)]
 struct ModuleInstance {
-    on_init: extern "Rust" fn(rt: &tokio::runtime::Runtime) -> tokio::runtime::Runtime,
+    on_init: extern "Rust" fn(
+        rt: &tokio::runtime::Runtime,
+    ) -> (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>),
     on_unload: extern "Rust" fn(),
 }
 
+pub struct ModuleStatus {
+    initialized: bool,
+    panicked: bool,
+}
+
+struct ModuleCombination {
+    name: String,
+    instance: dlopen2::wrapper::Container<ModuleInstance>,
+    tokio_runtime: tokio::runtime::Runtime,
+    status: AsyncModifiable<ModuleStatus>,
+}
+
 fn main() {
-    let mut module_instances: Vec<dlopen2::wrapper::Container<ModuleInstance>> = vec![];
-    let mut module_tokio_runtimes: Vec<tokio::runtime::Runtime> = vec![];
-    let module_config_json: ModuleConfigJson = parse_module_config_json(); // Parse from module config json string.
-    load_modules(
-        &mut module_instances,
-        &mut module_tokio_runtimes,
-        &module_config_json,
-    ); // Load modules.
-    MAIN_TOKIO_RUNTIME.block_on(async {
-        // Wait fot Ctrl+C.
-        tokio::signal::ctrl_c().await.unwrap();
-        for module in &module_instances {
-            module.on_unload(); // Unload each module.
-        }
-        println!(
-            "[MAIN_BACKEND] [INFO] [THREAD {}] Successfully unloaded all the modules.",
-            std::thread::current().id().as_u64()
-        );
-        println!(
-            "[MAIN_BACKEND] [INFO] [THREAD {}] Now quitting...",
-            std::thread::current().id().as_u64()
-        );
-        std::process::exit(0);
-    });
+    let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
+        std::sync::Arc::new(tokio::sync::Mutex::new(vec![]));
+    let module_config_json: AsyncModifiable<ModuleConfigJson> =
+        std::sync::Arc::new(tokio::sync::Mutex::new(parse_module_config_json())); // Parse from module config json string.
+    {
+        let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
+            std::sync::Arc::clone(&module_combinations);
+        let module_config_json: AsyncModifiable<ModuleConfigJson> =
+            std::sync::Arc::clone(&module_config_json);
+        MAIN_TOKIO_RUNTIME.block_on(async move {
+            let mut guard_module_combinations: tokio::sync::MutexGuard<'_, Vec<ModuleCombination>> =
+                module_combinations.lock().await;
+            let guard_module_config_json: tokio::sync::MutexGuard<'_, ModuleConfigJson> =
+                module_config_json.lock().await;
+            load_modules(&mut guard_module_combinations, &guard_module_config_json).await; // Load modules.
+        })
+    }
+
+    {
+        let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
+            module_combinations.clone();
+        let module_config_json: AsyncModifiable<ModuleConfigJson> = module_config_json.clone();
+        MAIN_TOKIO_RUNTIME.spawn(async move {
+            loop {
+                let guard_module_combinations: tokio::sync::MutexGuard<'_, Vec<ModuleCombination>> = module_combinations.lock().await;
+                let guard_module_config_json: tokio::sync::MutexGuard<'_, ModuleConfigJson> = module_config_json.lock().await;
+                for x in guard_module_combinations.iter() {
+                    let guard_status: tokio::sync::MutexGuard<'_, ModuleStatus> = x.status.lock().await;
+                    if guard_status.panicked {
+                        println!(
+                            "[MAIN_BACKEND] [WARNING] [THREAD {}] Module {} has panicked.",
+                            std::thread::current().id().as_u64(),
+                            x.name
+                        );
+                        if guard_module_config_json.restricted_mode {
+                            eprintln!(
+                                "[MAIN_BACKEND] [ERROR] [THREAD {}] Due to the restricted mode, the server backend now is shutting down.",
+                                std::thread::current().id().as_u64()
+                            );
+                        }
+                    }
+                    drop(guard_status);
+                    fake_yield_now().await;
+                }
+                drop(guard_module_combinations);
+                drop(guard_module_config_json);
+                fake_yield_now().await;
+            }
+        });
+    }
+
+    {
+        let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
+            module_combinations.clone();
+        MAIN_TOKIO_RUNTIME.block_on(async move {
+            // Wait fot Ctrl+C.
+            tokio::signal::ctrl_c().await.unwrap();
+            let guard_module_combinations: tokio::sync::MutexGuard<'_, Vec<ModuleCombination>> =
+                module_combinations.lock().await;
+            for module in guard_module_combinations.iter() {
+                module.instance.on_unload(); // Unload each module.
+            }
+            drop(guard_module_combinations);
+            println!(
+                "[MAIN_BACKEND] [INFO] [THREAD {}] Successfully unloaded all the modules.",
+                std::thread::current().id().as_u64()
+            );
+            println!(
+                "[MAIN_BACKEND] [INFO] [THREAD {}] Now quitting...",
+                std::thread::current().id().as_u64()
+            );
+            std::process::exit(0);
+        });
+    }
 }
 
 fn get_parent_path() -> String {
@@ -94,9 +161,8 @@ fn parse_module_config_json() -> ModuleConfigJson {
     serde_json::from_str(module_config_json_string.as_str()).unwrap()
 }
 
-fn load_modules(
-    module_instances: &mut Vec<dlopen2::wrapper::Container<ModuleInstance>>,
-    module_tokio_runtimes: &mut Vec<tokio::runtime::Runtime>,
+async fn load_modules(
+    module_combinations: &mut Vec<ModuleCombination>,
     module_config_json: &ModuleConfigJson,
 ) {
     // Load modules
@@ -127,8 +193,18 @@ fn load_modules(
                         &module_library_file_path
                     );
 
-                    module_tokio_runtimes.push(module.on_init(&MAIN_TOKIO_RUNTIME)); // Save the Tokio runtime.
-                    module_instances.push(module); // Save the module instance.
+                    let result: (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>) =
+                        module.on_init(&MAIN_TOKIO_RUNTIME);
+                    {
+                        let status: std::sync::Arc<tokio::sync::Mutex<ModuleStatus>> =
+                            result.1.clone();
+                        module_combinations.push(ModuleCombination {
+                            name: String::from(name),
+                            instance: module,
+                            tokio_runtime: result.0,
+                            status,
+                        }); // Save the Tokio runtime.
+                    }
                 }
                 Err(_) => {
                     eprintln!(
@@ -149,4 +225,13 @@ fn load_modules(
             }
         }
     }
+}
+
+const FAKE_YIELD_NOW_MILLISECONDS: u64 = 1;
+
+async fn fake_yield_now() {
+    tokio::time::sleep(tokio::time::Duration::from_millis(
+        FAKE_YIELD_NOW_MILLISECONDS,
+    ))
+    .await;
 }

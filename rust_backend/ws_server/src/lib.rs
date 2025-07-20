@@ -24,8 +24,6 @@ macro_rules! retry {
     };
 }
 
-// static WS_SERVER_APPLICATIONS_LIBRARIES: std::sync::atomic::
-
 #[derive(serde::Deserialize, serde::Serialize)]
 struct SingleWebsocketApplicationConfigJson {
     name: String,
@@ -41,8 +39,11 @@ struct WebsocketServerApplicationsConfigJson {
     restricted_mode: bool,
 }
 
-struct WebsocketServerStatus {
+type AsyncModifiable<T> = std::sync::Arc<tokio::sync::Mutex<T>>;
+
+pub struct ModuleStatus {
     initialized: bool,
+    panicked: bool,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -51,18 +52,26 @@ struct WebsocketServerJsonMessage {
     content: serde_json::Value,
 }
 
+static WS_SERVER_APPLICATIONS_LIBRARIES: std::sync::LazyLock<
+    tokio::sync::Mutex<Vec<(dlopen2::symbor::Library, tokio::runtime::Runtime)>>,
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(vec![]));
+
 #[unsafe(no_mangle)]
-pub extern "Rust" fn on_init(_rt: &'static tokio::runtime::Runtime) -> tokio::runtime::Runtime {
+pub extern "Rust" fn on_init(
+    rt: &'static tokio::runtime::Runtime,
+) -> (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>) {
     let ws_server_runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
-    let ws_server_status: WebsocketServerStatus = WebsocketServerStatus { initialized: false };
-    let ws_server_status: std::sync::Arc<tokio::sync::Mutex<WebsocketServerStatus>> =
+    let ws_server_status: ModuleStatus = ModuleStatus {
+        initialized: false,
+        panicked: false,
+    };
+    let ws_server_status: AsyncModifiable<ModuleStatus> =
         std::sync::Arc::new(tokio::sync::Mutex::new(ws_server_status));
     {
-        let ws_server_status: std::sync::Arc<tokio::sync::Mutex<WebsocketServerStatus>> =
-            ws_server_status.clone();
+        let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
             println!(
                 "[WS_SERVER] [INFO] [THREAD {}] Initializing the Websocket server...",
@@ -88,9 +97,11 @@ pub extern "Rust" fn on_init(_rt: &'static tokio::runtime::Runtime) -> tokio::ru
                         "[WS_SERVER] [INFO] [THREAD {}] Initialized the Websocket server.",
                         std::thread::current().id().as_u64()
                     );
-                    let mut guard: tokio::sync::MutexGuard<'_, WebsocketServerStatus> =
+
+                    let mut guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
                     ws_server_status.lock().await;
-                    guard.initialized = true;
+                    guard_ws_server_status.initialized = true;
+                    drop(guard_ws_server_status);
                     listener
                 }
                 Err(_) => {
@@ -98,36 +109,64 @@ pub extern "Rust" fn on_init(_rt: &'static tokio::runtime::Runtime) -> tokio::ru
                         "[WS_SERVER] [ERROR] [THREAD {}] Exceeded maximum retry times. Now quitting...",
                         std::thread::current().id().as_u64()
                     );
+
                     on_unload();
-                    panic!()
+                    let mut guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
+                    ws_server_status.lock().await;
+                    guard_ws_server_status.panicked = true;
+                    drop(guard_ws_server_status);
+                    panic!();
                 }
             };
             axum::serve(listener, ws_server_app).await.unwrap();
         });
-    }
+    };
 
     let ws_server_applications_config_json: WebsocketServerApplicationsConfigJson =
         parse_ws_server_applications_config_json();
     {
-        let ws_server_status: std::sync::Arc<tokio::sync::Mutex<WebsocketServerStatus>> =
-            ws_server_status.clone();
+        let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
             loop {
-                let guard: tokio::sync::MutexGuard<'_, WebsocketServerStatus> =
+                let guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
                     ws_server_status.lock().await;
-                if guard.initialized {
+                if guard_ws_server_status.initialized {
+                    drop(guard_ws_server_status);
                     break;
                 }
-                tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+                drop(guard_ws_server_status);
+                fake_yield_now().await;
             }
-            // load_ws_server_applications(
-            //     &mut WS_SERVER_APPLICATIONS_LIBRARIES,
-            //     &ws_server_applications_config_json,
-            // );
+            let mut guard_ws_server_applications_libraries: tokio::sync::MutexGuard<
+                '_,
+                Vec<(dlopen2::symbor::Library, tokio::runtime::Runtime)>,
+            > = WS_SERVER_APPLICATIONS_LIBRARIES.lock().await;
+            load_ws_server_applications(
+                rt,
+                &mut guard_ws_server_applications_libraries,
+                &ws_server_applications_config_json,
+            );
+            drop(guard_ws_server_applications_libraries);
+            fake_yield_now().await;
         });
     }
 
-    ws_server_runtime
+    {
+        let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
+        ws_server_runtime.spawn(async move {
+            loop {
+                let guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
+                    ws_server_status.lock().await;
+                if guard_ws_server_status.panicked {
+                    drop(guard_ws_server_status);
+                    break;
+                }
+                drop(guard_ws_server_status);
+                fake_yield_now().await;
+            }
+        });
+    }
+    (ws_server_runtime, ws_server_status)
 }
 
 #[unsafe(no_mangle)]
@@ -147,11 +186,49 @@ async fn ws_handler(ws_upgrade: axum::extract::ws::WebSocketUpgrade) -> axum::re
 }
 
 async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
+    println!(
+        "[WS_SERVER] [INFO] [THREAD {}] Websocket connection established.",
+        std::thread::current().id().as_u64()
+    );
+
     while let Some(original_msg) = ws.recv().await {
         let original_msg: axum::extract::ws::Message = original_msg.unwrap();
-        let json_msg: WebsocketServerJsonMessage =
-            serde_json::from_str(&original_msg.into_text().unwrap()).unwrap();
-        // for library in
+        match original_msg {
+            axum::extract::ws::Message::Text(text) => {
+                if let Ok(mut json_msg) =
+                    serde_json::from_str::<WebsocketServerJsonMessage>(text.as_str())
+                {
+                    let taken_json_msg_content: AsyncModifiable<serde_json::Value> =
+                        std::sync::Arc::new(tokio::sync::Mutex::new(json_msg.content.take()));
+                    for library in WS_SERVER_APPLICATIONS_LIBRARIES.lock().await.iter() {
+                        if let Ok(callback_function) = unsafe {
+                            library.0.symbol::<unsafe extern "Rust" fn(
+                                &tokio::runtime::Runtime,
+                                &mut axum::extract::ws::WebSocket,
+                                AsyncModifiable<serde_json::Value>,
+                            ) -> ()>(
+                                &(String::from("on_") + &json_msg.r#type)
+                            )
+                        } {
+                            unsafe {
+                                callback_function(
+                                    &library.1,
+                                    &mut ws,
+                                    taken_json_msg_content.clone(),
+                                )
+                            };
+                        };
+                    }
+                };
+            }
+            axum::extract::ws::Message::Close(_) => {
+                println!(
+                    "[WS_SERVER] [INFO] [THREAD {}] Websocket connection closed.",
+                    std::thread::current().id().as_u64(),
+                );
+            }
+            _ => {}
+        }
     }
 }
 
@@ -192,7 +269,8 @@ fn get_parent_path() -> String {
 }
 
 fn load_ws_server_applications(
-    ws_server_applications_libraries: &mut Vec<dlopen2::symbor::Library>,
+    rt: &tokio::runtime::Runtime,
+    ws_server_applications_libraries: &mut Vec<(dlopen2::symbor::Library, tokio::runtime::Runtime)>,
     ws_server_applications_config_json: &WebsocketServerApplicationsConfigJson,
 ) {
     for (name, config) in &ws_server_applications_config_json.ws_server_applications {
@@ -218,7 +296,19 @@ fn load_ws_server_applications(
                         &ws_server_application_library_file_path
                     );
 
-                    ws_server_applications_libraries.push(ws_server_application_library);
+                    if let Ok(callback) = unsafe {
+                        ws_server_application_library
+                            .symbol::<unsafe extern "Rust" fn(
+                            &tokio::runtime::Runtime,
+                        ) -> tokio::runtime::Runtime>("on_init")
+                    } {
+                        let ws_server_application_library_runtime: tokio::runtime::Runtime =
+                            unsafe { callback(rt) };
+                        ws_server_applications_libraries.push((
+                            ws_server_application_library,
+                            ws_server_application_library_runtime,
+                        ));
+                    }
                 }
                 Err(_) => {
                     eprintln!(
@@ -239,4 +329,13 @@ fn load_ws_server_applications(
             }
         }
     }
+}
+
+const FAKE_YIELD_NOW_MILLISECONDS: u64 = 1;
+
+async fn fake_yield_now() {
+    tokio::time::sleep(tokio::time::Duration::from_millis(
+        FAKE_YIELD_NOW_MILLISECONDS,
+    ))
+    .await;
 }

@@ -1,3 +1,5 @@
+cargo-features = ["profile-rustflags"]
+
 [workspace]
 members = [
     "main_backend",
@@ -7,9 +9,12 @@ members = [
 resolver = "2"
 
 [profile.dev]
-opt-level = 1
+opt-level = 0
+rustflags = ["-Zthreads=8"]
 [profile.dev.package."*"]
-opt-level = 1
+opt-level = 0
+rustflags = ["-Zthreads=8"]
 
 [profile.release]
 lto = true
+rustflags = ["-Zthreads=8"]
