@@ -12,6 +12,9 @@ static MAIN_TOKIO_RUNTIME: once_cell::sync::Lazy<tokio::runtime::Runtime> =
             .unwrap()
     });
 
+static MAIN_BACKEND_PANIC_FLAG: std::sync::LazyLock<AsyncModifiable<bool>> =
+    std::sync::LazyLock::new(|| std::sync::Arc::new(tokio::sync::Mutex::new(false)));
+
 #[derive(serde::Deserialize, serde::Serialize)]
 struct SingleModuleConfigJson {
     name: String,
@@ -53,7 +56,9 @@ fn main() {
     let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
         std::sync::Arc::new(tokio::sync::Mutex::new(vec![]));
     let module_config_json: AsyncModifiable<ModuleConfigJson> =
-        std::sync::Arc::new(tokio::sync::Mutex::new(parse_module_config_json())); // Parse from module config json string.
+        MAIN_TOKIO_RUNTIME.block_on(async {
+            std::sync::Arc::new(tokio::sync::Mutex::new(parse_module_config_json().await)) // Parse from module config json string.
+        });
     {
         let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
             std::sync::Arc::clone(&module_combinations);
@@ -72,6 +77,8 @@ fn main() {
         let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
             module_combinations.clone();
         let module_config_json: AsyncModifiable<ModuleConfigJson> = module_config_json.clone();
+        let main_backend_panic_flag: std::sync::Arc<tokio::sync::Mutex<bool>> =
+            MAIN_BACKEND_PANIC_FLAG.clone();
         MAIN_TOKIO_RUNTIME.spawn(async move {
             loop {
                 let guard_module_combinations: tokio::sync::MutexGuard<'_, Vec<ModuleCombination>> = module_combinations.lock().await;
@@ -89,6 +96,16 @@ fn main() {
                                 "[MAIN_BACKEND] [ERROR] [THREAD {}] Due to the restricted mode, the server backend now is shutting down.",
                                 std::thread::current().id().as_u64()
                             );
+                            drop(guard_status);
+                            drop(guard_module_config_json);
+                            println!(
+                                "[MAIN_BACKEND] [INFO] [THREAD {}] Now quitting...",
+                                std::thread::current().id().as_u64()
+                            );
+                            let mut guard_main_backend_panic_flag: tokio::sync::MutexGuard<'_, bool> = main_backend_panic_flag.lock().await;
+                            *guard_main_backend_panic_flag = true;
+                            drop(guard_main_backend_panic_flag);
+                            panic!();
                         }
                     }
                     drop(guard_status);
@@ -124,6 +141,37 @@ fn main() {
             std::process::exit(0);
         });
     }
+
+    {
+        let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
+            module_combinations.clone();
+        let main_backend_panic_flag: std::sync::Arc<tokio::sync::Mutex<bool>> =
+            MAIN_BACKEND_PANIC_FLAG.clone();
+        MAIN_TOKIO_RUNTIME.block_on(async move {
+            loop {
+                let guard_main_backend_panic_flag: tokio::sync::MutexGuard<'_, bool> =
+                    main_backend_panic_flag.lock().await;
+                if *guard_main_backend_panic_flag {
+                    break;
+                }
+            }
+            let guard_module_combinations: tokio::sync::MutexGuard<'_, Vec<ModuleCombination>> =
+                module_combinations.lock().await;
+            for module in guard_module_combinations.iter() {
+                module.instance.on_unload(); // Unload each module.
+            }
+            drop(guard_module_combinations);
+            println!(
+                "[MAIN_BACKEND] [INFO] [THREAD {}] Successfully unloaded all the modules.",
+                std::thread::current().id().as_u64()
+            );
+            println!(
+                "[MAIN_BACKEND] [INFO] [THREAD {}] Now quitting...",
+                std::thread::current().id().as_u64()
+            );
+            std::process::exit(0);
+        });
+    }
 }
 
 fn get_parent_path() -> String {
@@ -133,7 +181,7 @@ fn get_parent_path() -> String {
     String::from(pwd.to_str().unwrap())
 }
 
-fn parse_module_config_json() -> ModuleConfigJson {
+async fn parse_module_config_json() -> ModuleConfigJson {
     let mut module_config_json_string: String = String::new();
     let module_config_json_file_path: String = get_parent_path() + "/module_config_rs.json";
     let mut module_config_json_file: std::fs::File = match std::fs::File::open(
@@ -147,10 +195,16 @@ fn parse_module_config_json() -> ModuleConfigJson {
                 module_config_json_file_path
             );
             eprintln!(
-                "[MAIN_BACKEND] [THREAD {}] [ERROR] {}",
-                std::thread::current().id().as_u64(),
-                e
+                "[MAIN_BACKEND] [ERROR] [THREAD {}] {}",
+                e,
+                std::thread::current().id().as_u64()
             );
+            let main_backend_panic_flag: std::sync::Arc<tokio::sync::Mutex<bool>> =
+                MAIN_BACKEND_PANIC_FLAG.clone();
+            let mut guard_main_backend_panic_flag: tokio::sync::MutexGuard<'_, bool> =
+                main_backend_panic_flag.lock().await;
+            *guard_main_backend_panic_flag = true;
+            drop(guard_main_backend_panic_flag);
             panic!();
         }
     };

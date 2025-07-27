@@ -47,7 +47,7 @@ export default function Login() {
 
     useEffect(() => {
         if (loginStatus.value === true && dialogLoginSuccessOpenState === false) setDialogLoggedInOpenState(true);
-    }, []);
+    }, [loginStatus]);
 
     useEffect(() => {
         if (loginSessionState !== undefined) {

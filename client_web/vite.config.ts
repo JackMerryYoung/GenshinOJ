@@ -13,7 +13,7 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/wsapi': {
-        target: 'ws://localhost:9982',
+        target: 'ws://localhost:9983/ws',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/wsapi/, '')
       }

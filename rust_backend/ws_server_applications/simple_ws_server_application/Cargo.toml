@@ -18,6 +18,7 @@ retry = "2.1.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 mysql_async = "0.36.1"
+uuid = { version = "1.17.0", features = ["v4"] }
 
 [lib]
 crate-type = ["dylib"]
