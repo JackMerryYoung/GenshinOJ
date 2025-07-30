@@ -45,14 +45,14 @@ static USERNAMES_BY_WS_ID: std::sync::LazyLock<
     tokio::sync::Mutex<std::collections::HashMap<uuid::Uuid, String>>,
 > = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
 
+type AsyncModifiable<T> = std::sync::Arc<tokio::sync::Mutex<T>>;
+
 #[derive(serde::Deserialize, serde::Serialize)]
 struct ContentOnLogin {
     username: String,
     password: String,
     request_key: String,
 }
-
-type AsyncModifiable<T> = std::sync::Arc<tokio::sync::Mutex<T>>;
 
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_login(
@@ -222,7 +222,7 @@ pub extern "Rust" fn on_login(
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_close_connection(
     self_rt: &tokio::runtime::Runtime,
-    (ws, ws_id): (&mut axum::extract::ws::WebSocket, &uuid::Uuid),
+    (_ws, ws_id): (&mut axum::extract::ws::WebSocket, &uuid::Uuid),
 ) {
     self_rt.block_on(async move {
         let mut guard_usernames_by_ws_id: tokio::sync::MutexGuard<
@@ -245,6 +245,68 @@ pub extern "Rust" fn on_close_connection(
             guard_usernames_by_ws_id.remove(ws_id);
         }
         drop(guard_usernames_by_ws_id);
+    });
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct ContentOnQuit {
+    username: String,
+    session_token: String
+}
+
+#[unsafe(no_mangle)]
+pub extern "Rust" fn on_quit(
+    self_rt: &tokio::runtime::Runtime,
+    (_ws, ws_id): (&mut axum::extract::ws::WebSocket, &uuid::Uuid),
+    content: AsyncModifiable<serde_json::Value>,
+) {
+    self_rt.block_on(async move {
+        let mut guard_usernames_by_ws_id: tokio::sync::MutexGuard<
+            '_,
+            std::collections::HashMap<uuid::Uuid, String>,
+        > = USERNAMES_BY_WS_ID.lock().await;
+        if let Some(username_by_ws_id) = guard_usernames_by_ws_id.get(ws_id) {
+            let guard_content = content.lock().await;
+            let cloned_content: serde_json::Value = guard_content.clone();
+            let failed_content_reserved: serde_json::Value = guard_content.clone();
+            match serde_json::from_value::<ContentOnQuit>(cloned_content) {
+                Ok(unwrapped_content) => {
+                    drop(guard_content);
+                    let mut guard_logged_in_usernames: tokio::sync::MutexGuard<
+                        '_,
+                        std::collections::HashSet<String>,
+                    > = LOGGED_IN_USERNAMES.lock().await;
+                    if guard_logged_in_usernames.get(username_by_ws_id).is_some() {
+                        let mut guard_session_tokens_by_username: tokio::sync::MutexGuard<'_, std::collections::HashMap<String, String>> = SESSION_TOKENS_BY_USERNAME.lock().await;
+                        if &unwrapped_content.username == username_by_ws_id && &unwrapped_content.session_token == guard_session_tokens_by_username.get(username_by_ws_id).unwrap_or(&String::from("")) {
+                            println!("[WS_SERVER::SIMPLE_WS_SERVER_APPLICATION] [INFO] [THREAD {}] The user `{}` quitted with session token: `{}`.", 
+                                std::thread::current().id().as_u64(), username_by_ws_id, 
+                                guard_session_tokens_by_username.get(username_by_ws_id).unwrap_or(&String::from(""))
+                            );
+                            guard_session_tokens_by_username.remove(username_by_ws_id);
+                            guard_logged_in_usernames.remove(username_by_ws_id);
+                            guard_usernames_by_ws_id.remove(ws_id);
+                        } else {
+                            println!(
+                                "[WS_SERVER::SIMPLE_WS_SERVER_APPLICATION] [WARNING] [THREAD {}] The user `{}` wanted to quit with a fake session token.",
+                                std::thread::current().id().as_u64(),
+                                &unwrapped_content.username
+                            );
+                        }
+                        drop(guard_session_tokens_by_username);
+                    }
+                    drop(guard_logged_in_usernames);
+                }
+                Err(_) => {
+                    println!(
+                        "[WS_SERVER::SIMPLE_WS_SERVER_APPLICATION] [WARNING] [THREAD {}] The user `{}` failed to quit.",
+                        std::thread::current().id().as_u64(),
+                        failed_content_reserved["username"].as_str().unwrap_or_default()
+                    );
+                }
+            }
+            drop(guard_usernames_by_ws_id);
+        }
     });
 }
 

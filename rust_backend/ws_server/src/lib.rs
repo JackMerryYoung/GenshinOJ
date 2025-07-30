@@ -79,7 +79,7 @@ pub extern "Rust" fn on_init(
             );
             let ws_server_app: axum::Router = axum::Router::new()
                 .route("/", axum::routing::get(|| async { "Rust Backend Test" }))
-                .route("/ws", axum::routing::get(ws_handler));
+                .merge(axum::Router::new().route("/ws", axum::routing::get(ws_handler)).layer(tower::ServiceBuilder::new().layer(axum_client_ip::ClientIpSource::ConnectInfo.into_extension()).layer(axum::middleware::from_fn(ip_handler))));
             let listener: Result<tokio::net::TcpListener, std::io::Error> = retry!(
                 tokio::net::TcpListener::bind("0.0.0.0:9983").await,
                 2,
@@ -118,7 +118,7 @@ pub extern "Rust" fn on_init(
                     panic!();
                 }
             };
-            axum::serve(listener, ws_server_app).await.unwrap();
+            axum::serve(listener, ws_server_app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap();
         });
     };
 
@@ -185,6 +185,19 @@ pub extern "Rust" fn on_unload() {
         "[WS_SERVER] [INFO] [THREAD {}] Unloaded the Websocket server.",
         std::thread::current().id().as_u64()
     );
+}
+
+async fn ip_handler(
+    axum_client_ip::ClientIp(ip_addr): axum_client_ip::ClientIp,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    println!(
+        "[WS_SERVER] [INFO] [THREAD {}] Connection from `{}` established.",
+        std::thread::current().id().as_u64(),
+        ip_addr
+    );
+    next.run(request).await
 }
 
 async fn ws_handler(ws_upgrade: axum::extract::ws::WebSocketUpgrade) -> axum::response::Response {
