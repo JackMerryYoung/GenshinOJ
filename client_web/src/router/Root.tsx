@@ -35,7 +35,6 @@ export default function Root() {
         reconnectInterval: 3000,
         onClose: () => {
             if (loginStatus.value === true) {
-                console.log("quitting...");
                 sendJsonMessage({
                     type: "quit",
                     content: {
@@ -53,7 +52,6 @@ export default function Root() {
     const beforeunload = (ev: Event) => {
         if (ev) {
             if (loginStatus.value === true) {
-                console.log("quitting...");
                 sendJsonMessage({
                     type: "quit",
                     content: {
@@ -95,7 +93,6 @@ export default function Root() {
         const loginPasswordFromLocalStorage = localStorage.getItem("loginPassword");
         if (loginUsernameFromLocalStorage !== null && loginPasswordFromLocalStorage !== null) {
             loginSession(loginUsernameFromLocalStorage, loginPasswordFromLocalStorage);
-            console.log("Logged in.");
         }
     }, []);
 

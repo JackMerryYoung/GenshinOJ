@@ -4,8 +4,12 @@ export const loginStatusSlice = createSlice({
     name: "loginStatus",
     initialState: { value: false },
     reducers: {
-        loginReducer: (state) => { state.value = true; },
-        logoutReducer: (state) => { state.value = false; }
+        loginReducer: state => {
+            state.value = true
+        },
+        logoutReducer: state => {
+            state.value = false
+        }
     }
 });
 

@@ -4,8 +4,8 @@ export const sessionTokenSlice = createSlice({
     name: "sessionToken",
     initialState: { value: "" },
     reducers: {
-        modifySessionTokenReducer: (state, action) => { state.value = action.payload; },
-        clearSessionTokenReducer: (state) => { state.value = ""; }
+        modifySessionTokenReducer: (_state, action) => { return { value: action.payload }; },
+        clearSessionTokenReducer: (_state) => { return { value: "" }; }
     }
 });
 

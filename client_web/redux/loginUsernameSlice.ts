@@ -4,8 +4,8 @@ export const loginUsernameSlice = createSlice({
     name: "loginUsername",
     initialState: { value: "" },
     reducers: {
-        modifyLoginUsernameReducer: (state, action) => { state.value = action.payload; },
-        clearLoginUsernameReducer: (state) => { state.value = ""; }
+        modifyLoginUsernameReducer: (_state, action) => { return { value: action.payload }; },
+        clearLoginUsernameReducer: (_state) => { return { value: "" }; }
     }
 });
 

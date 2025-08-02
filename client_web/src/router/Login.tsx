@@ -33,11 +33,14 @@ export default function Login() {
     const [dialogLoggedInOpenState, setDialogLoggedInOpenState] = useState(false);
     const [dialogLoginFailureOpenState, setDialogLoginFailureOpenState] = useState(false);
     const [dialogLoginSuccessOpenState, setDialogLoginSuccessOpenState] = useState(false);
+    const [dialogLoginSuccessOpenedState, setDialogLoginSuccessOpenedState] = useState(false);
+    const [dialogSuppressedState, setDialogSuppressedState] = useState(false);
 
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
     const navigate = useNavigate();
 
     const handleClickLogin = () => {
+        setDialogSuppressedState(true);
         loginSession(loginUsernameFromInput, loginPasswordFromInput);
     };
 
@@ -46,8 +49,13 @@ export default function Login() {
     };
 
     useEffect(() => {
-        if (loginStatus.value === true && dialogLoginSuccessOpenState === false) setDialogLoggedInOpenState(true);
-    }, [loginStatus]);
+        if (dialogSuppressedState === true) {
+            setDialogLoggedInOpenState(false);
+        }
+        else {
+            if (loginStatus.value === true && dialogLoginSuccessOpenState === false && dialogLoginSuccessOpenedState === false) setDialogLoggedInOpenState(true);
+        }
+    }, [loginStatus, dialogLoginSuccessOpenState, dialogSuppressedState, dialogLoginSuccessOpenedState]);
 
     useEffect(() => {
         if (loginSessionState !== undefined) {
@@ -55,7 +63,9 @@ export default function Login() {
                 localStorage.setItem("loginUsername", loginUsernameFromInput);
                 localStorage.setItem("loginPassword", loginPasswordFromInput);
                 setDialogLoginSuccessOpenState(true);
+                setDialogLoginSuccessOpenedState(true);
             }
+            setDialogSuppressedState(false);
         }
     }, [loginUsernameFromInput, loginPasswordFromInput, loginSessionState]);
 
