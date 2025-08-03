@@ -80,7 +80,7 @@ class chat_ws_server_application(ws_server.ws_server_application_protocol):
     async def on_close_connection(
         self,
         websocket_protocol: websockets.server.WebSocketServerProtocol,
-        content: dict = None
+        content: dict = None,
     ):
         await super().on_close_connection(websocket_protocol, content)
 
@@ -108,49 +108,6 @@ class chat_ws_server_application(ws_server.ws_server_application_protocol):
         hash = hashlib.md5("add-some-salt".encode("utf-8"))
         hash.update(data.encode("utf-8"))
         return hash.hexdigest()
-
-    async def on_chat_short(
-        self,
-        websocket_protocol: websockets.server.WebSocketServerProtocol,
-        content: dict,
-    ):
-        warnings.warn(
-            "on_chat_short is deprecated and will be removed in 1.2-mainstream."
-        )
-        try:
-            if (
-                content["from"]
-                == self.ws_server_instance.server_instance.get_module_instance(
-                    "ws_server"
-                ).sessions[content["session_token"]]
-            ):
-                try:
-                    self.ws_server_instance.server_instance.get_module_instance(
-                        "chat_server"
-                    ).message_box[content["to"]]["message_queue"].append(
-                        {"from": content["from"], "messages": content["messages"]}
-                    )
-                    self.log(
-                        "The user {} tried to use session token: {} to send message.".format(
-                            content["from"], content["session_token"]
-                        )
-                    )
-                except KeyError:
-                    self.log(
-                        "The user {} tried to send a message to whom is not online.".format(
-                            content["from"]
-                        )
-                    )
-            else:
-                self.log(
-                    "The user {} tried to use a fake session token.".format(
-                        content["from"]
-                    )
-                )
-        except KeyError:
-            self.log(
-                "The user {} tried to use a fake session token.".format(content["from"])
-            )
 
     async def on_chat_user(
         self,
