@@ -7,6 +7,13 @@
             "enabled": true,
             "dependencies": [],
             "unload_timeout": 0
+        },
+        "chat_ws_server_application": {
+            "name": "Chat Websocket Server Application",
+            "id": "chat_ws_server_application",
+            "enabled": true,
+            "dependencies": [],
+            "unload_timeout": 0
         }
     }
 }

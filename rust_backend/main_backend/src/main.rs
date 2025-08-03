@@ -70,7 +70,7 @@ fn main() {
             let guard_module_config_json: tokio::sync::MutexGuard<'_, ModuleConfigJson> =
                 module_config_json.lock().await;
             load_modules(&mut guard_module_combinations, &guard_module_config_json).await; // Load modules.
-        })
+        });
     }
 
     {
@@ -81,28 +81,46 @@ fn main() {
             MAIN_BACKEND_PANIC_FLAG.clone();
         MAIN_TOKIO_RUNTIME.spawn(async move {
             loop {
-                let guard_module_combinations: tokio::sync::MutexGuard<'_, Vec<ModuleCombination>> = module_combinations.lock().await;
-                let guard_module_config_json: tokio::sync::MutexGuard<'_, ModuleConfigJson> = module_config_json.lock().await;
+                let guard_module_combinations: tokio::sync::MutexGuard<
+                    '_,
+                    Vec<ModuleCombination>
+                > = module_combinations.lock().await;
+                let guard_module_config_json: tokio::sync::MutexGuard<
+                    '_,
+                    ModuleConfigJson
+                > = module_config_json.lock().await;
                 for x in guard_module_combinations.iter() {
-                    let guard_status: tokio::sync::MutexGuard<'_, ModuleStatus> = x.status.lock().await;
+                    let guard_status: tokio::sync::MutexGuard<
+                        '_,
+                        ModuleStatus
+                    > = x.status.lock().await;
                     if guard_status.panicked {
                         println!(
-                            "[MAIN_BACKEND] [WARNING] [THREAD {}] Module {} has panicked.",
+                            "[MAIN_BACKEND] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Module {} has panicked.",
                             std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
                             x.name
                         );
                         if guard_module_config_json.restricted_mode {
                             eprintln!(
-                                "[MAIN_BACKEND] [ERROR] [THREAD {}] Due to the restricted mode, the server backend now is shutting down.",
-                                std::thread::current().id().as_u64()
+                                "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Due to the restricted mode, the server backend now is shutting down.",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!()
                             );
                             drop(guard_status);
                             drop(guard_module_config_json);
                             println!(
-                                "[MAIN_BACKEND] [INFO] [THREAD {}] Now quitting...",
-                                std::thread::current().id().as_u64()
+                                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!()
                             );
-                            let mut guard_main_backend_panic_flag: tokio::sync::MutexGuard<'_, bool> = main_backend_panic_flag.lock().await;
+                            let mut guard_main_backend_panic_flag: tokio::sync::MutexGuard<
+                                '_,
+                                bool
+                            > = main_backend_panic_flag.lock().await;
                             *guard_main_backend_panic_flag = true;
                             drop(guard_main_backend_panic_flag);
                             panic!();
@@ -124,19 +142,25 @@ fn main() {
         MAIN_TOKIO_RUNTIME.block_on(async move {
             // Wait fot Ctrl+C.
             tokio::signal::ctrl_c().await.unwrap();
-            let guard_module_combinations: tokio::sync::MutexGuard<'_, Vec<ModuleCombination>> =
-                module_combinations.lock().await;
+            let guard_module_combinations: tokio::sync::MutexGuard<
+                '_,
+                Vec<ModuleCombination>
+            > = module_combinations.lock().await;
             for module in guard_module_combinations.iter() {
                 module.instance.on_unload(); // Unload each module.
             }
             drop(guard_module_combinations);
             println!(
-                "[MAIN_BACKEND] [INFO] [THREAD {}] Successfully unloaded all the modules.",
-                std::thread::current().id().as_u64()
+                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully unloaded all the modules.",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
             );
             println!(
-                "[MAIN_BACKEND] [INFO] [THREAD {}] Now quitting...",
-                std::thread::current().id().as_u64()
+                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
             );
             std::process::exit(0);
         });
@@ -149,25 +173,33 @@ fn main() {
             MAIN_BACKEND_PANIC_FLAG.clone();
         MAIN_TOKIO_RUNTIME.block_on(async move {
             loop {
-                let guard_main_backend_panic_flag: tokio::sync::MutexGuard<'_, bool> =
-                    main_backend_panic_flag.lock().await;
+                let guard_main_backend_panic_flag: tokio::sync::MutexGuard<
+                    '_,
+                    bool
+                > = main_backend_panic_flag.lock().await;
                 if *guard_main_backend_panic_flag {
                     break;
                 }
             }
-            let guard_module_combinations: tokio::sync::MutexGuard<'_, Vec<ModuleCombination>> =
-                module_combinations.lock().await;
+            let guard_module_combinations: tokio::sync::MutexGuard<
+                '_,
+                Vec<ModuleCombination>
+            > = module_combinations.lock().await;
             for module in guard_module_combinations.iter() {
                 module.instance.on_unload(); // Unload each module.
             }
             drop(guard_module_combinations);
             println!(
-                "[MAIN_BACKEND] [INFO] [THREAD {}] Successfully unloaded all the modules.",
-                std::thread::current().id().as_u64()
+                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully unloaded all the modules.",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
             );
             println!(
-                "[MAIN_BACKEND] [INFO] [THREAD {}] Now quitting...",
-                std::thread::current().id().as_u64()
+                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
             );
             std::process::exit(0);
         });
@@ -190,14 +222,18 @@ async fn parse_module_config_json() -> ModuleConfigJson {
         Ok(file) => file,
         Err(e) => {
             eprintln!(
-                "[MAIN_BACKEND] [ERROR] [THREAD {}] Failed to open module_config_rs.json from `{}`. Maybe the file doesn't exist?",
+                "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open module_config_rs.json from `{}`. Maybe the file doesn't exist?",
                 std::thread::current().id().as_u64(),
+                file!(),
+                line!(),
                 module_config_json_file_path
             );
             eprintln!(
-                "[MAIN_BACKEND] [ERROR] [THREAD {}] {}",
+                "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] {}",
                 e,
-                std::thread::current().id().as_u64()
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
             );
             let main_backend_panic_flag: std::sync::Arc<tokio::sync::Mutex<bool>> =
                 MAIN_BACKEND_PANIC_FLAG.clone();
@@ -223,8 +259,10 @@ async fn load_modules(
     for (name, config) in &module_config_json.working_load {
         if config.enabled {
             println!(
-                "[MAIN_BACKEND] [INFO] [THREAD {}] Loading module {}...",
+                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Loading module {}...",
                 std::thread::current().id().as_u64(),
+                file!(),
+                line!(),
                 name
             );
 
@@ -241,8 +279,10 @@ async fn load_modules(
             match module {
                 Ok(module) => {
                     println!(
-                        "[MAIN_BACKEND] [INFO] [THREAD {}] Successfully loaded module `{}` from `{}`.",
+                        "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully loaded module `{}` from `{}`.",
                         std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
                         name,
                         &module_library_file_path
                     );
@@ -262,16 +302,20 @@ async fn load_modules(
                 }
                 Err(_) => {
                     eprintln!(
-                        "[MAIN_BACKEND] [ERROR] [THREAD {}] Failed to load module `{}` from `{}`. Maybe the module file doesn't exist or is not a valid shared object?",
+                        "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to load module `{}` from `{}`. Maybe the module file doesn't exist or is not a valid shared object?",
                         std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
                         name,
                         &module_library_file_path
                     );
 
                     if module_config_json.restricted_mode {
                         eprintln!(
-                            "[MAIN_BACKEND] [ERROR] [THREAD {}] Due to the restricted mode, the server backend now is shutting down.",
-                            std::thread::current().id().as_u64()
+                            "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Due to the restricted mode, the server backend now is shutting down.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!()
                         );
                         panic!();
                     }

@@ -4,7 +4,7 @@ cargo-features = ["profile-rustflags"]
 members = [
     "main_backend",
     "ws_server",
-    "./ws_server_applications/simple_ws_server_application",
+    "ws_server_applications/simple_ws_server_application", "ws_server_applications/chat_ws_server_application", "chat_server",
 ]
 resolver = "2"
 

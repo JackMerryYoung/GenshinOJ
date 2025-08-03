@@ -1,9 +1,9 @@
 #![feature(thread_id_value)]
-
 use std::io::Read;
 
 macro_rules! retry {
-    ($f:expr, $count:expr, $interval:expr, $retry_func: expr) => {{
+    ($f:expr, $count:expr, $interval:expr, $retry_func:expr) => {
+        {
         let mut retries = 0;
         let result = loop {
             let result = $f;
@@ -18,7 +18,8 @@ macro_rules! retry {
             }
         };
         result
-    }};
+        }
+    };
     ($f:expr) => {
         retry!($f, 2, 1000, {})
     };
@@ -41,9 +42,14 @@ struct WebsocketServerApplicationsConfigJson {
 
 type AsyncModifiable<T> = std::sync::Arc<tokio::sync::Mutex<T>>;
 
+fn new_async_modifiable<T>(x: T) -> AsyncModifiable<T> {
+    std::sync::Arc::new(tokio::sync::Mutex::new(x))
+}
+
 pub struct ModuleStatus {
     initialized: bool,
     panicked: bool,
+    socket_port: AsyncModifiable<u16>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -56,6 +62,9 @@ static WS_SERVER_APPLICATIONS_LIBRARIES: std::sync::LazyLock<
     tokio::sync::Mutex<Vec<(dlopen2::symbor::Library, tokio::runtime::Runtime)>>,
 > = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(vec![]));
 
+static WS_SERVER_SOCKET: std::sync::OnceLock<AsyncModifiable<tokio::net::TcpListener>> =
+    std::sync::OnceLock::new();
+
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_init(
     rt: &'static tokio::runtime::Runtime,
@@ -67,60 +76,137 @@ pub extern "Rust" fn on_init(
     let ws_server_status: ModuleStatus = ModuleStatus {
         initialized: false,
         panicked: false,
+        socket_port: new_async_modifiable(0),
     };
-    let ws_server_status: AsyncModifiable<ModuleStatus> =
-        std::sync::Arc::new(tokio::sync::Mutex::new(ws_server_status));
+    let ws_server_status: AsyncModifiable<ModuleStatus> = new_async_modifiable(ws_server_status);
     {
         let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
+            let guard_ws_server_status: tokio::sync::MutexGuard<
+                '_,
+                ModuleStatus
+            > = ws_server_status.lock().await;
+            let mut ws_server_socket_port: u16 = 9000;
+            let mut guard_ws_server_status_socket_port: tokio::sync::MutexGuard<
+                '_,
+                u16
+            > = guard_ws_server_status.socket_port.lock().await;
+            let ws_server_socket: tokio::net::TcpListener;
+            (ws_server_socket, *guard_ws_server_status_socket_port) = loop {
+                let ws_server_socket_result: Result<
+                    tokio::net::TcpListener,
+                    std::io::Error
+                > = tokio::net::TcpListener::bind(
+                    format!("localhost:{}", &ws_server_socket_port)
+                ).await;
+                if let Ok(x) = ws_server_socket_result {
+                    println!(
+                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket (port: {}).",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
+                        ws_server_socket_port
+                    );
+                    break (x, ws_server_socket_port);
+                } else {
+                    eprintln!(
+                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket. Retrying...",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
+                    );
+                }
+                if ws_server_socket_port == u16::MAX {
+                    eprintln!(
+                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
+                    );
+                    panic!();
+                }
+                ws_server_socket_port += 1;
+            };
+            drop(guard_ws_server_status_socket_port);
+            drop(guard_ws_server_status);
+            WS_SERVER_SOCKET.set(new_async_modifiable(ws_server_socket)).unwrap();
             println!(
-                "[WS_SERVER] [INFO] [THREAD {}] Initializing the Websocket server...",
-                std::thread::current().id().as_u64()
+                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initializing the Websocket server...",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
             );
-            let ws_server_app: axum::Router = axum::Router::new()
-                .route("/", axum::routing::get(|| async { "Rust Backend Test" }))
-                .merge(axum::Router::new().route("/ws", axum::routing::get(ws_handler)).layer(tower::ServiceBuilder::new().layer(axum_client_ip::ClientIpSource::ConnectInfo.into_extension()).layer(axum::middleware::from_fn(ip_handler))));
+            let ws_server_app: axum::Router = axum::Router
+                ::new()
+                .route(
+                    "/",
+                    axum::routing::get(|| async { "Rust Backend Test" })
+                )
+                .merge(
+                    axum::Router
+                        ::new()
+                        .route("/ws", axum::routing::get(ws_handler))
+                        .layer(
+                            tower::ServiceBuilder
+                                ::new()
+                                .layer(axum_client_ip::ClientIpSource::ConnectInfo.into_extension())
+                                .layer(axum::middleware::from_fn(ip_handler))
+                        )
+                );
             let listener: Result<tokio::net::TcpListener, std::io::Error> = retry!(
                 tokio::net::TcpListener::bind("0.0.0.0:9983").await,
                 2,
                 1000,
                 {
                     eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] Failed to initialize the Websocket server. Retrying...",
-                        std::thread::current().id().as_u64()
+                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to initialize the Websocket server. Retrying...",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
                     );
                 }
             );
             let listener: tokio::net::TcpListener = match listener {
                 Ok(listener) => {
                     println!(
-                        "[WS_SERVER] [INFO] [THREAD {}] Initialized the Websocket server.",
-                        std::thread::current().id().as_u64()
+                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the Websocket server.",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
                     );
 
-                    let mut guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
-                    ws_server_status.lock().await;
+                    let mut guard_ws_server_status: tokio::sync::MutexGuard<
+                        '_,
+                        ModuleStatus
+                    > = ws_server_status.lock().await;
                     guard_ws_server_status.initialized = true;
                     drop(guard_ws_server_status);
                     listener
                 }
                 Err(_) => {
                     eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] Exceeded maximum retry times. Now quitting...",
-                        std::thread::current().id().as_u64()
+                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting...",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
                     );
 
                     on_unload();
-                    let mut guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
-                    ws_server_status.lock().await;
+                    let mut guard_ws_server_status: tokio::sync::MutexGuard<
+                        '_,
+                        ModuleStatus
+                    > = ws_server_status.lock().await;
                     guard_ws_server_status.panicked = true;
                     drop(guard_ws_server_status); // Avoiding poisoned mutex lock
                     panic!();
                 }
             };
-            axum::serve(listener, ws_server_app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap();
+            axum::serve(
+                listener,
+                ws_server_app.into_make_service_with_connect_info::<std::net::SocketAddr>()
+            ).await.unwrap();
         });
-    };
+    }
 
     let ws_server_applications_config_json: WebsocketServerApplicationsConfigJson =
         parse_ws_server_applications_config_json();
@@ -150,7 +236,7 @@ pub extern "Rust" fn on_init(
             {
                 drop(guard_ws_server_applications_libraries);
                 panic!();
-            };
+            }
 
             drop(guard_ws_server_applications_libraries);
             fake_yield_now().await;
@@ -160,30 +246,52 @@ pub extern "Rust" fn on_init(
     {
         let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
-            loop {
-                let guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
-                    ws_server_status.lock().await;
-                if guard_ws_server_status.panicked {
-                    drop(guard_ws_server_status);
-                    break;
-                }
-                drop(guard_ws_server_status);
-                fake_yield_now().await;
-            }
+            self_management(ws_server_status).await;
         });
     }
     (ws_server_runtime, ws_server_status)
 }
 
+async fn self_management(ws_server_status: AsyncModifiable<ModuleStatus>) {
+    let mut monitor: usize = 0;
+    loop {
+        if let Ok(guard_ws_server_status) = ws_server_status.try_lock() {
+            if guard_ws_server_status.panicked {
+                drop(guard_ws_server_status);
+                break;
+            }
+            drop(guard_ws_server_status);
+            fake_yield_now().await;
+            monitor += 1;
+            if monitor == 600 {
+                // 1 minute
+                println!(
+                    "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: well.",
+                    std::thread::current().id().as_u64(),
+                    file!(),
+                    line!()
+                );
+                monitor = 0;
+            }
+        }
+    }
+
+    panic!();
+}
+
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_unload() {
     println!(
-        "[WS_SERVER] [INFO] [THREAD {}] Unloading the Websocket server...",
-        std::thread::current().id().as_u64()
+        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the Websocket server...",
+        std::thread::current().id().as_u64(),
+        file!(),
+        line!()
     );
     println!(
-        "[WS_SERVER] [INFO] [THREAD {}] Unloaded the Websocket server.",
-        std::thread::current().id().as_u64()
+        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the Websocket server.",
+        std::thread::current().id().as_u64(),
+        file!(),
+        line!()
     );
 }
 
@@ -193,8 +301,10 @@ async fn ip_handler(
     next: axum::middleware::Next,
 ) -> axum::response::Response {
     println!(
-        "[WS_SERVER] [INFO] [THREAD {}] Connection from `{}` established.",
+        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Connection from `{}` established.",
         std::thread::current().id().as_u64(),
+        file!(),
+        line!(),
         ip_addr
     );
     next.run(request).await
@@ -206,8 +316,10 @@ async fn ws_handler(ws_upgrade: axum::extract::ws::WebSocketUpgrade) -> axum::re
 
 async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
     println!(
-        "[WS_SERVER] [INFO] [THREAD {}] Websocket connection established.",
-        std::thread::current().id().as_u64()
+        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Websocket connection established.",
+        std::thread::current().id().as_u64(),
+        file!(),
+        line!()
     );
 
     let ws_id: uuid::Uuid = uuid::Uuid::new_v4();
@@ -240,16 +352,18 @@ async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
                                         &library.1,
                                         (&mut ws, &ws_id),
                                         taken_json_msg_content.clone(),
-                                    )
-                                };
+                                    );
+                                }
                             };
                         }
                     };
                 }
                 axum::extract::ws::Message::Close(_) => {
                     println!(
-                        "[WS_SERVER] [INFO] [THREAD {}] Websocket connection closed.",
+                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Websocket connection closed.",
                         std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
                     );
                     let guard_ws_server_applications_libraries: tokio::sync::MutexGuard<
                         '_,
@@ -260,11 +374,13 @@ async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
                             library.0.symbol::<unsafe extern "Rust" fn(
                                 &tokio::runtime::Runtime,
                                 (&mut axum::extract::ws::WebSocket, &uuid::Uuid),
-                            ) -> ()>(
-                                &(String::from("on_close_connection"))
-                            )
+                            ) -> ()>(&String::from(
+                                "on_close_connection",
+                            ))
                         } {
-                            unsafe { callback_function(&library.1, (&mut ws, &ws_id)) };
+                            unsafe {
+                                callback_function(&library.1, (&mut ws, &ws_id));
+                            }
                         };
                     }
                 }
@@ -284,14 +400,18 @@ fn parse_ws_server_applications_config_json() -> WebsocketServerApplicationsConf
         Ok(file) => file,
         Err(e) => {
             eprintln!(
-                "[WS_SERVER] [ERROR] [THREAD {}] Failed to open ws_server_config_rs.json from `{}`. Maybe the file doesn't exist?",
+                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open ws_server_config_rs.json from `{}`. Maybe the file doesn't exist?",
                 std::thread::current().id().as_u64(),
+                file!(),
+                line!(),
                 ws_server_applications_config_json_file_path
             );
             eprintln!(
-                "[WS_SERVER] [ERROR] [THREAD {}] {}",
-                e,
-                std::thread::current().id().as_u64()
+                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] {}",
+                file!(),
+                line!(),
+                std::thread::current().id().as_u64(),
+                e
             );
             panic!();
         }
@@ -318,8 +438,10 @@ fn load_ws_server_applications(
     for (name, config) in &ws_server_applications_config_json.ws_server_applications {
         if config.enabled {
             println!(
-                "[WS_SERVER] [INFO] [THREAD {}] Loading websocket server application {}...",
+                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Loading websocket server application {}...",
                 std::thread::current().id().as_u64(),
+                file!(),
+                line!(),
                 name
             );
             let ws_server_application_library_file_path: String = get_parent_path()
@@ -332,17 +454,20 @@ fn load_ws_server_applications(
             match ws_server_application_library {
                 Ok(ws_server_application_library) => {
                     println!(
-                        "[WS_SERVER] [INFO] [THREAD {}] Successfully loaded websocket server application `{}` from `{}`.",
+                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully loaded websocket server application `{}` from `{}`.",
                         std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
                         name,
                         &ws_server_application_library_file_path
                     );
 
                     if let Ok(callback) = unsafe {
-                        ws_server_application_library
-                            .symbol::<unsafe extern "Rust" fn(
-                            &tokio::runtime::Runtime,
-                        ) -> tokio::runtime::Runtime>("on_init")
+                        ws_server_application_library.symbol::<
+                                unsafe extern "Rust" fn(
+                                    &tokio::runtime::Runtime
+                                ) -> tokio::runtime::Runtime
+                            >("on_init")
                     } {
                         let ws_server_application_library_runtime: tokio::runtime::Runtime =
                             unsafe { callback(rt) };
@@ -354,16 +479,20 @@ fn load_ws_server_applications(
                 }
                 Err(e) => {
                     eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] Failed to load websocket server application `{}` from `{}`. Maybe the websocket server application file doesn't exist or is not a valid shared object?",
+                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to load websocket server application `{}` from `{}`. Maybe the websocket server application file doesn't exist or is not a valid shared object?",
                         std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
                         name,
                         &ws_server_application_library_file_path
                     );
 
                     if ws_server_applications_config_json.restricted_mode {
                         eprintln!(
-                            "[WS_SERVER] [ERROR] [THREAD {}] Due to the restricted mode, the websocket server now is shutting down.",
-                            std::thread::current().id().as_u64()
+                            "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Due to the restricted mode, the websocket server now is shutting down.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!()
                         );
                         return Err(e);
                     }
@@ -375,7 +504,7 @@ fn load_ws_server_applications(
     Ok(())
 }
 
-const FAKE_YIELD_NOW_MILLISECONDS: u64 = 1;
+const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
 
 async fn fake_yield_now() {
     tokio::time::sleep(tokio::time::Duration::from_millis(

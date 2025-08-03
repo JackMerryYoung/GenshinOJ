@@ -185,6 +185,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
 
 [[package]]
+name = "chat_server"
+version = "0.1.0"
+
+[[package]]
+name = "chat_ws_server_application"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "futures-core",
+ "futures-sink",
+ "futures-util",
+ "rand 0.9.1",
+ "rust-crypto",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "client-ip"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
