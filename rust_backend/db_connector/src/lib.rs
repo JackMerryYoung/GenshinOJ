@@ -15,18 +15,18 @@ pub struct ModuleStatus {
 pub extern "Rust" fn on_init(
     rt: &'static tokio::runtime::Runtime,
 ) -> (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>) {
-    let chat_server_runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
+    let db_connector_runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
-    let chat_server_status: ModuleStatus = ModuleStatus {
+    let db_connector_status: ModuleStatus = ModuleStatus {
         initialized: true,
         panicked: false,
         socket_port: new_async_modifiable(0),
     };
-    let chat_server_status: AsyncModifiable<ModuleStatus> =
-        new_async_modifiable(chat_server_status);
-    (chat_server_runtime, chat_server_status)
+    let db_connector_status: AsyncModifiable<ModuleStatus> =
+        new_async_modifiable(db_connector_status);
+    (db_connector_runtime, db_connector_status)
 }
 
 #[unsafe(no_mangle)]

@@ -1,6 +1,8 @@
 #![feature(thread_id_value)]
 use std::io::Read;
 
+use tokio::io::AsyncReadExt;
+
 macro_rules! retry {
     ($f:expr, $count:expr, $interval:expr, $retry_func:expr) => {
         {
@@ -65,6 +67,15 @@ static WS_SERVER_APPLICATIONS_LIBRARIES: std::sync::LazyLock<
 static WS_SERVER_SOCKET: std::sync::OnceLock<AsyncModifiable<tokio::net::TcpListener>> =
     std::sync::OnceLock::new();
 
+static WS_SERVER_CONNECTIONS_CNT: std::sync::LazyLock<tokio::sync::Mutex<usize>> =
+    std::sync::LazyLock::new(|| tokio::sync::Mutex::new(0));
+
+static WS_SERVER_CONNECTIONS_BY_WS_ID: std::sync::LazyLock<
+    tokio::sync::Mutex<
+        std::collections::HashMap<String, AsyncModifiable<axum::extract::ws::WebSocket>>,
+    >,
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_init(
     rt: &'static tokio::runtime::Runtime,
@@ -79,13 +90,15 @@ pub extern "Rust" fn on_init(
         socket_port: new_async_modifiable(0),
     };
     let ws_server_status: AsyncModifiable<ModuleStatus> = new_async_modifiable(ws_server_status);
+    // Initialization
     {
         let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
             let guard_ws_server_status: tokio::sync::MutexGuard<
                 '_,
                 ModuleStatus
-            > = ws_server_status.lock().await;
+            > = ws_server_status.lock().await; // Get the status of the server.
+            // Try to establish a socket for messaging.
             let mut ws_server_socket_port: u16 = 9000;
             let mut guard_ws_server_status_socket_port: tokio::sync::MutexGuard<
                 '_,
@@ -101,7 +114,7 @@ pub extern "Rust" fn on_init(
                 ).await;
                 if let Ok(x) = ws_server_socket_result {
                     println!(
-                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket (port: {}).",
+                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!(),
@@ -110,10 +123,11 @@ pub extern "Rust" fn on_init(
                     break (x, ws_server_socket_port);
                 } else {
                     eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket. Retrying...",
+                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
                         std::thread::current().id().as_u64(),
                         file!(),
-                        line!()
+                        line!(),
+                        ws_server_socket_port
                     );
                 }
                 if ws_server_socket_port == u16::MAX {
@@ -197,7 +211,7 @@ pub extern "Rust" fn on_init(
                         ModuleStatus
                     > = ws_server_status.lock().await;
                     guard_ws_server_status.panicked = true;
-                    drop(guard_ws_server_status); // Avoiding poisoned mutex lock
+                    drop(guard_ws_server_status); // Avoid poisoning the mutex lock.
                     panic!();
                 }
             };
@@ -214,6 +228,7 @@ pub extern "Rust" fn on_init(
         let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
             loop {
+                // Waiting for the initialization to be completed.
                 let guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
                     ws_server_status.lock().await;
                 if guard_ws_server_status.initialized {
@@ -223,6 +238,7 @@ pub extern "Rust" fn on_init(
                 drop(guard_ws_server_status);
                 fake_yield_now().await;
             }
+            // Now load the applications.
             let mut guard_ws_server_applications_libraries: tokio::sync::MutexGuard<
                 '_,
                 Vec<(dlopen2::symbor::Library, tokio::runtime::Runtime)>,
@@ -246,37 +262,127 @@ pub extern "Rust" fn on_init(
     {
         let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
-            self_management(ws_server_status).await;
+            loop {
+                // Waiting for the initialization to be completed.
+                let guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
+                    ws_server_status.lock().await;
+                if guard_ws_server_status.initialized {
+                    drop(guard_ws_server_status);
+                    break;
+                }
+                drop(guard_ws_server_status);
+                fake_yield_now().await;
+            }
+            // Now processing socket message
+            socket_message_processing().await;
         });
+    }
+
+    {
+        let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
+        ws_server_runtime.spawn(self_management(ws_server_status));
     }
     (ws_server_runtime, ws_server_status)
 }
 
-async fn self_management(ws_server_status: AsyncModifiable<ModuleStatus>) {
-    let mut monitor: usize = 0;
+#[derive(serde::Deserialize, serde::Serialize)]
+struct SocketJsonMessage {
+    r#type: String,
+    content: serde_json::Value,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct SocketJsonMessageContentOnSendMsg {
+    ws_id: String,
+    json_msg: serde_json::Value,
+}
+
+async fn socket_message_processing() {
+    let guard_ws_server_socket: tokio::sync::MutexGuard<'_, tokio::net::TcpListener> =
+        WS_SERVER_SOCKET.get().unwrap().lock().await;
     loop {
-        if let Ok(guard_ws_server_status) = ws_server_status.try_lock() {
-            if guard_ws_server_status.panicked {
-                drop(guard_ws_server_status);
-                break;
-            }
-            drop(guard_ws_server_status);
-            fake_yield_now().await;
-            monitor += 1;
-            if monitor == 600 {
-                // 1 minute
+        let (mut client, _) = guard_ws_server_socket.accept().await.unwrap();
+        tokio::spawn(async move {
+            client.readable().await.unwrap();
+            let buf: &mut [u8] = &mut [0; 1024];
+            client.read_exact(buf).await.unwrap();
+            if let Ok(msg) = serde_json::from_slice::<SocketJsonMessage>(buf)
+                && msg.r#type == "on_send_msg"
+                && let Ok(content) =
+                    serde_json::from_value::<SocketJsonMessageContentOnSendMsg>(msg.content)
+            {
+                let guard_ws_server_connections_by_ws_id: tokio::sync::MutexGuard<
+                    '_,
+                    std::collections::HashMap<
+                        String,
+                        std::sync::Arc<tokio::sync::Mutex<axum::extract::ws::WebSocket>>,
+                    >,
+                > = WS_SERVER_CONNECTIONS_BY_WS_ID.lock().await;
+                let ws: &std::sync::Arc<tokio::sync::Mutex<axum::extract::ws::WebSocket>> =
+                    guard_ws_server_connections_by_ws_id
+                        .get(content.ws_id.as_str())
+                        .unwrap();
+                let mut guard_ws: tokio::sync::MutexGuard<'_, axum::extract::ws::WebSocket> =
+                    ws.lock().await;
+                if guard_ws
+                    .send(axum::extract::ws::Message::from(
+                        serde_json::to_string(&content.json_msg).unwrap(),
+                    ))
+                    .await
+                    .is_err()
+                {
+                    eprintln!(
+                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to send JSON Message.",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
+                    );
+                }
+                drop(guard_ws);
+                drop(guard_ws_server_connections_by_ws_id);
+            } else {
                 println!(
-                    "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: well.",
+                    "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
                     std::thread::current().id().as_u64(),
                     file!(),
                     line!()
                 );
-                monitor = 0;
             }
+        });
+    }
+}
+
+async fn self_management(ws_server_status: AsyncModifiable<ModuleStatus>) {
+    let mut monitor_time_cnt: usize = 0;
+    loop {
+        if let Ok(guard_ws_server_status) = ws_server_status.try_lock() {
+            if guard_ws_server_status.panicked {
+                drop(guard_ws_server_status); // Avoid poisoning the mutex lock.
+                panic!();
+            } else if guard_ws_server_status.initialized && WS_SERVER_SOCKET.get().is_none() {
+                drop(guard_ws_server_status); // Avoid poisoning the mutex lock.
+                panic!();
+            }
+            drop(guard_ws_server_status);
+            monitor_time_cnt += 1;
+            if monitor_time_cnt == 600 {
+                // Show monitoring message per minute.
+                let guard_ws_server_connections_cnt: tokio::sync::MutexGuard<'_, usize> =
+                    WS_SERVER_CONNECTIONS_CNT.lock().await;
+                println!(
+                    "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well with {} connections in total.",
+                    std::thread::current().id().as_u64(),
+                    file!(),
+                    line!(),
+                    *guard_ws_server_connections_cnt
+                );
+                monitor_time_cnt = 0;
+            }
+            fake_yield_now().await;
+        } else {
+            fake_yield_now().await;
         }
     }
-
-    panic!();
 }
 
 #[unsafe(no_mangle)]
@@ -322,6 +428,11 @@ async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
         line!()
     );
 
+    let mut guard_ws_server_connections_cnt: tokio::sync::MutexGuard<'_, usize> =
+        WS_SERVER_CONNECTIONS_CNT.lock().await;
+    *guard_ws_server_connections_cnt += 1;
+    drop(guard_ws_server_connections_cnt);
+
     let ws_id: uuid::Uuid = uuid::Uuid::new_v4();
     while let Some(original_msg) = ws.recv().await {
         if let Ok(original_msg) = original_msg {
@@ -365,6 +476,10 @@ async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
                         file!(),
                         line!()
                     );
+                    let mut guard_ws_server_connections_cnt: tokio::sync::MutexGuard<'_, usize> =
+                        WS_SERVER_CONNECTIONS_CNT.lock().await;
+                    *guard_ws_server_connections_cnt -= 1;
+                    drop(guard_ws_server_connections_cnt);
                     let guard_ws_server_applications_libraries: tokio::sync::MutexGuard<
                         '_,
                         Vec<(dlopen2::symbor::Library, tokio::runtime::Runtime)>,

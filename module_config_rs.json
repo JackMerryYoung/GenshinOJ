@@ -4,22 +4,25 @@
         "db_connector": {
             "name": "Database Connector",
             "id": "db_connector",
-            "enabled": false,
+            "protocol": "std_db_connector@0.1.0",
+            "enabled": true,
             "dependencies": [],
             "unload_timeout": 0
         },
         "ws_server": {
             "name": "Websocket Server",
             "id": "ws_server",
+            "protocol": "std_ws_server@0.1.0",
             "enabled": true,
             "dependencies": [
-                "db_connector"
+                "std_db_connector@0.1.0"
             ],
             "unload_timeout": 0
         },
         "compilers_manager": {
             "name": "Compilers Manager",
             "id": "compilers_manager",
+            "protocol": "std_compilers_manager@0.1.0",
             "enabled": false,
             "dependencies": [],
             "unload_timeout": 0
@@ -27,28 +30,31 @@
         "judge": {
             "name": "Judge",
             "id": "judge",
+            "protocol": "std_judge@0.1.0",
             "enabled": false,
             "dependencies": [
-                "ws_server",
-                "compilers_manager"
+                "std_ws_server@0.1.0",
+                "std_compilers_manager@0.1.0"
             ],
             "unload_timeout": 0
         },
         "chat_server": {
             "name": "Chat Server",
             "id": "chat_server",
-            "enabled": false,
+            "protocol": "std_chat_server@0.1.0",
+            "enabled": true,
             "dependencies": [
-                "ws_server"
+                "std_ws_server@0.1.0"
             ],
             "unload_timeout": 0
         },
         "music_player_server": {
             "name": "Music Player Server",
             "id": "music_player_server",
+            "protocol": "music_player_server@0.1.0",
             "enabled": false,
             "dependencies": [
-                "ws_server"
+                "std_ws_server@0.1.0"
             ],
             "unload_timeout": 0
         }
