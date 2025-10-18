@@ -9,7 +9,7 @@ import useWebSocket from "react-use-websocket";
 
 import { nanoid } from "nanoid";
 
-const NavBar = lazy(() => import("./NavBar.tsx"));
+import NavBar from "./NavBar.tsx";
 
 import { RootState } from "../store.ts";
 import { logoutReducer } from "../../redux/loginStatusSlice.ts";
@@ -108,4 +108,5 @@ export default function Root() {
             <Footer />
         </FluentProvider>
     );
+
 }
