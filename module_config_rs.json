@@ -1,6 +1,14 @@
 {
     "restricted_mode": true,
     "working_load": {
+        "simple_authenticator": {
+            "name": "Simple Authenticator",
+            "id": "simple_authenticator",
+            "protocol": "std_authenticator@0.1.0",
+            "enabled": true,
+            "dependencies": [],
+            "unload_timeout": 0
+        },
         "db_connector": {
             "name": "Database Connector",
             "id": "db_connector",
@@ -15,7 +23,8 @@
             "protocol": "std_ws_server@0.1.0",
             "enabled": true,
             "dependencies": [
-                "std_db_connector@0.1.0"
+                "std_db_connector@0.1.0",
+                "std_authenticator@0.1.0"
             ],
             "unload_timeout": 0
         },

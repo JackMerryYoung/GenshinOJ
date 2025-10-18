@@ -13,7 +13,10 @@ pub struct ModuleStatus {
 
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_init(
-    rt: &'static tokio::runtime::Runtime,
+    _rt: &'static tokio::runtime::Runtime,
+    global_module_statuses_by_protocol: AsyncModifiable<
+        std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
+    >,
 ) -> (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>) {
     let db_connector_runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -32,15 +35,22 @@ pub extern "Rust" fn on_init(
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_unload() {
     println!(
-        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the database connector...",
-        std::thread::current().id().as_u64(),
-        file!(),
-        line!()
+        "{}", ansi_term::Color::Blue.paint(
+            format!(
+                "[DB_CONNECTOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the database connector...",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
+            )
+        )
     );
     println!(
-        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the database connector.",
-        std::thread::current().id().as_u64(),
-        file!(),
-        line!()
+        "{}",
+        ansi_term::Color::Blue.paint(format!(
+            "[DB_CONNECTOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the database connector.",
+            std::thread::current().id().as_u64(),
+            file!(),
+            line!()
+        ))
     );
 }

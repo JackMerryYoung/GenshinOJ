@@ -33,6 +33,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "ansi_term"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -171,9 +180,9 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
 name = "cc"
-version = "1.2.30"
+version = "1.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "deec109607ca693028562ed836a5f1c4b8bd77755c4e132fc5ce11b0b6211ae7"
+checksum = "2352e5597e9c544d5e6d9c95190d5d27738ade584fa8db0a16e130e5c2b5296e"
 dependencies = [
  "shlex",
 ]
@@ -189,6 +198,7 @@ name = "chat_server"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "bytes",
  "dlopen2",
  "serde",
  "serde_json",
@@ -200,6 +210,7 @@ dependencies = [
 name = "chat_ws_server_application"
 version = "0.1.0"
 dependencies = [
+ "ansi_term",
  "axum",
  "bytes",
  "futures-core",
@@ -311,6 +322,7 @@ checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 name = "db_connector"
 version = "0.1.0"
 dependencies = [
+ "ansi_term",
  "axum",
  "dlopen2",
  "serde",
@@ -502,9 +514,9 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
 name = "hashbrown"
-version = "0.15.4"
+version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5971ac85611da7067dbfcabef3c70ebb5606018acd9e2a3903a0da507521e0d5"
+checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
  "allocator-api2",
  "equivalent",
@@ -809,6 +821,7 @@ dependencies = [
 name = "main_backend"
 version = "0.1.0"
 dependencies = [
+ "ansi_term",
  "dlopen2",
  "dyn-clone",
  "once_cell",
@@ -903,9 +916,9 @@ dependencies = [
 
 [[package]]
 name = "mysql_common"
-version = "0.35.4"
+version = "0.35.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e0ec195e788c95f36b7cf88127d538465fc2f7773e6e47af01834738eab0aee"
+checksum = "fbb9f371618ce723f095c61fbcdc36e8936956d2b62832f9c7648689b338e052"
 dependencies = [
  "base64",
  "bitflags",
@@ -1365,17 +1378,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "simple_ws_server_application"
+name = "simple_authenticator"
 version = "0.1.0"
 dependencies = [
+ "ansi_term",
+ "axum",
+ "bytes",
+ "dlopen2",
+ "mysql_async",
+ "rand 0.9.1",
+ "rust-crypto",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "simple_authenticator_application"
+version = "0.1.0"
+dependencies = [
+ "ansi_term",
  "axum",
  "bytes",
  "dlopen2",
  "futures-core",
  "futures-sink",
  "futures-util",
- "mysql_async",
- "rand 0.9.1",
  "retry",
  "rust-crypto",
  "serde",
@@ -1542,9 +1571,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.15"
+version = "0.7.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66a539a9ad6d5d281510d5bd368c973d636c02dbf8a67300bfb6b950696ad7df"
+checksum = "14307c986784f72ef81c89db7d9e28d6ac26d16213b109ea501696195e6e3ce5"
 dependencies = [
  "bytes",
  "futures-core",
@@ -1931,6 +1960,7 @@ checksum = "ea2f10b9bb0928dfb1b42b65e1f9e36f7f54dbdf08457afefb38afcdec4fa2bb"
 name = "ws_server"
 version = "0.1.0"
 dependencies = [
+ "ansi_term",
  "axum",
  "axum-client-ip",
  "bytes",
@@ -2025,9 +2055,9 @@ dependencies = [
 
 [[package]]
 name = "zerovec"
-version = "0.11.2"
+version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a05eb080e015ba39cc9e23bbe5e7fb04d5fb040350f99f34e338d5fdd294428"
+checksum = "e7aa2bd55086f1ab526693ecbe444205da57e25f4489879da80635a46d90e73b"
 dependencies = [
  "yoke",
  "zerofrom",

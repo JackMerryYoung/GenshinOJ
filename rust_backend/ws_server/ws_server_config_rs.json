@@ -1,9 +1,10 @@
 {
     "restricted_mode": true,
     "ws_server_applications": {
-        "simple_ws_server_application": {
-            "name": "Simple Websocket Server Application",
-            "id": "simple_ws_server_application",
+        "simple_authenticator_application": {
+            "name": "Simple Authenticator Application",
+            "id": "simple_authenticator_application",
+            "protocol": "std_authenticator@0.1.0",
             "enabled": true,
             "dependencies": [],
             "unload_timeout": 0
@@ -11,8 +12,11 @@
         "chat_ws_server_application": {
             "name": "Chat Websocket Server Application",
             "id": "chat_ws_server_application",
+            "protocol": "std_chat_server@0.1.0",
             "enabled": true,
-            "dependencies": [],
+            "dependencies": [
+                "std_authenticator@0.1.0"
+            ],
             "unload_timeout": 0
         }
     }

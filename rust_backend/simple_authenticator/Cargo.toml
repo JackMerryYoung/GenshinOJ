@@ -1,24 +1,20 @@
 [package]
-name = "simple_ws_server_application"
+name = "simple_authenticator"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-rand = "0.9.1"
-rust-crypto = "0.2.36"
 axum = { version = "0.8.4", features = ["ws"] }
 tokio = { version = "1.39.2", features = ["full"] }
-tracing = "0.1.37"
-futures-core = "0.3.31"
-futures-sink = "0.3.31"
-bytes = "1.10.1"
-futures-util = "0.3.31"
 dlopen2 = "0.8.0"
-retry = "2.1.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
-mysql_async = "0.36.1"
 uuid = { version = "1.17.0", features = ["v4"] }
+ansi_term = "0.12"
+bytes = "1.10.1"
+mysql_async = "0.36.1"
+rand = "0.9.1"
+rust-crypto = "0.2.36"
 
 [lib]
 crate-type = ["dylib"]

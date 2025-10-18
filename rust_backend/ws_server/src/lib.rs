@@ -48,11 +48,16 @@ fn new_async_modifiable<T>(x: T) -> AsyncModifiable<T> {
     std::sync::Arc::new(tokio::sync::Mutex::new(x))
 }
 
+#[derive(Debug)]
 pub struct ModuleStatus {
     initialized: bool,
     panicked: bool,
     socket_port: AsyncModifiable<u16>,
 }
+
+static GLOBAL_MODULE_STATUSES_BY_PROTOCOL: std::sync::OnceLock<
+    AsyncModifiable<std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>>,
+> = std::sync::OnceLock::new();
 
 #[derive(serde::Deserialize, serde::Serialize)]
 struct WebsocketServerJsonMessage {
@@ -79,10 +84,16 @@ static WS_SERVER_CONNECTIONS_BY_WS_ID: std::sync::LazyLock<
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_init(
     rt: &'static tokio::runtime::Runtime,
+    global_module_statuses_by_protocol: AsyncModifiable<
+        std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
+    >,
 ) -> (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>) {
     let ws_server_runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
+        .unwrap();
+    GLOBAL_MODULE_STATUSES_BY_PROTOCOL
+        .set(global_module_statuses_by_protocol.clone())
         .unwrap();
     let ws_server_status: ModuleStatus = ModuleStatus {
         initialized: false,
@@ -122,8 +133,8 @@ pub extern "Rust" fn on_init(
                     );
                     break (x, ws_server_socket_port);
                 } else {
-                    eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
+                    println!(
+                        "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!(),
@@ -246,6 +257,7 @@ pub extern "Rust" fn on_init(
             if load_ws_server_applications(
                 rt,
                 &mut guard_ws_server_applications_libraries,
+                global_module_statuses_by_protocol,
                 &ws_server_applications_config_json,
             )
             .is_err()
@@ -285,10 +297,52 @@ pub extern "Rust" fn on_init(
     (ws_server_runtime, ws_server_status)
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+async fn get_socket_port_by_protocol(protocol: &String) -> u16 {
+    let guard_global_module_statuses_by_protocol: tokio::sync::MutexGuard<
+        '_,
+        std::collections::HashMap<String, std::sync::Arc<tokio::sync::Mutex<ModuleStatus>>>,
+    > = GLOBAL_MODULE_STATUSES_BY_PROTOCOL
+        .get()
+        .unwrap()
+        .lock()
+        .await;
+    let guard_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
+        guard_global_module_statuses_by_protocol
+            .get(protocol)
+            .unwrap()
+            .lock()
+            .await;
+    *(guard_status.socket_port.lock().await)
+}
+
+async fn get_socket_by_protocol(protocol: &String) -> tokio::net::TcpStream {
+    let socket_port: u16 = get_socket_port_by_protocol(protocol).await;
+    match tokio::net::TcpStream::connect(format!("localhost:{socket_port}")).await {
+        Ok(socket) => socket,
+        Err(_) => {
+            eprintln!(
+                "{}", ansi_term::Color::Red.paint(
+                    format!(
+                        "[WS_SERVER::CHAT_WS_SERVER_APPLICATION] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to connect to the socket of the module implemented protocol `{}` on port {}.",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
+                        protocol,
+                        socket_port
+                    )
+                )
+            );
+            panic!();
+        }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug)]
 struct SocketJsonMessage {
     r#type: String,
     content: serde_json::Value,
+    request_key: String,
+    from_protocol: String,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -303,43 +357,52 @@ async fn socket_message_processing() {
     loop {
         let (mut client, _) = guard_ws_server_socket.accept().await.unwrap();
         tokio::spawn(async move {
-            client.readable().await.unwrap();
-            let buf: &mut [u8] = &mut [0; 1024];
-            client.read_exact(buf).await.unwrap();
-            if let Ok(msg) = serde_json::from_slice::<SocketJsonMessage>(buf)
-                && msg.r#type == "on_send_msg"
-                && let Ok(content) =
-                    serde_json::from_value::<SocketJsonMessageContentOnSendMsg>(msg.content)
-            {
-                let guard_ws_server_connections_by_ws_id: tokio::sync::MutexGuard<
-                    '_,
-                    std::collections::HashMap<
-                        String,
-                        std::sync::Arc<tokio::sync::Mutex<axum::extract::ws::WebSocket>>,
-                    >,
-                > = WS_SERVER_CONNECTIONS_BY_WS_ID.lock().await;
-                let ws: &std::sync::Arc<tokio::sync::Mutex<axum::extract::ws::WebSocket>> =
-                    guard_ws_server_connections_by_ws_id
-                        .get(content.ws_id.as_str())
-                        .unwrap();
-                let mut guard_ws: tokio::sync::MutexGuard<'_, axum::extract::ws::WebSocket> =
-                    ws.lock().await;
-                if guard_ws
-                    .send(axum::extract::ws::Message::from(
-                        serde_json::to_string(&content.json_msg).unwrap(),
-                    ))
-                    .await
-                    .is_err()
+            let mut buf: bytes::BytesMut = bytes::BytesMut::with_capacity(1024);
+            client.read_buf(&mut buf).await.unwrap();
+            let msg: Result<SocketJsonMessage, serde_json::Error> =
+                serde_json::from_slice::<SocketJsonMessage>(&buf);
+            if let Ok(msg) = msg {
+                println!(
+                    "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
+                    std::thread::current().id().as_u64(),
+                    file!(),
+                    line!(),
+                    msg
+                );
+                if msg.r#type == "on_send_msg"
+                    && let Ok(content) =
+                        serde_json::from_value::<SocketJsonMessageContentOnSendMsg>(msg.content)
                 {
-                    eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to send JSON Message.",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!()
-                    );
+                    let guard_ws_server_connections_by_ws_id: tokio::sync::MutexGuard<
+                        '_,
+                        std::collections::HashMap<
+                            String,
+                            std::sync::Arc<tokio::sync::Mutex<axum::extract::ws::WebSocket>>,
+                        >,
+                    > = WS_SERVER_CONNECTIONS_BY_WS_ID.lock().await;
+                    let ws: &std::sync::Arc<tokio::sync::Mutex<axum::extract::ws::WebSocket>> =
+                        guard_ws_server_connections_by_ws_id
+                            .get(content.ws_id.as_str())
+                            .unwrap();
+                    let mut guard_ws: tokio::sync::MutexGuard<'_, axum::extract::ws::WebSocket> =
+                        ws.lock().await;
+                    if guard_ws
+                        .send(axum::extract::ws::Message::from(
+                            serde_json::to_string(&content.json_msg).unwrap(),
+                        ))
+                        .await
+                        .is_err()
+                    {
+                        eprintln!(
+                            "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to send JSON Message.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!()
+                        );
+                    }
+                    drop(guard_ws);
+                    drop(guard_ws_server_connections_by_ws_id);
                 }
-                drop(guard_ws);
-                drop(guard_ws_server_connections_by_ws_id);
             } else {
                 println!(
                     "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
@@ -548,6 +611,9 @@ fn get_parent_path() -> String {
 fn load_ws_server_applications(
     rt: &tokio::runtime::Runtime,
     ws_server_applications_libraries: &mut Vec<(dlopen2::symbor::Library, tokio::runtime::Runtime)>,
+    global_module_statuses_by_protocol: AsyncModifiable<
+        std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
+    >,
     ws_server_applications_config_json: &WebsocketServerApplicationsConfigJson,
 ) -> Result<(), dlopen2::Error> {
     for (name, config) in &ws_server_applications_config_json.ws_server_applications {
@@ -578,14 +644,16 @@ fn load_ws_server_applications(
                     );
 
                     if let Ok(callback) = unsafe {
-                        ws_server_application_library.symbol::<
-                                unsafe extern "Rust" fn(
-                                    &tokio::runtime::Runtime
-                                ) -> tokio::runtime::Runtime
-                            >("on_init")
+                        ws_server_application_library
+                            .symbol::<unsafe extern "Rust" fn(
+                            &tokio::runtime::Runtime,
+                            AsyncModifiable<
+                                std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
+                            >,
+                        ) -> tokio::runtime::Runtime>("on_init")
                     } {
                         let ws_server_application_library_runtime: tokio::runtime::Runtime =
-                            unsafe { callback(rt) };
+                            unsafe { callback(rt, global_module_statuses_by_protocol.clone()) };
                         ws_server_applications_libraries.push((
                             ws_server_application_library,
                             ws_server_application_library_runtime,

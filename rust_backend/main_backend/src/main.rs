@@ -34,10 +34,17 @@ struct ModuleConfigJson {
 
 type AsyncModifiable<T> = std::sync::Arc<tokio::sync::Mutex<T>>;
 
+fn new_async_modifiable<T>(x: T) -> AsyncModifiable<T> {
+    std::sync::Arc::new(tokio::sync::Mutex::new(x))
+}
+
 #[derive(dlopen2::wrapper::WrapperApi)]
 struct ModuleInstance {
     on_init: extern "Rust" fn(
         rt: &tokio::runtime::Runtime,
+        global_module_statuses_by_protocol: AsyncModifiable<
+            std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
+        >,
     ) -> (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>),
     on_unload: extern "Rust" fn(),
 }
@@ -52,27 +59,33 @@ struct ModuleCombination {
     name: String,
     instance: dlopen2::wrapper::Container<ModuleInstance>,
     tokio_runtime: tokio::runtime::Runtime,
-    status: AsyncModifiable<ModuleStatus>,
 }
 
 fn main() {
-    let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
-        std::sync::Arc::new(tokio::sync::Mutex::new(vec![]));
+    let module_combinations: AsyncModifiable<Vec<ModuleCombination>> = new_async_modifiable(vec![]);
+    let module_statuses_by_protocol: AsyncModifiable<
+        std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
+    > = new_async_modifiable(std::collections::HashMap::new());
     let module_config_json: AsyncModifiable<ModuleConfigJson> =
         MAIN_TOKIO_RUNTIME.block_on(async {
-            std::sync::Arc::new(tokio::sync::Mutex::new(parse_module_config_json().await)) // Parse from module config json string.
+            new_async_modifiable(parse_module_config_json().await) // Parse from module config json string.
         });
     {
         let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
-            std::sync::Arc::clone(&module_combinations);
-        let module_config_json: AsyncModifiable<ModuleConfigJson> =
-            std::sync::Arc::clone(&module_config_json);
+            module_combinations.clone();
+        let module_statuses_by_protocol: AsyncModifiable<
+            std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
+        > = module_statuses_by_protocol.clone();
+        let module_config_json: AsyncModifiable<ModuleConfigJson> = module_config_json.clone();
         MAIN_TOKIO_RUNTIME.block_on(async move {
-            let mut guard_module_combinations: tokio::sync::MutexGuard<'_, Vec<ModuleCombination>> =
-                module_combinations.lock().await;
             let guard_module_config_json: tokio::sync::MutexGuard<'_, ModuleConfigJson> =
                 module_config_json.lock().await;
-            load_modules(&mut guard_module_combinations, &guard_module_config_json).await; // Load modules.
+            load_modules(
+                module_combinations,
+                module_statuses_by_protocol,
+                &guard_module_config_json,
+            )
+            .await; // Load modules.
         });
     }
 
@@ -80,45 +93,58 @@ fn main() {
         let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
             module_combinations.clone();
         let module_config_json: AsyncModifiable<ModuleConfigJson> = module_config_json.clone();
-        let main_backend_panic_flag: std::sync::Arc<tokio::sync::Mutex<bool>> =
-            MAIN_BACKEND_PANIC_FLAG.clone();
+        let main_backend_panic_flag: AsyncModifiable<bool> = MAIN_BACKEND_PANIC_FLAG.clone();
         MAIN_TOKIO_RUNTIME.spawn(async move {
             loop {
                 let guard_module_combinations: tokio::sync::MutexGuard<
                     '_,
                     Vec<ModuleCombination>
                 > = module_combinations.lock().await;
+                let guard_module_statuses: tokio::sync::MutexGuard<'_, std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>> = module_statuses_by_protocol.lock().await;
                 let guard_module_config_json: tokio::sync::MutexGuard<
                     '_,
                     ModuleConfigJson
                 > = module_config_json.lock().await;
-                for x in guard_module_combinations.iter() {
+                for (index, status) in guard_module_statuses.iter().enumerate() {
+                    let status: &AsyncModifiable<ModuleStatus> = status.1;
                     let guard_status: tokio::sync::MutexGuard<
                         '_,
                         ModuleStatus
-                    > = x.status.lock().await;
+                    > = status.lock().await;
                     if guard_status.panicked {
                         println!(
-                            "[MAIN_BACKEND] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Module {} has panicked.",
-                            std::thread::current().id().as_u64(),
-                            file!(),
-                            line!(),
-                            x.name
+                            "{}", ansi_term::Color::Yellow.paint(
+                                format!(
+                                    "[MAIN_BACKEND] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Module {} has panicked.",
+                                    std::thread::current().id().as_u64(),
+                                    file!(),
+                                    line!(),
+                                    guard_module_combinations[index].name
+                                )
+                            )
                         );
                         if guard_module_config_json.restricted_mode {
                             eprintln!(
-                                "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Due to the restricted mode, the server backend now is shutting down.",
-                                std::thread::current().id().as_u64(),
-                                file!(),
-                                line!()
+                                "{}", ansi_term::Color::Red.paint(
+                                    format!(
+                                        "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Due to the restricted mode, the server backend now is shutting down.",
+                                        std::thread::current().id().as_u64(),
+                                        file!(),
+                                        line!()
+                                    )
+                                )
                             );
                             drop(guard_status);
                             drop(guard_module_config_json);
                             println!(
-                                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
-                                std::thread::current().id().as_u64(),
-                                file!(),
-                                line!()
+                                "{}", ansi_term::Color::Blue.paint(
+                                    format!(
+                                        "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
+                                        std::thread::current().id().as_u64(),
+                                        file!(),
+                                        line!()
+                                    )
+                                )
                             );
                             let mut guard_main_backend_panic_flag: tokio::sync::MutexGuard<
                                 '_,
@@ -154,16 +180,24 @@ fn main() {
             }
             drop(guard_module_combinations);
             println!(
-                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully unloaded all the modules.",
-                std::thread::current().id().as_u64(),
-                file!(),
-                line!()
+                "{}", ansi_term::Color::Blue.paint(
+                    format!(
+                        "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully unloaded all the modules.",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
+                    )
+                )
             );
             println!(
-                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
-                std::thread::current().id().as_u64(),
-                file!(),
-                line!()
+                "{}", ansi_term::Color::Blue.paint(
+                    format!(
+                        "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
+                    )
+                )
             );
             std::process::exit(0);
         });
@@ -193,16 +227,24 @@ fn main() {
             }
             drop(guard_module_combinations);
             println!(
-                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully unloaded all the modules.",
-                std::thread::current().id().as_u64(),
-                file!(),
-                line!()
+                "{}", ansi_term::Color::Blue.paint(
+                    format!(
+                        "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully unloaded all the modules.",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
+                    )
+                )
             );
             println!(
-                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
-                std::thread::current().id().as_u64(),
-                file!(),
-                line!()
+                "{}", ansi_term::Color::Blue.paint(
+                    format!(
+                        "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
+                    )
+                )
             );
             std::process::exit(0);
         });
@@ -299,7 +341,10 @@ fn check_protocol_version_requirements_satisfied(
 }
 
 async fn load_modules(
-    module_combinations: &mut Vec<ModuleCombination>,
+    module_combinations: AsyncModifiable<Vec<ModuleCombination>>,
+    module_statuses_by_protocol: AsyncModifiable<
+        std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
+    >,
     module_config_json: &ModuleConfigJson,
 ) {
     // Giving ID to each module.
@@ -307,7 +352,9 @@ async fn load_modules(
         std::collections::HashMap::new();
     let mut modules_protocol_version: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
-    let mut module_names_by_id: std::collections::HashMap<usize, String> =
+    let mut modules_name_by_id: std::collections::HashMap<usize, String> =
+        std::collections::HashMap::new();
+    let mut modules_protocol_by_id: std::collections::HashMap<usize, String> =
         std::collections::HashMap::new();
     let mut id_cnt: usize = 0;
     for config in module_config_json.working_load.values() {
@@ -320,11 +367,15 @@ async fn load_modules(
                 .is_some()
             {
                 eprintln!(
-                    "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Encountered different modules implemented the same protocol {}.",
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!(),
-                    &module_protocol_without_version
+                    "{}", ansi_term::Color::Red.paint(
+                        format!(
+                            "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Encountered different modules implemented the same protocol {}.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
+                            &module_protocol_without_version
+                        )
+                    )
                 );
                 panic!();
             }
@@ -339,25 +390,51 @@ async fn load_modules(
                 .is_some()
             {
                 eprintln!(
-                    "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Encountered different modules implemented the same protocol {}.",
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!(),
-                    &module_protocol_without_version
+                    "{}", ansi_term::Color::Red.paint(
+                        format!(
+                            "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Encountered different modules implemented the same protocol {}.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
+                            &module_protocol_without_version
+                        )
+                    )
                 );
                 panic!();
             }
 
-            if module_names_by_id
+            if modules_name_by_id
                 .insert(id_cnt, config.id.clone())
                 .is_some()
             {
                 eprintln!(
-                    "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Encountered different modules implemented the same protocol {}.",
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!(),
-                    &module_protocol_without_version
+                    "{}", ansi_term::Color::Red.paint(
+                        format!(
+                            "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Encountered different modules implemented the same protocol {}.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
+                            &module_protocol_without_version
+                        )
+                    )
+                );
+                panic!();
+            };
+
+            if modules_protocol_by_id
+                .insert(id_cnt, module_protocol_without_version.clone())
+                .is_some()
+            {
+                eprintln!(
+                    "{}", ansi_term::Color::Red.paint(
+                        format!(
+                            "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Encountered different modules implemented the same protocol {}.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
+                            &module_protocol_without_version
+                        )
+                    )
                 );
                 panic!();
             };
@@ -379,17 +456,25 @@ async fn load_modules(
                         .get(&dependencies_protocol_without_version)
                         .unwrap_or_else(||{
                             eprintln!(
-                                "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Protocol requirements are not satisfied.",
-                                std::thread::current().id().as_u64(),
-                                file!(),
-                                line!()
+                                "{}", ansi_term::Color::Red.paint(
+                                    format!(
+                                        "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Protocol requirements are not satisfied.",
+                                        std::thread::current().id().as_u64(),
+                                        file!(),
+                                        line!()
+                                    )
+                                )
                             );
                             eprintln!(
-                                "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Requires protocol `{}`.",
-                                std::thread::current().id().as_u64(),
-                                file!(),
-                                line!(),
-                                &dependencies_protocol_without_version
+                                "{}", ansi_term::Color::Red.paint(
+                                    format!(
+                                        "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Requires protocol `{}`.",
+                                        std::thread::current().id().as_u64(),
+                                        file!(),
+                                        line!(),
+                                        &dependencies_protocol_without_version
+                                    )
+                                )
                             );
                             panic!();
                         }),
@@ -424,13 +509,16 @@ async fn load_modules(
     }
     while !queue.is_empty() {
         let head_ele: usize = queue.pop_front().unwrap();
-        let module_name: &String = module_names_by_id.get(&head_ele).unwrap();
+        let module_name: &String = modules_name_by_id.get(&head_ele).unwrap();
         println!(
-            "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Loading module {}...",
-            std::thread::current().id().as_u64(),
-            file!(),
-            line!(),
-            module_name
+            "{}",
+            ansi_term::Color::Blue.paint(format!(
+                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Loading module {}...",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!(),
+                module_name
+            ))
         );
 
         let module_config = module_config_json.working_load.get(module_name).unwrap();
@@ -447,16 +535,20 @@ async fn load_modules(
         match module {
             Ok(module) => {
                 println!(
-                    "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully loaded module `{}` from `{}`.",
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!(),
-                    module_name,
-                    &module_library_file_path
+                    "{}", ansi_term::Color::Blue.paint(
+                        format!(
+                            "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully loaded module `{}` from `{}`.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
+                            module_name,
+                            &module_library_file_path
+                        )
+                    )
                 );
 
                 let result: (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>) =
-                    module.on_init(&MAIN_TOKIO_RUNTIME);
+                    module.on_init(&MAIN_TOKIO_RUNTIME, module_statuses_by_protocol.clone());
                 {
                     let status: AsyncModifiable<ModuleStatus> = result.1.clone();
                     loop {
@@ -470,12 +562,24 @@ async fn load_modules(
                         drop(guard_status);
                         fake_yield_now().await;
                     }
-                    module_combinations.push(ModuleCombination {
+                    let mut guard_module_combinations: tokio::sync::MutexGuard<
+                        '_,
+                        Vec<ModuleCombination>,
+                    > = module_combinations.lock().await;
+                    guard_module_combinations.push(ModuleCombination {
                         name: String::from(module_name),
                         instance: module,
                         tokio_runtime: result.0,
-                        status,
                     }); // Save the Tokio runtime.
+                    drop(guard_module_combinations);
+                    let mut guard_module_statuses_by_protocol: tokio::sync::MutexGuard<
+                        '_,
+                        std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
+                    > = module_statuses_by_protocol.lock().await;
+                    guard_module_statuses_by_protocol.insert(
+                        String::from(modules_protocol_by_id.get(&head_ele).unwrap()),
+                        status,
+                    );
                 }
 
                 if let Some(mut tmp) = forward_star_representation.head[head_ele] {
@@ -494,20 +598,28 @@ async fn load_modules(
             }
             Err(_) => {
                 eprintln!(
-                    "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to load module `{}` from `{}`. Maybe the module file doesn't exist or is not a valid shared object?",
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!(),
-                    module_name,
-                    &module_library_file_path
+                    "{}", ansi_term::Color::Red.paint(
+                        format!(
+                            "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to load module `{}` from `{}`. Maybe the module file doesn't exist or is not a valid shared object?",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
+                            module_name,
+                            &module_library_file_path
+                        )
+                    )
                 );
 
                 if module_config_json.restricted_mode {
                     eprintln!(
-                        "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Due to the restricted mode, the server backend now is shutting down.",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!()
+                        "{}", ansi_term::Color::Red.paint(
+                            format!(
+                                "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Due to the restricted mode, the server backend now is shutting down.",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!()
+                            )
+                        )
                     );
                     // TODO: Calling all the other modules to shutdown.
                     panic!();
