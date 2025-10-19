@@ -18,5 +18,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/wsapi/, '')
       }
     },
+    allowedHosts: true
   },
 })
+
