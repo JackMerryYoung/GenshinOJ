@@ -1,5 +1,7 @@
 #![feature(thread_id_value)]
 
+use mysql_async::prelude::*;
+
 type AsyncModifiable<T> = std::sync::Arc<tokio::sync::Mutex<T>>;
 
 #[derive(Debug)]
@@ -7,6 +9,13 @@ pub struct ModuleStatus {
     _initialized: bool,
     _panicked: bool,
     _socket_port: AsyncModifiable<u16>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct ContentOnLogin {
+    username: String,
+    password: String,
+    request_key: String,
 }
 
 static GLOBAL_MODULE_STATUSES_BY_PROTOCOL: std::sync::OnceLock<
@@ -26,8 +35,8 @@ pub extern "Rust" fn on_init(
             .build()
             .unwrap();
     GLOBAL_MODULE_STATUSES_BY_PROTOCOL
-        .set(global_module_statuses_by_protocol)
-        .unwrap();
+    .set(global_module_statuses_by_protocol)
+    .unwrap();
     simple_authenticator_application_runtime
 }
 

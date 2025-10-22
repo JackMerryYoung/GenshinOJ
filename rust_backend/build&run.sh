@@ -1,14 +1,103 @@
-cargo build -r -p ws_server
-mv ./target/release/libws_server.so ./modules/ws_server
-cargo build -r -p simple_authenticator_application
-mv ./target/release/libsimple_authenticator_application.so ./modules/ws_server/assets/lib
+# Build Websocket Server
+if [ ! -e "./modules" ]; then
+    mkdir ./modules
+fi
+
+if [ ! -e "./modules/ws_server" ]; then
+    mkdir ./modules/ws_server
+fi
+
+cargo build -r -p ws_server > /dev/null
+if [ -e "./target/release/libws_server.so" ]; then
+    if [ -e "./modules/ws_server/libws_server.so" ]; then
+        if [ "$(cat ./target/release/libws_server.so)" != "$(cat ./modules/ws_server/libws_server.so)" ]; then
+            mv ./target/release/libws_server.so ./modules/ws_server
+        fi
+    fi
+fi
+
+###############################################################
+
+# Building Websocket Application Libraries
+if [ ! -e "./modules/ws_server/assets" ]; then
+    mkdir ./modules/ws_server/assets
+fi
+
+if [ ! -e "./modules/ws_server/assets/lib" ]; then
+    mkdir ./modules/ws_server/assets/lib
+fi
+
+# Building Simple Authenticator Application
+cargo build -r -p simple_authenticator_application > /dev/null
+if [ -e "./target/release/libsimple_authenticator_application.so" ]; then
+    if [ -e "./modules/ws_server/assets/lib/libsimple_authenticator_application.so" ]; then
+        if [ "$(cat ./target/release/libsimple_authenticator_application.so)" != "$(cat ./modules/ws_server/assets/lib/libsimple_authenticator_application.so)" ]; then
+            mv ./target/release/libsimple_authenticator_application.so  ./modules/ws_server/assets/lib
+        fi
+    fi
+fi
+
+# Building Chat Websocket Server Application
 cargo build -r -p chat_ws_server_application
-mv ./target/release/libchat_ws_server_application.so ./modules/ws_server/assets/lib
+if [ -e "./target/release/libchat_ws_server_application.so" ]; then
+    if [ -e "./modules/ws_server/assets/lib/libchat_ws_server_application.so" ]; then
+        if [ "$(cat ./target/release/libchat_ws_server_application.so)" != "$(cat ./modules/ws_server/assets/lib/libchat_ws_server_application.so)" ]; then
+            mv ./target/release/libchat_ws_server_application.so ./modules/ws_server/assets/lib
+        fi
+    fi
+fi
+
+###############################################################
+
+# Building Simple Authenticator
+if [ ! -e "./modules/simple_authenticator" ]; then
+    mkdir ./modules/simple_authenticator
+fi
+
 cargo build -r -p simple_authenticator
-mv ./target/release/libsimple_authenticator.so ./modules/simple_authenticator
+if [ -e "./target/release/libsimple_authenticator.so" ]; then
+    if [ -e "./modules/ws_server/assets/lib/libsimple_authenticator.so" ]; then
+        if [ "$(cat ./target/release/libsimple_authenticator.so)" != "$(cat ./modules/ws_server/assets/lib/libsimple_authenticator.so)" ]; then
+            mv ./target/release/libsimple_authenticator.so ./modules/simple_authenticator
+        fi
+    fi
+fi
+
+###############################################################
+
+# Building Database Connector
+if [ ! -e "./modules/db_connector" ]; then
+    mkdir ./modules/db_connector
+fi
+
 cargo build -r -p db_connector
-mv ./target/release/libdb_connector.so ./modules/db_connector
+if [ -e "./target/release/libdb_connector.so" ]; then
+    if [ -e "./modules/db_connector/libdb_connector.so" ]; then
+        if [ "$(cat ./target/release/libdb_connector.so)" != "$(cat ./modules/db_connector/libdb_connector.so)" ]; then
+            mv ./target/release/libdb_connector.so ./modules/db_connector
+        fi
+    fi
+fi
+
+###############################################################
+
+# Building Chat Server
+if [ ! -e "./modules/chat_server" ]; then
+    mkdir ./modules/chat_server
+fi
+
 cargo build -r -p chat_server
-mv ./target/release/libchat_server.so ./modules/chat_server
-# rm -r ./target
+if [ -e "./target/release/libchat_server.so" ]; then
+    if [ -e "./modules/chat_server/libdb_connector.so" ]; then
+        if [ "$(cat ./target/release/libchat_server.so)" != "$(cat ./modules/chat_server/libdb_connector.so)" ]; then
+            mv ./target/release/libchat_server.so ./modules/chat_server
+        fi
+    fi
+fi
+
+###############################################################
+
+# Building Main Backend
 cargo run -r -p main_backend
+
+###############################################################

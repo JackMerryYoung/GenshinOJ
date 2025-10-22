@@ -1405,6 +1405,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "futures-util",
+ "mysql_async",
  "retry",
  "rust-crypto",
  "serde",

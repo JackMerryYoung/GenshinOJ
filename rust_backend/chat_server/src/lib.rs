@@ -7,6 +7,7 @@ fn new_async_modifiable<T>(x: T) -> AsyncModifiable<T> {
     std::sync::Arc::new(tokio::sync::Mutex::new(x))
 }
 
+#[derive(Debug)]
 pub struct ModuleStatus {
     initialized: bool,
     panicked: bool,
@@ -30,6 +31,10 @@ async fn wait_for_initialized(chat_server_status: AsyncModifiable<ModuleStatus>)
     }
 }
 
+static GLOBAL_MODULE_STATUSES_BY_PROTOCOL: std::sync::OnceLock<
+    AsyncModifiable<std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>>,
+> = std::sync::OnceLock::new();
+
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_init(
     _rt: &'static tokio::runtime::Runtime,
@@ -48,6 +53,10 @@ pub extern "Rust" fn on_init(
     };
     let chat_server_status: AsyncModifiable<ModuleStatus> =
         new_async_modifiable(chat_server_status);
+    
+    GLOBAL_MODULE_STATUSES_BY_PROTOCOL
+        .set(global_module_statuses_by_protocol)
+        .unwrap();
     // Initialization
     {
         let chat_server_status: AsyncModifiable<ModuleStatus> = chat_server_status.clone();
@@ -176,13 +185,13 @@ pub extern "Rust" fn on_unload() {
 }
 
 async fn self_management(chat_server_status: AsyncModifiable<ModuleStatus>) {
+    let global_module_statuses_by_protocol = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get().unwrap();
+    let mut guard_global_module_statuses_by_protocol = global_module_statuses_by_protocol.lock().await;
+    guard_global_module_statuses_by_protocol.insert(String::from("chat_server"), chat_server_status.clone());
     let mut monitor_time_cnt: usize = 0;
     loop {
         if let Ok(guard_chat_server_status) = chat_server_status.try_lock() {
-            if guard_chat_server_status.panicked {
-                drop(guard_chat_server_status); // Avoid poisoning the mutex lock.
-                panic!();
-            } else if guard_chat_server_status.initialized && CHAT_SERVER_SOCKET.get().is_none() {
+            if guard_chat_server_status.panicked || (guard_chat_server_status.initialized && CHAT_SERVER_SOCKET.get().is_none()) {
                 drop(guard_chat_server_status); // Avoid poisoning the mutex lock.
                 panic!();
             }

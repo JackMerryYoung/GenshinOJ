@@ -5,7 +5,7 @@
             "name": "Simple Authenticator Application",
             "id": "simple_authenticator_application",
             "protocol": "std_authenticator@0.1.0",
-            "enabled": true,
+            "enabled": false,
             "dependencies": [],
             "unload_timeout": 0
         },
