@@ -17,14 +17,6 @@ pub static GLOBAL_MODULE_STATUSES_BY_PROTOCOL: std::sync::OnceLock<
     AsyncModifiable<std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>>,
 > = std::sync::OnceLock::new();
 
-pub static LOGGED_IN_USERNAMES: std::sync::OnceLock<
-    AsyncModifiable<std::collections::HashSet<String>>,
-> = std::sync::OnceLock::new();
-
-pub static MYSQL_DATABASE_POOL: std::sync::OnceLock<
-    AsyncModifiable<mysql_async::Pool>,
-> = std::sync::OnceLock::new();
-
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct ContentOnLogin {
     pub username: String,

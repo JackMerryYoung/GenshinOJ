@@ -77,32 +77,44 @@ pub extern "Rust" fn on_init(
                     tokio::net::TcpListener,
                     std::io::Error
                 > = tokio::net::TcpListener::bind(
-                    format!("localhost:{}", &chat_server_socket_port)
+                    format!("127.0.0.1:{}", &chat_server_socket_port)
                 ).await;
                 if let Ok(x) = chat_server_socket_result {
                     println!(
-                        "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!(),
-                        chat_server_socket_port
+                        "{}", ansi_term::Color::Blue.paint(
+                            format!(
+                                "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                chat_server_socket_port
+                            )
+                        )
                     );
                     break (x, chat_server_socket_port);
                 } else {
                     println!(
-                        "[CHAT_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!(),
-                        chat_server_socket_port
+                        "{}", ansi_term::Color::Yellow.paint(
+                            format!(
+                                "[CHAT_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                chat_server_socket_port
+                            )
+                        )
                     );
                 }
                 if chat_server_socket_port == u16::MAX {
                     eprintln!(
-                        "[CHAT_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!()
+                        "{}", ansi_term::Color::Red.paint(
+                            format!(
+                                "[CHAT_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!()
+                            )
+                        )
                     );
                     panic!();
                 }
@@ -158,11 +170,15 @@ async fn socket_message_processing() {
             let mut buf: bytes::BytesMut = bytes::BytesMut::with_capacity(1024);
             client.read_buf(&mut buf).await.unwrap();
             println!(
-                "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
-                std::thread::current().id().as_u64(),
-                file!(),
-                line!(),
-                serde_json::from_slice::<SocketJsonMessage>(&buf).unwrap()
+                "{}", ansi_term::Color::Blue.paint(
+                    format!(
+                        "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
+                        serde_json::from_slice::<SocketJsonMessage>(&buf).unwrap()
+                    )
+                )
             );
         });
     }
@@ -171,16 +187,24 @@ async fn socket_message_processing() {
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_unload() {
     println!(
-        "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the chat server...",
-        std::thread::current().id().as_u64(),
-        file!(),
-        line!()
+        "{}", ansi_term::Color::Blue.paint(
+            format!(
+                "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the chat server...",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
+            )
+        )
     );
     println!(
-        "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the chat server.",
-        std::thread::current().id().as_u64(),
-        file!(),
-        line!()
+        "{}", ansi_term::Color::Blue.paint(
+            format!(
+                "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the chat server.",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
+            )
+        )
     );
 }
 
@@ -200,10 +224,14 @@ async fn self_management(chat_server_status: AsyncModifiable<ModuleStatus>) {
             if monitor_time_cnt == 600 {
                 // Show monitoring message per minute.
                 println!(
-                    "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well.",
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!()
+                    "{}", ansi_term::Color::Blue.paint(
+                        format!(
+                            "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!()
+                        )
+                    )
                 );
                 monitor_time_cnt = 0;
             }

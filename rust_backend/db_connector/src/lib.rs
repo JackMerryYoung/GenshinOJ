@@ -16,20 +16,6 @@ static GLOBAL_MODULE_STATUSES_BY_PROTOCOL: std::sync::OnceLock<
     AsyncModifiable<std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>>,
 > = std::sync::OnceLock::new();
 
-async fn wait_for_initialized(db_connector_status: AsyncModifiable<ModuleStatus>) {
-    loop {
-        // Waiting for the initialization to be completed.
-        let guard_db_connector_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
-            db_connector_status.lock().await;
-        if guard_db_connector_status.initialized {
-            drop(guard_db_connector_status);
-            break;
-        }
-        drop(guard_db_connector_status);
-        fake_yield_now().await;
-    }
-}
-
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_init(
     _rt: &'static tokio::runtime::Runtime,
@@ -42,7 +28,7 @@ pub extern "Rust" fn on_init(
         .build()
         .unwrap();
     let db_connector_status: ModuleStatus = ModuleStatus {
-        initialized: true,
+        initialized: false,
         panicked: false,
         socket_port: new_async_modifiable(0),
     };
@@ -55,7 +41,18 @@ pub extern "Rust" fn on_init(
     {
         let db_connector_status: AsyncModifiable<ModuleStatus> = db_connector_status.clone();
         db_connector_runtime.spawn(async move {
-            wait_for_initialized(db_connector_status.clone()).await;
+            loop {
+                // Waiting for the initialization to be completed.
+                let guard_db_connector_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
+                db_connector_status.lock().await;
+                if guard_db_connector_status.initialized {
+                    fake_yield_now(0).await;
+                    drop(guard_db_connector_status);
+                    break;
+                }
+                drop(guard_db_connector_status);
+                fake_yield_now(1000).await;
+            }
             // Now start self management
             self_management(db_connector_status).await
         });
@@ -87,6 +84,16 @@ pub extern "Rust" fn on_unload() {
 }
 
 async fn self_management(db_connector_status: AsyncModifiable<ModuleStatus>) {
+    println!(
+        "{}", ansi_term::Color::Blue.paint(
+            format!(
+                "[DB_CONNECTOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] Started self management.",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
+            )
+        )
+    );
     let global_module_statuses_by_protocol = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get().unwrap();
     let mut guard_global_module_statuses_by_protocol = global_module_statuses_by_protocol.lock().await;
     guard_global_module_statuses_by_protocol.insert(String::from("db_connect"), db_connector_status.clone());
@@ -102,25 +109,36 @@ async fn self_management(db_connector_status: AsyncModifiable<ModuleStatus>) {
             if monitor_time_cnt == 600 {
                 // Show monitoring message per minute.
                 println!(
-                    "[DB_CONNECTOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well.",
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!()
+                    "{}", ansi_term::Color::Blue.paint(
+                        format!(
+                            "[DB_CONNECTOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!()
+                        )
+                    )
                 );
                 monitor_time_cnt = 0;
             }
-            fake_yield_now().await;
+            fake_yield_now(0).await;
         } else {
-            fake_yield_now().await;
+            fake_yield_now(1000).await;
         }
     }
 }
 
 const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
 
-async fn fake_yield_now() {
-    tokio::time::sleep(tokio::time::Duration::from_millis(
-        FAKE_YIELD_NOW_MILLISECONDS,
-    ))
-    .await;
+async fn fake_yield_now(tm: u64) {
+    if tm == 0 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(
+            FAKE_YIELD_NOW_MILLISECONDS,
+        ))
+        .await;
+    } else {
+        tokio::time::sleep(tokio::time::Duration::from_millis(
+            tm,
+        ))
+        .await;
+    }
 }

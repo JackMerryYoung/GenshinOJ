@@ -48,32 +48,44 @@ pub extern "Rust" fn on_init(
                     tokio::net::TcpListener,
                     std::io::Error
                 > = tokio::net::TcpListener::bind(
-                    format!("localhost:{}", &ws_server_socket_port)
+                    format!("127.0.0.1:{}", &ws_server_socket_port)
                 ).await;
                 if let Ok(x) = ws_server_socket_result {
                     println!(
-                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!(),
-                        ws_server_socket_port
+                        "{}", ansi_term::Color::Blue.paint(
+                            format!(
+                                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                ws_server_socket_port
+                            )
+                        )
                     );
                     break (x, ws_server_socket_port);
                 } else {
                     println!(
-                        "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!(),
-                        ws_server_socket_port
+                        "{}", ansi_term::Color::Yellow.paint(
+                            format!(
+                                "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                ws_server_socket_port
+                            )
+                        )
                     );
                 }
                 if ws_server_socket_port == u16::MAX {
                     eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!()
+                        "{}", ansi_term::Color::Red.paint(
+                            format!(
+                                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!()
+                            )
+                        )
                     );
                     panic!();
                 }
@@ -84,10 +96,14 @@ pub extern "Rust" fn on_init(
             drop(guard_ws_server_status);
             WS_SERVER_SOCKET.set(new_async_modifiable(ws_server_socket)).unwrap();
             println!(
-                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initializing the Websocket server...",
-                std::thread::current().id().as_u64(),
-                file!(),
-                line!()
+                "{}", ansi_term::Color::Blue.paint(
+                    format!(
+                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initializing the Websocket server...",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
+                    )
+                )
             );
             let ws_server_app: axum::Router = axum::Router
                 ::new()
@@ -112,20 +128,28 @@ pub extern "Rust" fn on_init(
                 1000,
                 {
                     eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to initialize the Websocket server. Retrying...",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!()
+                        "{}", ansi_term::Color::Red.paint(
+                            format!(
+                                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to initialize the Websocket server. Retrying...",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!()
+                            )
+                        )
                     );
                 }
             );
             let listener: tokio::net::TcpListener = match listener {
                 Ok(listener) => {
                     println!(
-                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the Websocket server.",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!()
+                        "{}", ansi_term::Color::Blue.paint(
+                            format!(
+                                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the Websocket server.",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!()
+                            )
+                        )
                     );
 
                     let mut guard_ws_server_status: tokio::sync::MutexGuard<
@@ -138,10 +162,14 @@ pub extern "Rust" fn on_init(
                 }
                 Err(_) => {
                     eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting...",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!()
+                        "{}", ansi_term::Color::Red.paint(
+                            format!(
+                                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting...",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!()
+                            )
+                        )
                     );
 
                     on_unload();
@@ -228,15 +256,23 @@ pub extern "Rust" fn on_init(
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_unload() {
     println!(
-        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the Websocket server...",
-        std::thread::current().id().as_u64(),
-        file!(),
-        line!()
+        "{}", ansi_term::Color::Blue.paint(
+            format!(
+                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the Websocket server...",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
+            )
+        )
     );
     println!(
-        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the Websocket server.",
-        std::thread::current().id().as_u64(),
-        file!(),
-        line!()
+        "{}", ansi_term::Color::Blue.paint(
+            format!(
+                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the Websocket server.",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
+            )
+        )
     );
 }

@@ -13,7 +13,7 @@
             "name": "Database Connector",
             "id": "db_connector",
             "protocol": "std_db_connector@0.1.0",
-            "enabled": true,
+            "enabled": false,
             "dependencies": [],
             "unload_timeout": 0
         },
@@ -23,7 +23,6 @@
             "protocol": "std_ws_server@0.1.0",
             "enabled": true,
             "dependencies": [
-                "std_db_connector@0.1.0",
                 "std_authenticator@0.1.0"
             ],
             "unload_timeout": 0

@@ -15,11 +15,15 @@ pub async fn self_management(ws_server_status: AsyncModifiable<ModuleStatus>) {
                 let guard_ws_server_connections_cnt: tokio::sync::MutexGuard<'_, usize> =
                     WS_SERVER_CONNECTIONS_CNT.lock().await;
                 println!(
-                    "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well with {} connections in total.",
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!(),
-                    *guard_ws_server_connections_cnt
+                    "{}", ansi_term::Color::Blue.paint(
+                        format!(
+                            "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well with {} connections in total.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
+                            *guard_ws_server_connections_cnt
+                        )
+                    )
                 );
                 monitor_time_cnt = 0;
             }

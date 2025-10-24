@@ -2,46 +2,6 @@ use crate::global::*;
 
 use tokio::io::AsyncReadExt;
 
-pub async fn get_socket_port_by_protocol(protocol: &String) -> u16 {
-    let guard_global_module_statuses_by_protocol: tokio::sync::MutexGuard<
-        '_,
-        std::collections::HashMap<String, std::sync::Arc<tokio::sync::Mutex<ModuleStatus>>>,
-    > = crate::GLOBAL_MODULE_STATUSES_BY_PROTOCOL
-        .get()
-        .unwrap()
-        .lock()
-        .await;
-    let guard_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
-        guard_global_module_statuses_by_protocol
-            .get(protocol)
-            .unwrap()
-            .lock()
-            .await;
-    *(guard_status.socket_port.lock().await)
-}
-
-pub async fn get_socket_by_protocol(protocol: &String) -> tokio::net::TcpStream {
-    let socket_port: u16 = get_socket_port_by_protocol(protocol).await;
-    match tokio::net::TcpStream::connect(format!("localhost:{socket_port}")).await {
-        Ok(socket) => socket,
-        Err(_) => {
-            eprintln!(
-                "{}", ansi_term::Color::Red.paint(
-                    format!(
-                        "[WS_SERVER::CHAT_WS_SERVER_APPLICATION] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to connect to the socket of the module implemented protocol `{}` on port {}.",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!(),
-                        protocol,
-                        socket_port
-                    )
-                )
-            );
-            panic!();
-        }
-    }
-}
-
 #[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug)]
 pub struct SocketJsonMessage {
     pub r#type: String,
@@ -68,11 +28,15 @@ pub async fn socket_message_processing() {
                 serde_json::from_slice::<SocketJsonMessage>(&buf);
             if let Ok(msg) = msg {
                 println!(
-                    "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!(),
-                    msg
+                    "{}", ansi_term::Color::Blue.paint(
+                        format!(
+                            "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
+                            msg
+                        )
+                    )
                 );
                 if msg.r#type == "on_send_msg"
                     && let Ok(content) =
@@ -99,10 +63,14 @@ pub async fn socket_message_processing() {
                         .is_err()
                     {
                         eprintln!(
-                            "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to send JSON Message.",
-                            std::thread::current().id().as_u64(),
-                            file!(),
-                            line!()
+                            "{}", ansi_term::Color::Red.paint(
+                                format!(
+                                    "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to send JSON Message.",
+                                    std::thread::current().id().as_u64(),
+                                    file!(),
+                                    line!()
+                                )
+                            )
                         );
                     }
                     drop(guard_ws);
@@ -110,10 +78,14 @@ pub async fn socket_message_processing() {
                 }
             } else {
                 println!(
-                    "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!()
+                    "{}", ansi_term::Color::Yellow.paint(
+                        format!(
+                            "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!()
+                        )
+                    )
                 );
             }
         });

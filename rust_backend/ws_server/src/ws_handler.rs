@@ -6,11 +6,15 @@ pub async fn ip_handler(
     next: axum::middleware::Next,
 ) -> axum::response::Response {
     println!(
-        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Connection from `{}` established.",
-        std::thread::current().id().as_u64(),
-        file!(),
-        line!(),
-        ip_addr
+        "{}", ansi_term::Color::Blue.paint(
+            format!(
+                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Connection from `{}` established.",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!(),
+                ip_addr
+            )
+        )
     );
     next.run(request).await
 }
@@ -21,10 +25,14 @@ pub async fn ws_handler(ws_upgrade: axum::extract::ws::WebSocketUpgrade) -> axum
 
 pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
     println!(
-        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Websocket connection established.",
-        std::thread::current().id().as_u64(),
-        file!(),
-        line!()
+        "{}", ansi_term::Color::Blue.paint(
+            format!(
+                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Websocket connection established.",
+                std::thread::current().id().as_u64(),
+                file!(),
+                line!()
+            )
+        )
     );
 
     let mut guard_ws_server_connections_cnt: tokio::sync::MutexGuard<'_, usize> =
@@ -70,10 +78,14 @@ pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
                 }
                 axum::extract::ws::Message::Close(_) => {
                     println!(
-                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Websocket connection closed.",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!()
+                        "{}", ansi_term::Color::Blue.paint(
+                            format!(
+                                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Websocket connection closed.",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!()
+                            )
+                        )
                     );
                     let mut guard_ws_server_connections_cnt: tokio::sync::MutexGuard<'_, usize> =
                         WS_SERVER_CONNECTIONS_CNT.lock().await;

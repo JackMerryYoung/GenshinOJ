@@ -156,11 +156,11 @@ fn main() {
                         }
                     }
                     drop(guard_status);
-                    fake_yield_now().await;
+                    fake_yield_now(0).await;
                 }
                 drop(guard_module_combinations);
                 drop(guard_module_config_json);
-                fake_yield_now().await;
+                fake_yield_now(0).await;
             }
         });
     }
@@ -267,18 +267,26 @@ async fn parse_module_config_json() -> ModuleConfigJson {
         Ok(file) => file,
         Err(e) => {
             eprintln!(
-                "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open module_config_rs.json from `{}`. Maybe the file doesn't exist?",
-                std::thread::current().id().as_u64(),
-                file!(),
-                line!(),
-                module_config_json_file_path
+                "{}", ansi_term::Color::Red.paint(
+                    format!(
+                        "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open module_config_rs.json from `{}`. Maybe the file doesn't exist?",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
+                        module_config_json_file_path
+                    )
+                )
             );
             eprintln!(
-                "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] {}",
-                e,
-                std::thread::current().id().as_u64(),
-                file!(),
-                line!()
+                "{}", ansi_term::Color::Red.paint(
+                    format!(
+                        "[MAIN_BACKEND] [ERROR] [THREAD {}] [FILE `{}` LINE {}] {}",
+                        e,
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
+                    )
+                )
             );
             let main_backend_panic_flag: std::sync::Arc<tokio::sync::Mutex<bool>> =
                 MAIN_BACKEND_PANIC_FLAG.clone();
@@ -553,15 +561,39 @@ async fn load_modules(
                     let status: AsyncModifiable<ModuleStatus> = result.1.clone();
                     loop {
                         // Waiting for the initialization to be completed.
+                        println!(
+                            "{}", ansi_term::Color::Blue.paint(
+                                format!(
+                                    "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Waiting for module `{}` to finish initialization.",
+                                    std::thread::current().id().as_u64(),
+                                    file!(),
+                                    line!(),
+                                    module_name
+                                )
+                            )
+                        );
                         let guard_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
                             status.lock().await;
                         if guard_status.initialized {
+                            fake_yield_now(0).await;
                             drop(guard_status);
                             break;
                         }
                         drop(guard_status);
-                        fake_yield_now().await;
+                        fake_yield_now(1000).await;
                     }
+                    fake_yield_now(1000).await;
+                    println!(
+                        "{}", ansi_term::Color::Blue.paint(
+                            format!(
+                                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Module `{}` finished initialization.",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                module_name
+                            )
+                        )
+                    );
                     let mut guard_module_combinations: tokio::sync::MutexGuard<
                         '_,
                         Vec<ModuleCombination>,
@@ -631,9 +663,16 @@ async fn load_modules(
 
 const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
 
-async fn fake_yield_now() {
-    tokio::time::sleep(tokio::time::Duration::from_millis(
-        FAKE_YIELD_NOW_MILLISECONDS,
-    ))
-    .await;
+async fn fake_yield_now(tm: u64) {
+    if tm == 0 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(
+            FAKE_YIELD_NOW_MILLISECONDS,
+        ))
+        .await;
+    } else {
+        tokio::time::sleep(tokio::time::Duration::from_millis(
+            tm,
+        ))
+        .await;
+    }
 }

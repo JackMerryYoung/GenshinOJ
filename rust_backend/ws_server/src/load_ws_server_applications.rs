@@ -18,11 +18,15 @@ pub fn load_ws_server_applications(
     for (name, config) in &ws_server_applications_config_json.ws_server_applications {
         if config.enabled {
             println!(
-                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Loading websocket server application {}...",
-                std::thread::current().id().as_u64(),
-                file!(),
-                line!(),
-                name
+                "{}", ansi_term::Color::Blue.paint(
+                    format!(
+                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Loading websocket server application {}...",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
+                        name
+                    )
+                )
             );
             let ws_server_application_library_file_path: String = get_parent_path()
                 + "/rust_backend/modules/ws_server/assets/lib/lib"
@@ -34,12 +38,16 @@ pub fn load_ws_server_applications(
             match ws_server_application_library {
                 Ok(ws_server_application_library) => {
                     println!(
-                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully loaded websocket server application `{}` from `{}`.",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!(),
-                        name,
-                        &ws_server_application_library_file_path
+                        "{}", ansi_term::Color::Blue.paint(
+                            format!(
+                                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully loaded websocket server application `{}` from `{}`.",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                name,
+                                &ws_server_application_library_file_path
+                            )
+                        )
                     );
 
                     if let Ok(callback) = unsafe {
@@ -61,20 +69,28 @@ pub fn load_ws_server_applications(
                 }
                 Err(e) => {
                     eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to load websocket server application `{}` from `{}`. Maybe the websocket server application file doesn't exist or is not a valid shared object?",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!(),
-                        name,
-                        &ws_server_application_library_file_path
+                        "{}", ansi_term::Color::Red.paint(
+                            format!(
+                                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to load websocket server application `{}` from `{}`. Maybe the websocket server application file doesn't exist or is not a valid shared object?",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                name,
+                                &ws_server_application_library_file_path
+                            )
+                        )
                     );
 
                     if ws_server_applications_config_json.restricted_mode {
                         eprintln!(
-                            "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Due to the restricted mode, the websocket server now is shutting down.",
-                            std::thread::current().id().as_u64(),
-                            file!(),
-                            line!()
+                            "{}", ansi_term::Color::Red.paint(
+                                format!(
+                                    "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Due to the restricted mode, the websocket server now is shutting down.",
+                                    std::thread::current().id().as_u64(),
+                                    file!(),
+                                    line!()
+                                )
+                            )
                         );
                         return Err(e);
                     }
@@ -96,18 +112,26 @@ pub fn parse_ws_server_applications_config_json() -> WebsocketServerApplications
         Ok(file) => file,
         Err(e) => {
             eprintln!(
-                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open ws_server_config_rs.json from `{}`. Maybe the file doesn't exist?",
-                std::thread::current().id().as_u64(),
-                file!(),
-                line!(),
-                ws_server_applications_config_json_file_path
+                "{}", ansi_term::Color::Red.paint(
+                    format!(
+                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open ws_server_config_rs.json from `{}`. Maybe the file doesn't exist?",
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
+                        ws_server_applications_config_json_file_path
+                    )
+                )
             );
             eprintln!(
-                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] {}",
-                file!(),
-                line!(),
-                std::thread::current().id().as_u64(),
-                e
+                "{}", ansi_term::Color::Red.paint(
+                    format!(
+                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] {}",
+                        file!(),
+                        line!(),
+                        std::thread::current().id().as_u64(),
+                        e
+                    )
+                )
             );
             panic!();
         }

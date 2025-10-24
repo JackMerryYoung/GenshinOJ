@@ -21,7 +21,6 @@ pub extern "Rust" fn on_init(
     GLOBAL_MODULE_STATUSES_BY_PROTOCOL
     .set(global_module_statuses_by_protocol)
     .unwrap();
-    MYSQL_DATABASE_POOL.set(new_async_modifiable(mysql_async::Pool::new(""))).unwrap();
     simple_authenticator_application_runtime
 }
 
@@ -47,32 +46,6 @@ pub extern "Rust" fn on_unload() {
             )
         )
     );
-}
-
-#[unsafe(no_mangle)]
-pub extern "Rust" fn on_close_connection(
-    self_rt: &tokio::runtime::Runtime,
-    (_ws, ws_id): (&mut axum::extract::ws::WebSocket, &uuid::Uuid),
-) {
-    self_rt.block_on(async move {
-        
-    });
-}
-
-#[unsafe(no_mangle)]
-pub extern "Rust" fn on_quit(
-    self_rt: &tokio::runtime::Runtime,
-    (_ws, ws_id): (&mut axum::extract::ws::WebSocket, &uuid::Uuid),
-    content: AsyncModifiable<serde_json::Value>,
-) {
-    self_rt.block_on(async move {
-        
-    });
-}
-
-#[derive(serde::Deserialize, serde::Serialize)]
-struct ContentOnOnlineUser {
-    request_key: String,
 }
 
 #[unsafe(no_mangle)]
@@ -110,4 +83,20 @@ pub extern "Rust" fn on_online_user(
                 .unwrap_or_default();
         }
     });
+}
+
+async fn send_to_simple_authenticator(msg: serde_json::Value) {
+    let msg: SocketJsonMessage = SocketJsonMessage {
+        r#type: String::from("on_send_msg"),
+        content: msg,
+        request_key: uuid::Uuid::new_v4().to_string(),
+        from_protocol: String::from("std_authenticator"),
+    };
+    let msg: serde_json::Value = serde_json::to_value(&msg).unwrap();
+    let msg: String = serde_json::to_string(&msg).unwrap();
+    let mut socket: tokio::net::TcpStream =
+        simple_authenticator_socket::get_socket_by_protocol("std_simple_authenticator").await;
+    socket.writable().await.unwrap();
+    socket.write_all(msg.as_bytes()).await.unwrap();
+    socket.flush().await.unwrap();
 }
