@@ -33,6 +33,8 @@ if [ -e "./target/release/libsimple_authenticator_application.so" ]; then
     if [ -e "./modules/ws_server/assets/lib/libsimple_authenticator_application.so" ]; then
         if [ "$(cat ./target/release/libsimple_authenticator_application.so)" != "$(cat ./modules/ws_server/assets/lib/libsimple_authenticator_application.so)" ]; then
             mv ./target/release/libsimple_authenticator_application.so  ./modules/ws_server/assets/lib
+        else
+            echo "No need to move simple_authenticator_application."
         fi
     fi
 fi
@@ -43,6 +45,8 @@ if [ -e "./target/release/libchat_ws_server_application.so" ]; then
     if [ -e "./modules/ws_server/assets/lib/libchat_ws_server_application.so" ]; then
         if [ "$(cat ./target/release/libchat_ws_server_application.so)" != "$(cat ./modules/ws_server/assets/lib/libchat_ws_server_application.so)" ]; then
             mv ./target/release/libchat_ws_server_application.so ./modules/ws_server/assets/lib
+        else
+            echo "No need to move chat_ws_server_application."
         fi
     fi
 fi
@@ -56,9 +60,11 @@ fi
 
 cargo build -r -p simple_authenticator
 if [ -e "./target/release/libsimple_authenticator.so" ]; then
-    if [ -e "./modules/ws_server/assets/lib/libsimple_authenticator.so" ]; then
-        if [ "$(cat ./target/release/libsimple_authenticator.so)" != "$(cat ./modules/ws_server/assets/lib/libsimple_authenticator.so)" ]; then
+    if [ -e "./modules/simple_authenticator/libsimple_authenticator.so" ]; then
+        if [ "$(cat ./target/release/libsimple_authenticator.so)" != "$(cat ./modules/simple_authenticator/libsimple_authenticator.so)" ]; then
             mv ./target/release/libsimple_authenticator.so ./modules/simple_authenticator
+        else
+            echo "No need to move simple_authenticator."
         fi
     fi
 fi
@@ -75,6 +81,8 @@ if [ -e "./target/release/libdb_connector.so" ]; then
     if [ -e "./modules/db_connector/libdb_connector.so" ]; then
         if [ "$(cat ./target/release/libdb_connector.so)" != "$(cat ./modules/db_connector/libdb_connector.so)" ]; then
             mv ./target/release/libdb_connector.so ./modules/db_connector
+        else
+            echo "No need to move db_connector."
         fi
     fi
 fi
@@ -91,6 +99,8 @@ if [ -e "./target/release/libchat_server.so" ]; then
     if [ -e "./modules/chat_server/libdb_connector.so" ]; then
         if [ "$(cat ./target/release/libchat_server.so)" != "$(cat ./modules/chat_server/libdb_connector.so)" ]; then
             mv ./target/release/libchat_server.so ./modules/chat_server
+        else
+            echo "No need to move chat_server."
         fi
     fi
 fi

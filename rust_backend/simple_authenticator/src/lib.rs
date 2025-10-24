@@ -66,7 +66,7 @@ pub extern "Rust" fn on_init(
                 ).await;
                 if let Ok(x) = simple_authenticator_socket_result {
                     println!(
-                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
+                        "[SIMPLE_AUTHENTICATOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!(),
@@ -75,7 +75,7 @@ pub extern "Rust" fn on_init(
                     break (x, simple_authenticator_socket_port);
                 } else {
                     println!(
-                        "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
+                        "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!(),
@@ -84,7 +84,7 @@ pub extern "Rust" fn on_init(
                 }
                 if simple_authenticator_socket_port == u16::MAX {
                     eprintln!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
+                        "[SIMPLE_AUTHENTICATOR] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!()
@@ -179,7 +179,7 @@ async fn get_socket_by_protocol(protocol: &str) -> tokio::net::TcpStream {
             eprintln!(
                 "{}", ansi_term::Color::Red.paint(
                     format!(
-                        "[WS_SERVER::CHAT_WS_SERVER_APPLICATION] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to connect to the socket of the module implemented protocol `{}` on port {}.",
+                        "[SIMPLE_AUTHENTICATOR::CHAT_SIMPLE_AUTHENTICATOR_APPLICATION] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to connect to the socket of the module implemented protocol `{}` on port {}.",
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!(),
@@ -279,7 +279,7 @@ async fn socket_message_processing() {
                         println!(
                         "{}", ansi_term::Color::Blue.paint(
                             format!(
-                                "[WS_SERVER::SIMPLE_AUTHENTICATOR_APPLICATION] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` try to login with the hash: `{}`.",
+                                "[SIMPLE_AUTHENTICATOR::SIMPLE_AUTHENTICATOR_APPLICATION] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` try to login with the hash: `{}`.",
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),
@@ -314,7 +314,7 @@ async fn socket_message_processing() {
                                         println!(
                                         "{}", ansi_term::Color::Blue.paint(
                                             format!(
-                                                "[WS_SERVER::SIMPLE_AUTHENTICATOR_APPLICATION] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` logged in successfully.",
+                                                "[SIMPLE_AUTHENTICATOR::SIMPLE_AUTHENTICATOR_APPLICATION] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` logged in successfully.",
                                                 std::thread::current().id().as_u64(),
                                                 file!(),
                                                 line!(),
@@ -325,7 +325,7 @@ async fn socket_message_processing() {
                                         println!(
                                         "{}", ansi_term::Color::Blue.paint(
                                             format!(
-                                                "[WS_SERVER::SIMPLE_AUTHENTICATOR_APPLICATION] [INFO] [THREAD {}] [FILE `{}` LINE {}] The session token: `{}`.",
+                                                "[SIMPLE_AUTHENTICATOR::SIMPLE_AUTHENTICATOR_APPLICATION] [INFO] [THREAD {}] [FILE `{}` LINE {}] The session token: `{}`.",
                                                 std::thread::current().id().as_u64(),
                                                 file!(),
                                                 line!(),
@@ -382,7 +382,7 @@ async fn socket_message_processing() {
                                         println!(
                                         "{}", ansi_term::Color::Yellow.paint(
                                             format!(
-                                                "[WS_SERVER::SIMPLE_AUTHENTICATOR_APPLICATION] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (The user tried to login with a fake password).",
+                                                "[SIMPLE_AUTHENTICATOR::SIMPLE_AUTHENTICATOR_APPLICATION] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (The user tried to login with a fake password).",
                                                 std::thread::current().id().as_u64(),
                                                 file!(),
                                                 line!(),
@@ -412,7 +412,7 @@ async fn socket_message_processing() {
                                     println!(
                                         "{}", ansi_term::Color::Yellow.paint(
                                             format!(
-                                                "[WS_SERVER::SIMPLE_AUTHENTICATOR_APPLICATION] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (Failed to get queries from the database).",
+                                                "[SIMPLE_AUTHENTICATOR::SIMPLE_AUTHENTICATOR_APPLICATION] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (Failed to get queries from the database).",
                                                 std::thread::current().id().as_u64(),
                                                 file!(),
                                                 line!(),
@@ -443,7 +443,7 @@ async fn socket_message_processing() {
                                 println!(
                                 "{}", ansi_term::Color::Yellow.paint(
                                     format!(
-                                        "[WS_SERVER::SIMPLE_AUTHENTICATOR_APPLICATION] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (Failed to get queries from the database).",
+                                        "[SIMPLE_AUTHENTICATOR::SIMPLE_AUTHENTICATOR_APPLICATION] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (Failed to get queries from the database).",
                                         std::thread::current().id().as_u64(),
                                         file!(),
                                         line!(),
@@ -520,7 +520,7 @@ async fn socket_message_processing() {
                                     println!(
                                         "{}", ansi_term::Color::Blue.paint(
                                             format!(
-                                                "[WS_SERVER::SIMPLE_AUTHENTICATOR_APPLICATION] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` quitted with session token: `{}`.",
+                                                "[SIMPLE_AUTHENTICATOR::SIMPLE_AUTHENTICATOR_APPLICATION] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` quitted with session token: `{}`.",
                                                 std::thread::current().id().as_u64(),
                                                 file!(),
                                                 line!(),
@@ -539,7 +539,7 @@ async fn socket_message_processing() {
                                     println!(
                                         "{}", ansi_term::Color::Yellow.paint(
                                             format!(
-                                                "[WS_SERVER::SIMPLE_AUTHENTICATOR_APPLICATION] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to quit (The user wanted to quit with a fake session token).",
+                                                "[SIMPLE_AUTHENTICATOR::SIMPLE_AUTHENTICATOR_APPLICATION] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to quit (The user wanted to quit with a fake session token).",
                                                 std::thread::current().id().as_u64(),
                                                 file!(),
                                                 line!(),
@@ -578,7 +578,7 @@ async fn socket_message_processing() {
                                 println!(
                                     "{}", ansi_term::Color::Blue.paint(
                                         format!(
-                                            "[WS_SERVER::SIMPLE_AUTHENTICATOR_APPLICATION] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` quitted with session token: `{}`.",
+                                            "[SIMPLE_AUTHENTICATOR::SIMPLE_AUTHENTICATOR_APPLICATION] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` quitted with session token: `{}`.",
                                                 std::thread::current().id().as_u64(),
                                                 file!(),
                                                 line!(),
@@ -601,7 +601,7 @@ async fn socket_message_processing() {
                     }
                 } else {
                     println!(
-                        "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                        "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!()
@@ -609,7 +609,7 @@ async fn socket_message_processing() {
                 }
             } else {
                 println!(
-                    "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                    "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
                     std::thread::current().id().as_u64(),
                     file!(),
                     line!()
@@ -623,12 +623,8 @@ async fn self_management(simple_authenticator_status: AsyncModifiable<ModuleStat
     let mut monitor_time_cnt: usize = 0;
     loop {
         if let Ok(guard_simple_authenticator_status) = simple_authenticator_status.try_lock() {
-            if guard_simple_authenticator_status.panicked {
-                drop(guard_simple_authenticator_status); // Avoid poisoning the mutex lock.
-                panic!();
-            } else if guard_simple_authenticator_status.initialized
-                && SIMPLE_AUTHENTICATOR_SOCKET.get().is_none()
-            {
+            if guard_simple_authenticator_status.panicked || (guard_simple_authenticator_status.initialized
+                && SIMPLE_AUTHENTICATOR_SOCKET.get().is_none()) {
                 drop(guard_simple_authenticator_status); // Avoid poisoning the mutex lock.
                 panic!();
             }

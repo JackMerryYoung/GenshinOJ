@@ -78,6 +78,7 @@ pub extern "Rust" fn on_init(
                     panic!();
                 }
                 ws_server_socket_port += 1;
+                fake_yield_now().await;
             };
             drop(guard_ws_server_status_socket_port);
             drop(guard_ws_server_status);
