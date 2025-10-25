@@ -2,26 +2,24 @@
 
 mod global;
 mod ws_handler;
+mod socket_actions;
 mod self_management;
 mod ws_server_socket;
-mod load_ws_server_applications;
 
 use global::*;
 
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_init(
-    rt: &'static tokio::runtime::Runtime,
     global_module_statuses_by_protocol: AsyncModifiable<
-        std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
-    >,
+        std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>
+    >
 ) -> (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>) {
-    let ws_server_runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
+    let ws_server_runtime: tokio::runtime::Runtime = tokio::runtime::Builder
+        ::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
-    GLOBAL_MODULE_STATUSES_BY_PROTOCOL
-        .set(global_module_statuses_by_protocol.clone())
-        .unwrap();
+    GLOBAL_MODULE_STATUSES_BY_PROTOCOL.set(global_module_statuses_by_protocol.clone()).unwrap();
     let ws_server_status: ModuleStatus = ModuleStatus {
         initialized: false,
         panicked: false,
@@ -52,7 +50,8 @@ pub extern "Rust" fn on_init(
                 ).await;
                 if let Ok(x) = ws_server_socket_result {
                     println!(
-                        "{}", ansi_term::Color::Blue.paint(
+                        "{}",
+                        ansi_term::Color::Blue.paint(
                             format!(
                                 "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
                                 std::thread::current().id().as_u64(),
@@ -65,7 +64,8 @@ pub extern "Rust" fn on_init(
                     break (x, ws_server_socket_port);
                 } else {
                     println!(
-                        "{}", ansi_term::Color::Yellow.paint(
+                        "{}",
+                        ansi_term::Color::Yellow.paint(
                             format!(
                                 "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
                                 std::thread::current().id().as_u64(),
@@ -78,7 +78,8 @@ pub extern "Rust" fn on_init(
                 }
                 if ws_server_socket_port == u16::MAX {
                     eprintln!(
-                        "{}", ansi_term::Color::Red.paint(
+                        "{}",
+                        ansi_term::Color::Red.paint(
                             format!(
                                 "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
                                 std::thread::current().id().as_u64(),
@@ -96,7 +97,8 @@ pub extern "Rust" fn on_init(
             drop(guard_ws_server_status);
             WS_SERVER_SOCKET.set(new_async_modifiable(ws_server_socket)).unwrap();
             println!(
-                "{}", ansi_term::Color::Blue.paint(
+                "{}",
+                ansi_term::Color::Blue.paint(
                     format!(
                         "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initializing the Websocket server...",
                         std::thread::current().id().as_u64(),
@@ -128,7 +130,8 @@ pub extern "Rust" fn on_init(
                 1000,
                 {
                     eprintln!(
-                        "{}", ansi_term::Color::Red.paint(
+                        "{}",
+                        ansi_term::Color::Red.paint(
                             format!(
                                 "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to initialize the Websocket server. Retrying...",
                                 std::thread::current().id().as_u64(),
@@ -142,7 +145,8 @@ pub extern "Rust" fn on_init(
             let listener: tokio::net::TcpListener = match listener {
                 Ok(listener) => {
                     println!(
-                        "{}", ansi_term::Color::Blue.paint(
+                        "{}",
+                        ansi_term::Color::Blue.paint(
                             format!(
                                 "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the Websocket server.",
                                 std::thread::current().id().as_u64(),
@@ -162,7 +166,8 @@ pub extern "Rust" fn on_init(
                 }
                 Err(_) => {
                     eprintln!(
-                        "{}", ansi_term::Color::Red.paint(
+                        "{}",
+                        ansi_term::Color::Red.paint(
                             format!(
                                 "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting...",
                                 std::thread::current().id().as_u64(),
@@ -189,15 +194,15 @@ pub extern "Rust" fn on_init(
         });
     }
 
-    let ws_server_applications_config_json: load_ws_server_applications::WebsocketServerApplicationsConfigJson =
-        load_ws_server_applications::parse_ws_server_applications_config_json();
     {
         let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
             loop {
                 // Waiting for the initialization to be completed.
-                let guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
-                    ws_server_status.lock().await;
+                let guard_ws_server_status: tokio::sync::MutexGuard<
+                    '_,
+                    ModuleStatus
+                > = ws_server_status.lock().await;
                 if guard_ws_server_status.initialized {
                     drop(guard_ws_server_status);
                     break;
@@ -205,42 +210,9 @@ pub extern "Rust" fn on_init(
                 drop(guard_ws_server_status);
                 fake_yield_now().await;
             }
-            // Now load the applications.
-            let mut guard_ws_server_applications_libraries: tokio::sync::MutexGuard<
-                '_,
-                Vec<(dlopen2::symbor::Library, tokio::runtime::Runtime)>,
-            > = WS_SERVER_APPLICATIONS_LIBRARIES.lock().await;
-            if crate::load_ws_server_applications::load_ws_server_applications(
-                rt,
-                &mut guard_ws_server_applications_libraries,
-                global_module_statuses_by_protocol,
-                &ws_server_applications_config_json,
-            )
-            .is_err()
-            {
-                drop(guard_ws_server_applications_libraries);
-                panic!();
-            }
-
-            drop(guard_ws_server_applications_libraries);
-            fake_yield_now().await;
-        });
-    }
-
-    {
-        let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
-        ws_server_runtime.spawn(async move {
-            loop {
-                // Waiting for the initialization to be completed.
-                let guard_ws_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
-                    ws_server_status.lock().await;
-                if guard_ws_server_status.initialized {
-                    drop(guard_ws_server_status);
-                    break;
-                }
-                drop(guard_ws_server_status);
-                fake_yield_now().await;
-            }
+            WS_SERVER_EXTERNAL_LISTENERS_BY_PROTOCOL.set(
+                new_async_modifiable(std::collections::HashMap::new())
+            ).unwrap();
             // Now processing socket message
             crate::ws_server_socket::socket_message_processing().await;
         });
@@ -256,7 +228,8 @@ pub extern "Rust" fn on_init(
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_unload() {
     println!(
-        "{}", ansi_term::Color::Blue.paint(
+        "{}",
+        ansi_term::Color::Blue.paint(
             format!(
                 "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the Websocket server...",
                 std::thread::current().id().as_u64(),
@@ -266,7 +239,8 @@ pub extern "Rust" fn on_unload() {
         )
     );
     println!(
-        "{}", ansi_term::Color::Blue.paint(
+        "{}",
+        ansi_term::Color::Blue.paint(
             format!(
                 "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the Websocket server.",
                 std::thread::current().id().as_u64(),

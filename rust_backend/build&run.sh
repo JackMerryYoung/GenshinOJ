@@ -23,42 +23,6 @@ if [ ! -e "./modules/ws_server/assets" ]; then
     mkdir ./modules/ws_server/assets
 fi
 
-if [ ! -e "./modules/ws_server/assets/lib" ]; then
-    mkdir ./modules/ws_server/assets/lib
-fi
-
-# Building Simple Authenticator Application
-cargo build -r -p simple_authenticator_application > /dev/null
-if [ -e "./target/release/libsimple_authenticator_application.so" ]; then
-    if [ -e "./modules/ws_server/assets/lib/libsimple_authenticator_application.so" ]; then
-        if [ "$(cat ./target/release/libsimple_authenticator_application.so)" != "$(cat ./modules/ws_server/assets/lib/libsimple_authenticator_application.so)" ]; then
-            echo "Moving simple_authenticator_application..."
-            mv ./target/release/libsimple_authenticator_application.so  ./modules/ws_server/assets/lib
-        else
-            echo "No need to move simple_authenticator_application."
-        fi
-    else
-        echo "Moving simple_authenticator_application..."
-        mv ./target/release/libsimple_authenticator_application.so  ./modules/ws_server/assets/lib
-    fi
-fi
-
-# Building Chat Websocket Server Application
-cargo build -r -p chat_ws_server_application
-if [ -e "./target/release/libchat_ws_server_application.so" ]; then
-    if [ -e "./modules/ws_server/assets/lib/libchat_ws_server_application.so" ]; then
-        if [ "$(cat ./target/release/libchat_ws_server_application.so)" != "$(cat ./modules/ws_server/assets/lib/libchat_ws_server_application.so)" ]; then
-            echo "Moving chat_ws_server_application..."
-            mv ./target/release/libchat_ws_server_application.so ./modules/ws_server/assets/lib
-        else
-            echo "No need to move chat_ws_server_application."
-        fi
-    else
-        echo "Moving chat_ws_server_application..."
-        mv ./target/release/libchat_ws_server_application.so ./modules/ws_server/assets/lib
-    fi
-fi
-
 ###############################################################
 
 # Building Simple Authenticator

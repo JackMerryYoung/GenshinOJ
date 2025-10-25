@@ -14,14 +14,15 @@ pub struct ModuleStatus {
     socket_port: AsyncModifiable<u16>,
 }
 
-static CHAT_SERVER_SOCKET: std::sync::OnceLock<AsyncModifiable<tokio::net::TcpListener>> =
-    std::sync::OnceLock::new();
+static CHAT_SERVER_SOCKET: std::sync::OnceLock<AsyncModifiable<tokio::net::TcpListener>> = std::sync::OnceLock::new();
 
 async fn wait_for_initialized(chat_server_status: AsyncModifiable<ModuleStatus>) {
     loop {
         // Waiting for the initialization to be completed.
-        let guard_chat_server_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
-            chat_server_status.lock().await;
+        let guard_chat_server_status: tokio::sync::MutexGuard<
+            '_,
+            ModuleStatus
+        > = chat_server_status.lock().await;
         if guard_chat_server_status.initialized && CHAT_SERVER_SOCKET.get().is_some() {
             drop(guard_chat_server_status);
             break;
@@ -32,17 +33,17 @@ async fn wait_for_initialized(chat_server_status: AsyncModifiable<ModuleStatus>)
 }
 
 static GLOBAL_MODULE_STATUSES_BY_PROTOCOL: std::sync::OnceLock<
-    AsyncModifiable<std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>>,
+    AsyncModifiable<std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>>
 > = std::sync::OnceLock::new();
 
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_init(
-    _rt: &'static tokio::runtime::Runtime,
     global_module_statuses_by_protocol: AsyncModifiable<
-        std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>,
-    >,
+        std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>
+    >
 ) -> (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>) {
-    let chat_server_runtime: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
+    let chat_server_runtime: tokio::runtime::Runtime = tokio::runtime::Builder
+        ::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
@@ -53,10 +54,8 @@ pub extern "Rust" fn on_init(
     };
     let chat_server_status: AsyncModifiable<ModuleStatus> =
         new_async_modifiable(chat_server_status);
-    
-    GLOBAL_MODULE_STATUSES_BY_PROTOCOL
-        .set(global_module_statuses_by_protocol)
-        .unwrap();
+
+    GLOBAL_MODULE_STATUSES_BY_PROTOCOL.set(global_module_statuses_by_protocol).unwrap();
     // Initialization
     {
         let chat_server_status: AsyncModifiable<ModuleStatus> = chat_server_status.clone();
@@ -81,7 +80,8 @@ pub extern "Rust" fn on_init(
                 ).await;
                 if let Ok(x) = chat_server_socket_result {
                     println!(
-                        "{}", ansi_term::Color::Blue.paint(
+                        "{}",
+                        ansi_term::Color::Blue.paint(
                             format!(
                                 "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
                                 std::thread::current().id().as_u64(),
@@ -94,7 +94,8 @@ pub extern "Rust" fn on_init(
                     break (x, chat_server_socket_port);
                 } else {
                     println!(
-                        "{}", ansi_term::Color::Yellow.paint(
+                        "{}",
+                        ansi_term::Color::Yellow.paint(
                             format!(
                                 "[CHAT_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
                                 std::thread::current().id().as_u64(),
@@ -107,7 +108,8 @@ pub extern "Rust" fn on_init(
                 }
                 if chat_server_socket_port == u16::MAX {
                     eprintln!(
-                        "{}", ansi_term::Color::Red.paint(
+                        "{}",
+                        ansi_term::Color::Red.paint(
                             format!(
                                 "[CHAT_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
                                 std::thread::current().id().as_u64(),
@@ -161,8 +163,10 @@ struct SocketJsonMessageContentOnSendMsg {
 }
 
 async fn socket_message_processing() {
-    let guard_chat_server_socket: tokio::sync::MutexGuard<'_, tokio::net::TcpListener> =
-        CHAT_SERVER_SOCKET.get().unwrap().lock().await;
+    let guard_chat_server_socket: tokio::sync::MutexGuard<
+        '_,
+        tokio::net::TcpListener
+    > = CHAT_SERVER_SOCKET.get().unwrap().lock().await;
     loop {
         let (mut client, _) = guard_chat_server_socket.accept().await.unwrap();
         tokio::spawn(async move {
@@ -170,7 +174,8 @@ async fn socket_message_processing() {
             let mut buf: bytes::BytesMut = bytes::BytesMut::with_capacity(1024);
             client.read_buf(&mut buf).await.unwrap();
             println!(
-                "{}", ansi_term::Color::Blue.paint(
+                "{}",
+                ansi_term::Color::Blue.paint(
                     format!(
                         "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
                         std::thread::current().id().as_u64(),
@@ -187,7 +192,8 @@ async fn socket_message_processing() {
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_unload() {
     println!(
-        "{}", ansi_term::Color::Blue.paint(
+        "{}",
+        ansi_term::Color::Blue.paint(
             format!(
                 "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the chat server...",
                 std::thread::current().id().as_u64(),
@@ -197,7 +203,8 @@ pub extern "Rust" fn on_unload() {
         )
     );
     println!(
-        "{}", ansi_term::Color::Blue.paint(
+        "{}",
+        ansi_term::Color::Blue.paint(
             format!(
                 "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the chat server.",
                 std::thread::current().id().as_u64(),
@@ -210,12 +217,19 @@ pub extern "Rust" fn on_unload() {
 
 async fn self_management(chat_server_status: AsyncModifiable<ModuleStatus>) {
     let global_module_statuses_by_protocol = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get().unwrap();
-    let mut guard_global_module_statuses_by_protocol = global_module_statuses_by_protocol.lock().await;
-    guard_global_module_statuses_by_protocol.insert(String::from("chat_server"), chat_server_status.clone());
+    let mut guard_global_module_statuses_by_protocol =
+        global_module_statuses_by_protocol.lock().await;
+    guard_global_module_statuses_by_protocol.insert(
+        String::from("chat_server"),
+        chat_server_status.clone()
+    );
     let mut monitor_time_cnt: usize = 0;
     loop {
         if let Ok(guard_chat_server_status) = chat_server_status.try_lock() {
-            if guard_chat_server_status.panicked || (guard_chat_server_status.initialized && CHAT_SERVER_SOCKET.get().is_none()) {
+            if
+                guard_chat_server_status.panicked ||
+                (guard_chat_server_status.initialized && CHAT_SERVER_SOCKET.get().is_none())
+            {
                 drop(guard_chat_server_status); // Avoid poisoning the mutex lock.
                 panic!();
             }
@@ -224,7 +238,8 @@ async fn self_management(chat_server_status: AsyncModifiable<ModuleStatus>) {
             if monitor_time_cnt == 600 {
                 // Show monitoring message per minute.
                 println!(
-                    "{}", ansi_term::Color::Blue.paint(
+                    "{}",
+                    ansi_term::Color::Blue.paint(
                         format!(
                             "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well.",
                             std::thread::current().id().as_u64(),
@@ -245,8 +260,5 @@ async fn self_management(chat_server_status: AsyncModifiable<ModuleStatus>) {
 const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
 
 async fn fake_yield_now() {
-    tokio::time::sleep(tokio::time::Duration::from_millis(
-        FAKE_YIELD_NOW_MILLISECONDS,
-    ))
-    .await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(FAKE_YIELD_NOW_MILLISECONDS)).await;
 }

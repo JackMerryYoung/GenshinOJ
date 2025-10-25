@@ -208,25 +208,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chat_ws_server_application"
-version = "0.1.0"
-dependencies = [
- "ansi_term",
- "axum",
- "bytes",
- "futures-core",
- "futures-sink",
- "futures-util",
- "rand 0.9.1",
- "rust-crypto",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "client-ip"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -838,16 +819,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 
 [[package]]
-name = "md-5"
-version = "0.10.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d89e7ee0cfbedfc4da3340218492196241d89eefb6dab27de5df917a6d2e78cf"
-dependencies = [
- "cfg-if",
- "digest",
-]
-
-[[package]]
 name = "memchr"
 version = "2.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1402,28 +1373,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "uuid",
-]
-
-[[package]]
-name = "simple_authenticator_application"
-version = "0.1.0"
-dependencies = [
- "ansi_term",
- "axum",
- "bytes",
- "dlopen2",
- "futures-core",
- "futures-sink",
- "futures-util",
- "md-5",
- "mysql_async",
- "retry",
- "rust-crypto",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
  "uuid",
 ]
 
