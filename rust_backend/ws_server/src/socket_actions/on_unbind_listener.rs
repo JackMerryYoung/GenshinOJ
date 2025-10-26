@@ -6,7 +6,7 @@ pub struct SocketJsonMessageContentOnBindListener {
     pub commands_to_bind: Vec<String>,
 }
 
-pub async fn on_bind_listener(msg: SocketJsonMessage) {
+pub async fn on_unbind_listener(msg: SocketJsonMessage) {
     if
         let Ok(content) = serde_json::from_value::<SocketJsonMessageContentOnBindListener>(
             msg.content
@@ -21,13 +21,13 @@ pub async fn on_bind_listener(msg: SocketJsonMessage) {
                 let Some(external_listener) =
                     (*guard_ws_server_external_listeners_by_command).get_mut(&command_to_bind)
             {
-                let result = external_listener.protocols.insert(content.protocol.clone());
+                let result = external_listener.protocols.remove(&content.protocol);
                 if !result {
                     println!(
                         "{}",
                         ansi_term::Color::Yellow.paint(
                             format!(
-                                "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to bind a listener whose protocol exists.",
+                                "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to unbind a listener whose protocol doesn't exist.",
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!()
@@ -40,7 +40,7 @@ pub async fn on_bind_listener(msg: SocketJsonMessage) {
                     "{}",
                     ansi_term::Color::Yellow.paint(
                         format!(
-                            "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to bind a listener whose command is not implemented.",
+                            "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to unbind a listener whose command is not implemented.",
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!()

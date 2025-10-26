@@ -210,7 +210,7 @@ pub extern "Rust" fn on_init(
                 drop(guard_ws_server_status);
                 fake_yield_now().await;
             }
-            WS_SERVER_EXTERNAL_LISTENERS_BY_PROTOCOL.set(
+            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.set(
                 new_async_modifiable(std::collections::HashMap::new())
             ).unwrap();
             // Now processing socket message

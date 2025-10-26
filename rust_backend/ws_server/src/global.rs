@@ -127,17 +127,18 @@ pub static WS_SERVER_SOCKET: std::sync::OnceLock<AsyncModifiable<tokio::net::Tcp
 
 #[derive(Debug)]
 pub struct ExternalListener {
-    pub commands_listening: std::collections::HashSet<String>, // List of commands which are listened by this listener.
+    pub command: String, // Represents what command they listen to.
+    pub protocols: std::collections::HashSet<String>, // List of protocols implemented by modules which listen to this command.
 }
 
 /**
-    # `WS_SERVER_EXTERNAL_LISTENERS_BY_PROTOCOL`
+    # `WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND`
 
     Represents several external modules' listeners.
 
-    **External listeners can be indexed by specifying protocol**.
+    **External listeners can be indexed by specifying commands**.
  */
-pub static WS_SERVER_EXTERNAL_LISTENERS_BY_PROTOCOL: std::sync::OnceLock<
+pub static WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND: std::sync::OnceLock<
     AsyncModifiable<std::collections::HashMap<String, ExternalListener>>
 > = std::sync::OnceLock::new();
 
@@ -153,6 +154,13 @@ pub struct SocketJsonMessage {
 pub struct WebsocketServerJsonMessage {
     pub r#type: String,
     pub content: serde_json::Value,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct WebsocketServerJsonMessageWithWsId {
+    pub r#type: String,
+    pub content: serde_json::Value,
+    pub ws_id: String,
 }
 
 pub fn get_parent_path() -> String {
