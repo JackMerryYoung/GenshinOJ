@@ -1,5 +1,3 @@
-use tokio::io::AsyncWriteExt;
-
 use crate::global::*;
 
 pub async fn ip_handler(
@@ -7,11 +5,13 @@ pub async fn ip_handler(
     request: axum::extract::Request,
     next: axum::middleware::Next
 ) -> axum::response::Response {
+    // Show IP when connected.
     println!(
         "{}",
         ansi_term::Color::Blue.paint(
             format!(
-                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Connection from `{}` established.",
+                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Connection from `{}` established.",
+                MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
                 line!(),
@@ -33,7 +33,8 @@ pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
         "{}",
         ansi_term::Color::Blue.paint(
             format!(
-                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Websocket connection established.",
+                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Websocket connection established.",
+                MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
                 line!()
@@ -52,6 +53,7 @@ pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
 
     let ws_id: uuid::Uuid = uuid::Uuid::new_v4();
     while let Some(original_msg) = ws.recv().await {
+        // Receive messages.
         if let Ok(original_msg) = original_msg {
             match original_msg {
                 axum::extract::ws::Message::Text(text) => {
@@ -60,49 +62,39 @@ pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
                             text.as_str()
                         )
                     {
-                        let ws_server_external_listeners_by_command =
-                            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.get().unwrap();
+                        // Received JSON message.
                         let guard_ws_server_external_listeners_by_command =
-                            ws_server_external_listeners_by_command.lock().await;
-                        let json_msg_with_ws_id = WebsocketServerJsonMessageWithWsId {
-                            r#type: json_msg.r#type,
-                            content: json_msg.content,
-                            ws_id: ws_id.to_string(),
-                        };
+                            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.lock().await;
+                        let json_msg_with_ws_id: SocketJsonMessageWithWsId =
+                            SocketJsonMessageWithWsId {
+                                r#type: json_msg.r#type,
+                                content: json_msg.content,
+                                request_key: uuid::Uuid::new_v4().to_string(),
+                                from_protocol: String::from("std_ws_server@0.1.0"),
+                                ws_id: ws_id.to_string(),
+                            };
                         if
                             let Some(external_listener) =
                                 (*guard_ws_server_external_listeners_by_command).get(
                                     &json_msg_with_ws_id.r#type
                                 )
                         {
+                            let json_msg_with_ws_id_value = serde_json
+                                ::to_value(json_msg_with_ws_id)
+                                .unwrap();
                             for protocol in &external_listener.protocols {
-                                let mut socket =
-                                    crate::ws_server_socket::get_socket_by_protocol(protocol).await;
-                                let json_msg_str = serde_json
-                                    ::to_string(&json_msg_with_ws_id)
-                                    .unwrap();
-                                let x = socket.write_all(json_msg_str.as_bytes()).await;
-                                if x.is_err() {
-                                    println!(
-                                        "{}",
-                                        ansi_term::Color::Yellow.paint(
-                                            format!(
-                                                "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to send message to protocol `{}`.",
-                                                std::thread::current().id().as_u64(),
-                                                &protocol,
-                                                file!(),
-                                                line!()
-                                            )
-                                        )
-                                    );
-                                }
+                                send_socket_json_message(
+                                    &json_msg_with_ws_id_value,
+                                    protocol
+                                ).await;
                             }
                         } else {
                             println!(
                                 "{}",
                                 ansi_term::Color::Yellow.paint(
                                     format!(
-                                        "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to bind a listener whose command is not implemented.",
+                                        "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to bind a listener whose command is not implemented.",
+                                        MODULE_IDENTITY,
                                         std::thread::current().id().as_u64(),
                                         file!(),
                                         line!()
@@ -117,7 +109,8 @@ pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
                         "{}",
                         ansi_term::Color::Blue.paint(
                             format!(
-                                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Websocket connection closed.",
+                                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Websocket connection closed.",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!()

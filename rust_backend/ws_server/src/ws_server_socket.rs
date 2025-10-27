@@ -18,11 +18,13 @@ pub async fn socket_message_processing() {
                 serde_json::Error
             > = serde_json::from_slice::<SocketJsonMessage>(&buf);
             if let Ok(msg) = msg {
+                // INFO: Received socket message: xxx
                 println!(
                     "{}",
                     ansi_term::Color::Blue.paint(
                         format!(
-                            "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
+                            "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
+                            MODULE_IDENTITY,
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!(),
@@ -37,11 +39,13 @@ pub async fn socket_message_processing() {
                 } else if msg.r#type == "on_unbind_listener" {
                     socket_actions::on_unbind_listener::on_unbind_listener(msg).await;
                 } else {
+                    // WARNING: The JSON message received is not implemented.
                     println!(
                         "{}",
                         ansi_term::Color::Yellow.paint(
                             format!(
-                                "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is not implemented.",
+                                "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is not implemented.",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!()
@@ -50,11 +54,13 @@ pub async fn socket_message_processing() {
                     );
                 }
             } else {
+                // WARNING: The JSON message received is in wrong format.
                 println!(
                     "{}",
                     ansi_term::Color::Yellow.paint(
                         format!(
-                            "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                            "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                            MODULE_IDENTITY,
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!()
@@ -63,40 +69,5 @@ pub async fn socket_message_processing() {
                 );
             }
         });
-    }
-}
-
-pub async fn get_socket_port_by_protocol(protocol: &str) -> u16 {
-    let guard_global_module_statuses_by_protocol: tokio::sync::MutexGuard<
-        '_,
-        std::collections::HashMap<String, std::sync::Arc<tokio::sync::Mutex<ModuleStatus>>>
-    > = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get().unwrap().lock().await;
-    let guard_status: tokio::sync::MutexGuard<
-        '_,
-        ModuleStatus
-    > = guard_global_module_statuses_by_protocol.get(protocol).unwrap().lock().await;
-    *guard_status.socket_port.lock().await
-}
-
-pub async fn get_socket_by_protocol(protocol: &str) -> tokio::net::TcpStream {
-    let socket_port: u16 = get_socket_port_by_protocol(protocol).await;
-    match tokio::net::TcpStream::connect(format!("127.0.0.1:{socket_port}")).await {
-        Ok(socket) => socket,
-        Err(_) => {
-            eprintln!(
-                "{}",
-                ansi_term::Color::Red.paint(
-                    format!(
-                        "[SIMPLE_AUTHENTICATOR] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to connect to the socket of the module implemented protocol `{}` on port {}.",
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!(),
-                        protocol,
-                        socket_port
-                    )
-                )
-            );
-            panic!();
-        }
     }
 }

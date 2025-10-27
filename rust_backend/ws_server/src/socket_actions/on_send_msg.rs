@@ -3,7 +3,7 @@ use crate::global::*;
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct SocketJsonMessageContentOnSendMsg {
     pub ws_id: String,
-    pub json_msg: serde_json::Value,
+    pub msg_to_send: serde_json::Value,
 }
 
 pub async fn on_send_msg(msg: SocketJsonMessage) {
@@ -26,7 +26,7 @@ pub async fn on_send_msg(msg: SocketJsonMessage) {
             guard_ws
                 .send(
                     axum::extract::ws::Message::from(
-                        serde_json::to_string(&content.json_msg).unwrap()
+                        serde_json::to_string(&content.msg_to_send).unwrap()
                     )
                 ).await
                 .is_err()
@@ -35,7 +35,8 @@ pub async fn on_send_msg(msg: SocketJsonMessage) {
                 "{}",
                 ansi_term::Color::Red.paint(
                     format!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to send JSON Message.",
+                        "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to send JSON Message.",
+                        MODULE_IDENTITY,
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!()
@@ -51,7 +52,8 @@ pub async fn on_send_msg(msg: SocketJsonMessage) {
             "{}",
             ansi_term::Color::Yellow.paint(
                 format!(
-                    "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                    "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                    MODULE_IDENTITY,
                     std::thread::current().id().as_u64(),
                     file!(),
                     line!()

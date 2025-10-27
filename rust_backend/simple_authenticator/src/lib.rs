@@ -10,7 +10,6 @@ use crate::global::*;
 
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_init(
-    _rt: &'static tokio::runtime::Runtime,
     global_module_statuses_by_protocol: AsyncModifiable<
         std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>
     >

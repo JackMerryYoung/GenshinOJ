@@ -53,7 +53,8 @@ pub extern "Rust" fn on_init(
                         "{}",
                         ansi_term::Color::Blue.paint(
                             format!(
-                                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
+                                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),
@@ -67,7 +68,8 @@ pub extern "Rust" fn on_init(
                         "{}",
                         ansi_term::Color::Yellow.paint(
                             format!(
-                                "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
+                                "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),
@@ -81,7 +83,8 @@ pub extern "Rust" fn on_init(
                         "{}",
                         ansi_term::Color::Red.paint(
                             format!(
-                                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
+                                "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!()
@@ -100,7 +103,8 @@ pub extern "Rust" fn on_init(
                 "{}",
                 ansi_term::Color::Blue.paint(
                     format!(
-                        "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initializing the Websocket server...",
+                        "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initializing the Websocket server...",
+                        MODULE_IDENTITY,
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!()
@@ -133,7 +137,8 @@ pub extern "Rust" fn on_init(
                         "{}",
                         ansi_term::Color::Red.paint(
                             format!(
-                                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to initialize the Websocket server. Retrying...",
+                                "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to initialize the Websocket server. Retrying...",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!()
@@ -148,7 +153,8 @@ pub extern "Rust" fn on_init(
                         "{}",
                         ansi_term::Color::Blue.paint(
                             format!(
-                                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the Websocket server.",
+                                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the Websocket server.",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!()
@@ -169,7 +175,8 @@ pub extern "Rust" fn on_init(
                         "{}",
                         ansi_term::Color::Red.paint(
                             format!(
-                                "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting...",
+                                "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting...",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!()
@@ -210,9 +217,6 @@ pub extern "Rust" fn on_init(
                 drop(guard_ws_server_status);
                 fake_yield_now().await;
             }
-            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.set(
-                new_async_modifiable(std::collections::HashMap::new())
-            ).unwrap();
             // Now processing socket message
             crate::ws_server_socket::socket_message_processing().await;
         });
@@ -231,7 +235,8 @@ pub extern "Rust" fn on_unload() {
         "{}",
         ansi_term::Color::Blue.paint(
             format!(
-                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the Websocket server...",
+                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the Websocket server...",
+                MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
                 line!()
@@ -242,7 +247,8 @@ pub extern "Rust" fn on_unload() {
         "{}",
         ansi_term::Color::Blue.paint(
             format!(
-                "[WS_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the Websocket server.",
+                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the Websocket server.",
+                MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
                 line!()

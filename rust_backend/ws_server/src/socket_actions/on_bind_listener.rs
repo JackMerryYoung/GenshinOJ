@@ -12,10 +12,8 @@ pub async fn on_bind_listener(msg: SocketJsonMessage) {
             msg.content
         )
     {
-        let ws_server_external_listeners_by_command =
-            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.get().unwrap();
         let mut guard_ws_server_external_listeners_by_command =
-            ws_server_external_listeners_by_command.lock().await;
+            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.lock().await;
         for command_to_bind in content.commands_to_bind {
             if
                 let Some(external_listener) =
@@ -27,7 +25,8 @@ pub async fn on_bind_listener(msg: SocketJsonMessage) {
                         "{}",
                         ansi_term::Color::Yellow.paint(
                             format!(
-                                "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to bind a listener whose protocol exists.",
+                                "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to bind a listener whose protocol exists.",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!()
@@ -40,7 +39,8 @@ pub async fn on_bind_listener(msg: SocketJsonMessage) {
                     "{}",
                     ansi_term::Color::Yellow.paint(
                         format!(
-                            "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to bind a listener whose command is not implemented.",
+                            "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to bind a listener whose command is not implemented.",
+                            MODULE_IDENTITY,
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!()
@@ -54,7 +54,8 @@ pub async fn on_bind_listener(msg: SocketJsonMessage) {
             "{}",
             ansi_term::Color::Yellow.paint(
                 format!(
-                    "[WS_SERVER] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                    "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                    MODULE_IDENTITY,
                     std::thread::current().id().as_u64(),
                     file!(),
                     line!()

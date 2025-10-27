@@ -1,3 +1,7 @@
+use tokio::io::AsyncWriteExt;
+
+pub static MODULE_IDENTITY: &str = "WS_SERVER";
+
 /**
     # `retry!()`
 
@@ -27,7 +31,8 @@
                 "{}",
                 ansi_term::Color::Red.paint(
                     format!(
-                        "[WS_SERVER] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to initialize the Websocket server. Retrying...",
+                        "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to initialize the Websocket server. Retrying...",
+                        MODULE_IDENTITY,
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!()
@@ -138,9 +143,15 @@ pub struct ExternalListener {
 
     **External listeners can be indexed by specifying commands**.
  */
-pub static WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND: std::sync::OnceLock<
+pub static WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND: std::sync::LazyLock<
     AsyncModifiable<std::collections::HashMap<String, ExternalListener>>
-> = std::sync::OnceLock::new();
+> = std::sync::LazyLock::new(|| new_async_modifiable(std::collections::HashMap::new()));
+
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct WebsocketServerJsonMessage {
+    pub r#type: String,
+    pub content: serde_json::Value,
+}
 
 #[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug)]
 pub struct SocketJsonMessage {
@@ -151,16 +162,69 @@ pub struct SocketJsonMessage {
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
-pub struct WebsocketServerJsonMessage {
+pub struct SocketJsonMessageWithWsId {
     pub r#type: String,
     pub content: serde_json::Value,
+    pub request_key: String,
+    pub from_protocol: String,
+    pub ws_id: String,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
-pub struct WebsocketServerJsonMessageWithWsId {
-    pub r#type: String,
-    pub content: serde_json::Value,
-    pub ws_id: String,
+pub async fn get_socket_port_by_protocol(protocol: &str) -> u16 {
+    let guard_global_module_statuses_by_protocol: tokio::sync::MutexGuard<
+        '_,
+        std::collections::HashMap<String, std::sync::Arc<tokio::sync::Mutex<ModuleStatus>>>
+    > = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get().unwrap().lock().await;
+    let guard_status: tokio::sync::MutexGuard<
+        '_,
+        ModuleStatus
+    > = guard_global_module_statuses_by_protocol.get(protocol).unwrap().lock().await;
+    *guard_status.socket_port.lock().await
+}
+
+pub async fn get_socket_by_protocol(protocol: &str) -> tokio::net::TcpStream {
+    let socket_port: u16 = get_socket_port_by_protocol(protocol).await;
+    match tokio::net::TcpStream::connect(format!("127.0.0.1:{socket_port}")).await {
+        Ok(socket) => socket,
+        Err(_) => {
+            eprintln!(
+                "{}",
+                ansi_term::Color::Red.paint(
+                    format!(
+                        "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to connect to the socket of the module implemented protocol `{}` on port {}.",
+                        MODULE_IDENTITY,
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
+                        protocol,
+                        socket_port
+                    )
+                )
+            );
+            panic!();
+        }
+    }
+}
+
+pub async fn send_socket_json_message(msg_to_send: &serde_json::Value, to_protocol: &String) {
+    let mut socket = get_socket_by_protocol(to_protocol).await;
+    let json_msg_str = serde_json::to_string(&msg_to_send).unwrap();
+    let result = socket.write_all(json_msg_str.as_bytes()).await;
+    if result.is_err() {
+        println!(
+            "{}",
+            ansi_term::Color::Yellow.paint(
+                format!(
+                    "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to send message to protocol `{}`.",
+                    MODULE_IDENTITY,
+                    std::thread::current().id().as_u64(),
+                    to_protocol,
+                    file!(),
+                    line!()
+                )
+            )
+        );
+    }
 }
 
 pub fn get_parent_path() -> String {
