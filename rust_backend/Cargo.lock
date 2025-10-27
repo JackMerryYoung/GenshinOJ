@@ -209,6 +209,7 @@ dependencies = [
  "ansi_term",
  "axum",
  "bytes",
+ "chrono",
  "dlopen2",
  "serde",
  "serde_json",

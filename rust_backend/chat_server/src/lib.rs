@@ -1,5 +1,6 @@
 #![feature(thread_id_value)]
 use tokio::io::AsyncReadExt;
+use chrono::{ DateTime, TimeDelta, Utc };
 
 type AsyncModifiable<T> = std::sync::Arc<tokio::sync::Mutex<T>>;
 
@@ -223,7 +224,7 @@ async fn self_management(chat_server_status: AsyncModifiable<ModuleStatus>) {
         String::from("chat_server"),
         chat_server_status.clone()
     );
-    let mut monitor_time_cnt: usize = 0;
+    let mut time_last: DateTime<Utc> = Utc::now();
     loop {
         if let Ok(guard_chat_server_status) = chat_server_status.try_lock() {
             if
@@ -234,8 +235,8 @@ async fn self_management(chat_server_status: AsyncModifiable<ModuleStatus>) {
                 panic!();
             }
             drop(guard_chat_server_status);
-            monitor_time_cnt += 1;
-            if monitor_time_cnt == 600 {
+            let time_now = Utc::now();
+            if time_now - time_last >= TimeDelta::minutes(1) {
                 // Show monitoring message per minute.
                 println!(
                     "{}",
@@ -248,7 +249,7 @@ async fn self_management(chat_server_status: AsyncModifiable<ModuleStatus>) {
                         )
                     )
                 );
-                monitor_time_cnt = 0;
+                time_last = time_now;
             }
             fake_yield_now().await;
         } else {

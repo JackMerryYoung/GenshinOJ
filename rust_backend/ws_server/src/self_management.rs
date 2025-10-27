@@ -14,7 +14,7 @@ pub async fn self_management(ws_server_status: AsyncModifiable<ModuleStatus>) {
             }
             drop(guard_ws_server_status);
             let time_now = Utc::now();
-            if time_last - time_now >= TimeDelta::minutes(1) {
+            if time_now - time_last >= TimeDelta::minutes(1) {
                 // Show monitoring message per minute.
                 let guard_ws_server_connections_cnt: tokio::sync::MutexGuard<
                     '_,

@@ -15,7 +15,7 @@ pub async fn self_management(simple_authenticator_status: AsyncModifiable<Module
             }
             drop(guard_simple_authenticator_status);
             let time_now = Utc::now();
-            if time_last - time_now >= TimeDelta::minutes(1) {
+            if time_now - time_last >= TimeDelta::minutes(1) {
                 // Show monitoring message per minute.
                 println!(
                     "{}",
