@@ -234,8 +234,12 @@ pub fn get_parent_path() -> String {
     String::from(pwd.to_str().unwrap())
 }
 
-pub const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
+const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
 
-pub async fn fake_yield_now() {
-    tokio::time::sleep(tokio::time::Duration::from_millis(FAKE_YIELD_NOW_MILLISECONDS)).await;
+pub async fn fake_yield_now(tm: u64) {
+    if tm == 0 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(FAKE_YIELD_NOW_MILLISECONDS)).await;
+    } else {
+        tokio::time::sleep(tokio::time::Duration::from_millis(tm)).await;
+    }
 }

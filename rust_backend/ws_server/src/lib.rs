@@ -94,7 +94,7 @@ pub extern "Rust" fn on_init(
                     panic!();
                 }
                 ws_server_socket_port += 1;
-                fake_yield_now().await;
+                fake_yield_now(0).await;
             };
             drop(guard_ws_server_status_socket_port);
             drop(guard_ws_server_status);
@@ -215,7 +215,7 @@ pub extern "Rust" fn on_init(
                     break;
                 }
                 drop(guard_ws_server_status);
-                fake_yield_now().await;
+                fake_yield_now(200).await;
             }
             // Now processing socket message
             crate::ws_server_socket::socket_message_processing().await;

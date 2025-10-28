@@ -24,7 +24,7 @@ pub async fn self_management(ws_server_status: AsyncModifiable<ModuleStatus>) {
                     "{}",
                     ansi_term::Color::Blue.paint(
                         format!(
-                            "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well with {} connections in total.",
+                            "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well with {} connection(s) in total.",
                             MODULE_IDENTITY,
                             std::thread::current().id().as_u64(),
                             file!(),
@@ -35,9 +35,9 @@ pub async fn self_management(ws_server_status: AsyncModifiable<ModuleStatus>) {
                 );
                 time_last = time_now;
             }
-            fake_yield_now().await;
+            fake_yield_now(200).await;
         } else {
-            fake_yield_now().await;
+            fake_yield_now(200).await;
         }
     }
 }

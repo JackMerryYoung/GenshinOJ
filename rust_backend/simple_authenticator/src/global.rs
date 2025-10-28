@@ -176,6 +176,10 @@ pub async fn send_socket_json_message(msg_to_send: &serde_json::Value, to_protoc
 
 const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
 
-pub async fn fake_yield_now() {
-    tokio::time::sleep(tokio::time::Duration::from_millis(FAKE_YIELD_NOW_MILLISECONDS)).await;
+pub async fn fake_yield_now(tm: u64) {
+    if tm == 0 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(FAKE_YIELD_NOW_MILLISECONDS)).await;
+    } else {
+        tokio::time::sleep(tokio::time::Duration::from_millis(tm)).await;
+    }
 }

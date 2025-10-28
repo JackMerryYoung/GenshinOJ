@@ -21,7 +21,8 @@ pub async fn self_management(simple_authenticator_status: AsyncModifiable<Module
                     "{}",
                     ansi_term::Color::Blue.paint(
                         format!(
-                            "[SIMPLE_AUTHENTICATOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well.",
+                            "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well.",
+                            MODULE_IDENTITY,
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!()
@@ -30,9 +31,9 @@ pub async fn self_management(simple_authenticator_status: AsyncModifiable<Module
                 );
                 time_last = time_now;
             }
-            fake_yield_now().await;
+            fake_yield_now(200).await;
         } else {
-            fake_yield_now().await;
+            fake_yield_now(200).await;
         }
     }
 }

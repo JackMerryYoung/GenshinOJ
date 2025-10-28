@@ -25,7 +25,8 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
             "{}",
             ansi_term::Color::Blue.paint(
                 format!(
-                    "[SIMPLE_AUTHENTICATOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` try to login with the hash: `{}`.",
+                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` try to login with the hash: `{}`.",
+                    MODULE_IDENTITY,
                     std::thread::current().id().as_u64(),
                     file!(),
                     line!(),
@@ -60,7 +61,8 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                             "{}",
                             ansi_term::Color::Blue.paint(
                                 format!(
-                                    "[SIMPLE_AUTHENTICATOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` logged in successfully.",
+                                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` logged in successfully.",
+                                    MODULE_IDENTITY,
                                     std::thread::current().id().as_u64(),
                                     file!(),
                                     line!(),
@@ -72,7 +74,8 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                             "{}",
                             ansi_term::Color::Blue.paint(
                                 format!(
-                                    "[SIMPLE_AUTHENTICATOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] The session token: `{}`.",
+                                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The session token: `{}`.",
+                                    MODULE_IDENTITY,
                                     std::thread::current().id().as_u64(),
                                     file!(),
                                     line!(),
@@ -112,7 +115,8 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                             "{}",
                             ansi_term::Color::Yellow.paint(
                                 format!(
-                                    "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (The user tried to login with a fake password).",
+                                    "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (The user tried to login with a fake password).",
+                                    MODULE_IDENTITY,
                                     std::thread::current().id().as_u64(),
                                     file!(),
                                     line!(),
@@ -126,7 +130,8 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                         "{}",
                         ansi_term::Color::Yellow.paint(
                             format!(
-                                "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (Failed to get queries from the database).",
+                                "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (Failed to get queries from the database).",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),
@@ -141,7 +146,8 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                     "{}",
                     ansi_term::Color::Yellow.paint(
                         format!(
-                            "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (Failed to get queries from the database).",
+                            "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (Failed to get queries from the database).",
+                            MODULE_IDENTITY,
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!(),

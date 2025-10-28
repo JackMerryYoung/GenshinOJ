@@ -55,7 +55,8 @@ pub extern "Rust" fn on_init(
                         "{}",
                         ansi_term::Color::Blue.paint(
                             format!(
-                                "[SIMPLE_AUTHENTICATOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
+                                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),
@@ -69,7 +70,8 @@ pub extern "Rust" fn on_init(
                         "{}",
                         ansi_term::Color::Yellow.paint(
                             format!(
-                                "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
+                                "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to open the socket on port {}. Retrying...",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),
@@ -83,7 +85,8 @@ pub extern "Rust" fn on_init(
                         "{}",
                         ansi_term::Color::Red.paint(
                             format!(
-                                "[SIMPLE_AUTHENTICATOR] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
+                                "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Exceeded maximum retry times. Now quitting... ",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!()
@@ -93,7 +96,7 @@ pub extern "Rust" fn on_init(
                     panic!();
                 }
                 simple_authenticator_socket_port += 1;
-                fake_yield_now().await;
+                fake_yield_now(0).await;
             };
             SIMPLE_AUTHENTICATOR_SOCKET.set(
                 new_async_modifiable(simple_authenticator_socket)
@@ -119,7 +122,70 @@ pub extern "Rust" fn on_init(
                     break;
                 }
                 drop(guard_simple_authenticator_status);
-                fake_yield_now().await;
+                fake_yield_now(200).await;
+            }
+
+            fake_yield_now(3000).await; // TODO: Fix dead lock.
+            loop {
+                // Waiting for the initialization of ws_server to be completed.
+                let guard_global_module_statuses_by_protocol =
+                    global_module_statuses_by_protocol.lock().await;
+                if
+                    let Some(ws_server_status) =
+                        guard_global_module_statuses_by_protocol.get("std_ws_server@0.1.0")
+                {
+                    let guard_ws_server_status = ws_server_status.lock().await;
+                    if guard_ws_server_status.initialized {
+                        println!(
+                            "{}",
+                            ansi_term::Color::Blue.paint(
+                                format!(
+                                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The Websocket server has been initialized.",
+                                    MODULE_IDENTITY,
+                                    std::thread::current().id().as_u64(),
+                                    file!(),
+                                    line!()
+                                )
+                            )
+                        );
+                        drop(guard_ws_server_status);
+                        drop(guard_global_module_statuses_by_protocol);
+                        simple_authenticator_socket::connect_to_ws_server().await;
+                        break;
+                    } else {
+                        println!(
+                            "{}",
+                            ansi_term::Color::Blue.paint(
+                                format!(
+                                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Waiting for the Websocket server to be initialized...",
+                                    MODULE_IDENTITY,
+                                    std::thread::current().id().as_u64(),
+                                    file!(),
+                                    line!()
+                                )
+                            )
+                        );
+                        drop(guard_ws_server_status);
+                        drop(guard_global_module_statuses_by_protocol);
+                        fake_yield_now(500).await;
+                    }
+                } else {
+                    println!(
+                        "{}",
+                        ansi_term::Color::Blue.paint(
+                            format!(
+                                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Waiting for the Websocket server to be initialized...",
+                                MODULE_IDENTITY,
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!()
+                            )
+                        )
+                    );
+                    drop(guard_global_module_statuses_by_protocol);
+                    fake_yield_now(500).await;
+                }
+                fake_yield_now(500).await;
             }
             // Now processing socket message
             crate::socket_message_processing::socket_message_processing().await;
@@ -138,22 +204,36 @@ pub extern "Rust" fn on_init(
 
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_unload() {
+    let simple_authenticator_runtime_on_unload: tokio::runtime::Runtime = tokio::runtime::Builder
+        ::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
     println!(
         "{}",
         ansi_term::Color::Blue.paint(
             format!(
-                "[SIMPLE_AUTHENTICATOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the simple authenticator...",
+                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the simple authenticator...",
+                MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
                 line!()
             )
         )
     );
+
+    simple_authenticator_runtime_on_unload.spawn(async move {
+        simple_authenticator_socket::disconnect_from_ws_server().await;
+        // TODO: To tell main backend to drop this module.
+    });
+
     println!(
         "{}",
         ansi_term::Color::Blue.paint(
             format!(
-                "[SIMPLE_AUTHENTICATOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the simple authenticator.",
+                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the simple authenticator.",
+                MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
                 line!()

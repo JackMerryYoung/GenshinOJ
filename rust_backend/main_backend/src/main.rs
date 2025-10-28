@@ -561,11 +561,15 @@ async fn load_modules(
         let module_config = module_config_json.working_load.get(module_name).unwrap();
         let module_library_file_path: String =
             get_parent_path() +
-            "/rust_backend/modules/" +
+            (if cfg!(target_os = "windows") {
+                "\\rust_backend\\modules\\"
+            } else {
+                "/rust_backend/modules/"
+            }) +
             &module_config.id +
-            "/lib" +
+            (if cfg!(target_os = "windows") { "\\" } else { "/lib" }) +
             &module_config.id +
-            ".so"; // Get the path of the module.
+            (if cfg!(target_os = "windows") { ".dll" } else { ".so" }); // Get the path of the module.
 
         let module: Result<dlopen2::wrapper::Container<ModuleInstance>, dlopen2::Error> = unsafe {
             dlopen2::wrapper::Container::load(&module_library_file_path)
@@ -619,7 +623,6 @@ async fn load_modules(
                         drop(guard_status);
                         fake_yield_now(1000).await;
                     }
-                    fake_yield_now(1000).await;
                     println!(
                         "{}",
                         ansi_term::Color::Blue.paint(

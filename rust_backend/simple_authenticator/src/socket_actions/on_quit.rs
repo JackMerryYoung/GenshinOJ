@@ -46,7 +46,8 @@ pub async fn on_quit(msg: SocketJsonMessageWithWsId) {
                         "{}",
                         ansi_term::Color::Blue.paint(
                             format!(
-                                "[SIMPLE_AUTHENTICATOR] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` quitted with session token: `{}`.",
+                                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` quitted with session token: `{}`.",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),
@@ -65,7 +66,8 @@ pub async fn on_quit(msg: SocketJsonMessageWithWsId) {
                         "{}",
                         ansi_term::Color::Yellow.paint(
                             format!(
-                                "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to quit (The user wanted to quit with a fake session token).",
+                                "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to quit (The user wanted to quit with a fake session token).",
+                                MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),

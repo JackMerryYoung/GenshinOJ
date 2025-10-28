@@ -22,7 +22,8 @@ pub async fn socket_message_processing() {
                             "{}",
                             ansi_term::Color::Blue.paint(
                                 format!(
-                                    "[CHAT_SERVER] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
+                                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
+                                    MODULE_IDENTITY,
                                     std::thread::current().id().as_u64(),
                                     file!(),
                                     line!(),
@@ -45,7 +46,8 @@ pub async fn socket_message_processing() {
                                 "{}",
                                 ansi_term::Color::Yellow.paint(
                                     format!(
-                                        "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                                        "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                                        MODULE_IDENTITY,
                                         std::thread::current().id().as_u64(),
                                         file!(),
                                         line!()
@@ -58,7 +60,8 @@ pub async fn socket_message_processing() {
                             "{}",
                             ansi_term::Color::Yellow.paint(
                                 format!(
-                                    "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                                    "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                                    MODULE_IDENTITY,
                                     std::thread::current().id().as_u64(),
                                     file!(),
                                     line!()
@@ -72,7 +75,8 @@ pub async fn socket_message_processing() {
                     "{}",
                     ansi_term::Color::Yellow.paint(
                         format!(
-                            "[SIMPLE_AUTHENTICATOR] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                            "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                            MODULE_IDENTITY,
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!()

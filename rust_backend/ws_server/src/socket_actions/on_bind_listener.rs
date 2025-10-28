@@ -19,8 +19,22 @@ pub async fn on_bind_listener(msg: SocketJsonMessage) {
                 let Some(external_listener) =
                     (*guard_ws_server_external_listeners_by_command).get_mut(&command_to_bind)
             {
-                let result = external_listener.protocols.insert(content.protocol.clone());
-                if !result {
+                if external_listener.protocols.insert(content.protocol.clone()) {
+                    println!(
+                        "{}",
+                        ansi_term::Color::Blue.paint(
+                            format!(
+                                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Protocol `{}` successfully binded `{}`.",
+                                MODULE_IDENTITY,
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                content.protocol,
+                                command_to_bind
+                            )
+                        )
+                    );
+                } else {
                     println!(
                         "{}",
                         ansi_term::Color::Yellow.paint(
