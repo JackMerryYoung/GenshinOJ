@@ -30,18 +30,10 @@ pub extern "Rust" fn on_init(
     {
         let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
-            let guard_ws_server_status: tokio::sync::MutexGuard<
-                '_,
-                ModuleStatus
-            > = ws_server_status.lock().await; // Get the status of the server.
             // Try to establish a socket for messaging.
-            let mut ws_server_socket_port: u16 = 9000;
-            let mut guard_ws_server_status_socket_port: tokio::sync::MutexGuard<
-                '_,
-                u16
-            > = guard_ws_server_status.socket_port.lock().await;
             let ws_server_socket: tokio::net::TcpListener;
-            (ws_server_socket, *guard_ws_server_status_socket_port) = loop {
+            let mut ws_server_socket_port: u16 = 9000;
+            let (tmp_socket, tmp_port) = loop {
                 let ws_server_socket_result: Result<
                     tokio::net::TcpListener,
                     std::io::Error
@@ -96,6 +88,15 @@ pub extern "Rust" fn on_init(
                 ws_server_socket_port += 1;
                 fake_yield_now(0).await;
             };
+            let guard_ws_server_status: tokio::sync::MutexGuard<
+                '_,
+                ModuleStatus
+            > = ws_server_status.lock().await; // Get the status of the server.
+            let mut guard_ws_server_status_socket_port: tokio::sync::MutexGuard<
+                '_,
+                u16
+            > = guard_ws_server_status.socket_port.lock().await;
+            (ws_server_socket, *guard_ws_server_status_socket_port) = (tmp_socket, tmp_port);
             drop(guard_ws_server_status_socket_port);
             drop(guard_ws_server_status);
             WS_SERVER_SOCKET.set(new_async_modifiable(ws_server_socket)).unwrap();

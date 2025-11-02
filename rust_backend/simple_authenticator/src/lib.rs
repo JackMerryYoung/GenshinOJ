@@ -125,14 +125,19 @@ pub extern "Rust" fn on_init(
                 fake_yield_now(200).await;
             }
 
-            fake_yield_now(3000).await; // TODO: Fix dead lock.
+            // Now processing socket message
+            crate::socket_message_processing::socket_message_processing().await;
+        });
+    }
+
+    {
+        simple_authenticator_runtime.spawn(async move { 
             loop {
                 // Waiting for the initialization of ws_server to be completed.
-                let guard_global_module_statuses_by_protocol =
-                    global_module_statuses_by_protocol.lock().await;
+                let guard_global_module_statuses_by_protocol = global_module_statuses_by_protocol.lock().await;
                 if
                     let Some(ws_server_status) =
-                        guard_global_module_statuses_by_protocol.get("std_ws_server@0.1.0")
+                        guard_global_module_statuses_by_protocol.get("std_ws_server")
                 {
                     let guard_ws_server_status = ws_server_status.lock().await;
                     if guard_ws_server_status.initialized {
@@ -148,9 +153,6 @@ pub extern "Rust" fn on_init(
                                 )
                             )
                         );
-                        drop(guard_ws_server_status);
-                        drop(guard_global_module_statuses_by_protocol);
-                        simple_authenticator_socket::connect_to_ws_server().await;
                         break;
                     } else {
                         println!(
@@ -165,9 +167,6 @@ pub extern "Rust" fn on_init(
                                 )
                             )
                         );
-                        drop(guard_ws_server_status);
-                        drop(guard_global_module_statuses_by_protocol);
-                        fake_yield_now(500).await;
                     }
                 } else {
                     println!(
@@ -182,13 +181,11 @@ pub extern "Rust" fn on_init(
                             )
                         )
                     );
-                    drop(guard_global_module_statuses_by_protocol);
-                    fake_yield_now(500).await;
                 }
-                fake_yield_now(500).await;
+                fake_yield_now(200).await;
             }
-            // Now processing socket message
-            crate::socket_message_processing::socket_message_processing().await;
+
+            simple_authenticator_socket::connect_to_ws_server().await;
         });
     }
 

@@ -49,12 +49,12 @@ pub struct SocketJsonMessageContentOnUnbindListener {
 }
 
 pub async fn connect_to_ws_server() {
-    println!("Test!");
+    println!("Test! Trying to connect to the Websocket Server.");
     let msg_to_send = SocketJsonMessage {
         r#type: String::from("on_bind_listener"),
         content: serde_json
             ::to_value(SocketJsonMessageContentOnBindListener {
-                protocol: String::from("std_authenticator@0.1.0"),
+                protocol: String::from("std_authenticator"),
                 commands_to_bind: vec![
                     String::from("on_close_connection"),
                     String::from("on_login_check"),
@@ -66,11 +66,11 @@ pub async fn connect_to_ws_server() {
             })
             .unwrap(),
         request_key: uuid::Uuid::new_v4().to_string(),
-        from_protocol: String::from("std_authenticator@0.1.0"),
+        from_protocol: String::from("std_authenticator"),
     };
     send_socket_json_message(
         &serde_json::to_value(msg_to_send).unwrap(),
-        &String::from("std_ws_server@0.1.0")
+        &String::from("std_ws_server")
     ).await;
 }
 

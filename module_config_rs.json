@@ -50,7 +50,7 @@
             "name": "Chat Server",
             "id": "chat_server",
             "protocol": "std_chat_server@0.1.0",
-            "enabled": true,
+            "enabled": false,
             "dependencies": [
                 "std_ws_server@0.1.0"
             ],

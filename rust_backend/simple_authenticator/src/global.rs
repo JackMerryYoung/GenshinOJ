@@ -9,7 +9,7 @@ pub fn new_async_modifiable<T>(x: T) -> AsyncModifiable<T> {
     std::sync::Arc::new(tokio::sync::Mutex::new(x))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ModuleStatus {
     pub initialized: bool,
     pub panicked: bool,
