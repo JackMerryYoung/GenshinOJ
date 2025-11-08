@@ -34,7 +34,7 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
             mysql_async::Pool
         > = MYSQL_DATABASE_POOL.lock().await;
         let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
-        let tmp: Result<Vec<String>, _> = conn.query(
+        let results: Result<Vec<String>, _> = conn.query(
             format!(
                 "SELECT password FROM GenshinOJ.users WHERE username = \"{}\"",
                 &unwrapped_content.username
@@ -42,9 +42,9 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
         ).await;
         drop(conn);
         drop(guard_mysql_database_pool);
-        match tmp {
-            Ok(results) => {
-                if let Some(real_password_hash) = results.first() {
+        match results {
+            Ok(results_unwrapped) => {
+                if let Some(real_password_hash) = results_unwrapped.first() {
                     if real_password_hash == &password_hash {
                         let new_session_token: String = generate_session_token(
                             rand::rng().random_range(u32::MAX / 4..=u32::MAX)
@@ -108,7 +108,7 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                             "{}",
                             ansi_term::Color::Yellow.paint(
                                 format!(
-                                    "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (The user tried to login with a fake password).",
+                                    "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (The user tried to login with a wrong password).",
                                     MODULE_IDENTITY,
                                     std::thread::current().id().as_u64(),
                                     file!(),
@@ -123,7 +123,7 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                         "{}",
                         ansi_term::Color::Yellow.paint(
                             format!(
-                                "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (Failed to get queries from the database).",
+                                "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (The user doesn't exist).",
                                 MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
@@ -139,7 +139,7 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                     "{}",
                     ansi_term::Color::Yellow.paint(
                         format!(
-                            "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (Failed to get queries from the database).",
+                            "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to login (The SQL query is not correct).",
                             MODULE_IDENTITY,
                             std::thread::current().id().as_u64(),
                             file!(),

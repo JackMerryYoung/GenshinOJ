@@ -43,11 +43,10 @@ pub extern "Rust" fn on_init(
             if !tmp.iter().any(|x| x == "GenshinOJ") {
                 "CREATE DATABASE GenshinOJ".ignore(&mut conn).await.unwrap();
             }
-            let tmp: Vec<String> = conn
-                .query("SHOW TABLES LIKE \'GenshinOJ.users\'").await
-                .unwrap();
-            if !tmp.iter().any(|x| x == "GenshinOJ") {
-                "CREATE TABLE GenshinOJ.users (
+            "USE GenshinOJ".ignore(&mut conn).await.unwrap();
+            let tmp: Vec<String> = conn.query("SHOW TABLES LIKE \'users\'").await.unwrap();
+            if !tmp.iter().any(|x| x == "users") {
+                "CREATE TABLE users (
                     id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
                     username VARCHAR(256) NOT NULL,
                     password VARCHAR(256) NOT NULL

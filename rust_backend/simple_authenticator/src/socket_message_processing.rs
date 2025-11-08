@@ -41,6 +41,8 @@ pub async fn socket_message_processing() {
                             socket_actions::on_close_connection::on_close_connection(msg).await;
                         } else if msg.r#type == "on_online_user" {
                             socket_actions::on_online_user::on_online_user(msg).await;
+                        } else if msg.r#type == "on_register" {
+                            socket_actions::on_register::on_register(msg).await;
                         } else {
                             println!(
                                 "{}",

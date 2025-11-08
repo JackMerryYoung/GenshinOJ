@@ -112,7 +112,15 @@ pub static WS_SERVER_CONNECTIONS_CNT: std::sync::LazyLock<tokio::sync::Mutex<usi
  */
 pub static WS_SERVER_CONNECTIONS_BY_WS_ID: std::sync::LazyLock<
     tokio::sync::Mutex<
-        std::collections::HashMap<String, AsyncModifiable<axum::extract::ws::WebSocket>>
+        std::collections::HashMap<
+            String,
+            AsyncModifiable<
+                futures_util::stream::SplitSink<
+                    axum::extract::ws::WebSocket,
+                    axum::extract::ws::Message
+                >
+            >
+        >
     >
 > = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
 

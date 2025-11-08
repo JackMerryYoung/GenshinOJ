@@ -1,3 +1,5 @@
+use futures_util::StreamExt;
+
 use crate::global::*;
 
 pub async fn ip_handler(
@@ -28,7 +30,9 @@ pub async fn ws_handler(
     ws_upgrade.on_upgrade(ws_callback)
 }
 
-pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
+#[allow(unused_parens)]
+pub async fn ws_callback(ws: axum::extract::ws::WebSocket) {
+    let (ws_sender, mut ws_receiver) = ws.split();
     println!(
         "{}",
         ansi_term::Color::Blue.paint(
@@ -52,7 +56,21 @@ pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
     }
 
     let ws_id: uuid::Uuid = uuid::Uuid::new_v4();
-    while let Some(original_msg) = ws.recv().await {
+    let mut guard_ws_server_connections_by_ws_id: tokio::sync::MutexGuard<
+        '_,
+        std::collections::HashMap<
+            String,
+            AsyncModifiable<
+                futures_util::stream::SplitSink<
+                    axum::extract::ws::WebSocket,
+                    axum::extract::ws::Message
+                >
+            >
+        >
+    > = WS_SERVER_CONNECTIONS_BY_WS_ID.lock().await;
+    guard_ws_server_connections_by_ws_id.insert(ws_id.to_string(), new_async_modifiable(ws_sender));
+    drop(guard_ws_server_connections_by_ws_id);
+    while let Some(original_msg) = ws_receiver.next().await {
         // Receive messages.
         if let Ok(original_msg) = original_msg {
             match original_msg {
@@ -72,7 +90,7 @@ pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
                                 r#type: String::from("on_") + &json_msg.r#type,
                                 content: json_msg.content,
                                 request_key: uuid::Uuid::new_v4().to_string(),
-                                from_protocol: String::from("std_ws_server@0.1.0"),
+                                from_protocol: String::from("std_ws_server"),
                                 ws_id: ws_id.to_string(),
                             };
                         if
