@@ -22,7 +22,7 @@ pub static GLOBAL_MODULE_STATUSES_BY_PROTOCOL: std::sync::OnceLock<
 
 pub static SIMPLE_AUTHENTICATOR_SOCKET: std::sync::OnceLock<AsyncModifiable<tokio::net::TcpListener>> = std::sync::OnceLock::new();
 
-pub const MYSQL_DATABASE_URL: &str = "mysql://root:123456@127.0.0.1:3306/GenshinOJ";
+pub const MYSQL_DATABASE_URL: &str = "mysql://root:123456@127.0.0.1:3306/";
 
 pub static MYSQL_DATABASE_POOL: std::sync::LazyLock<tokio::sync::Mutex<mysql_async::Pool>> = std::sync::LazyLock::new(
     || { tokio::sync::Mutex::new(mysql_async::Pool::new(MYSQL_DATABASE_URL)) }
@@ -48,7 +48,7 @@ pub struct SocketJsonMessage {
     pub from_protocol: String,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug)]
 pub struct SocketJsonMessageWithWsId {
     pub r#type: String,
     pub content: serde_json::Value,

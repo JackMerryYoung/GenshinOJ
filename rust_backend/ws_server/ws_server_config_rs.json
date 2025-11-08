@@ -1,3 +1,11 @@
 {
-    "restricted_mode": true
+    "restricted_mode": true,
+    "external_listeners_list": [
+        "on_close_connection",
+        "on_login_check",
+        "on_login",
+        "on_online_user",
+        "on_quit",
+        "on_register"
+    ]
 }

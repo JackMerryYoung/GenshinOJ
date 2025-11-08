@@ -6,7 +6,15 @@ mod socket_actions;
 mod self_management;
 mod ws_server_socket;
 
+use std::io::Read;
+
 use global::*;
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct WsServerConfigJson {
+    restricted_mode: bool,
+    external_listeners_list: Vec<String>,
+}
 
 #[unsafe(no_mangle)]
 pub extern "Rust" fn on_init(
@@ -30,6 +38,71 @@ pub extern "Rust" fn on_init(
     {
         let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
+            // Try to load config file.
+            let mut ws_server_config_json_string: String = String::new();
+            let ws_server_config_json_file_path: String =
+                get_pwd() + "/ws_server/ws_server_config_rs.json";
+            let mut ws_server_config_json_file: std::fs::File = match
+                std::fs::File::open(&ws_server_config_json_file_path)
+            {
+                Ok(file) => file,
+                Err(e) => {
+                    eprintln!(
+                        "{}",
+                        ansi_term::Color::Red.paint(
+                            format!(
+                                "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to open module_config_rs.json from `{}`. Maybe the file doesn't exist?",
+                                MODULE_IDENTITY,
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                ws_server_config_json_file_path
+                            )
+                        )
+                    );
+                    eprintln!(
+                        "{}",
+                        ansi_term::Color::Red.paint(
+                            format!(
+                                "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] {}",
+                                MODULE_IDENTITY,
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                e
+                            )
+                        )
+                    );
+                    on_unload();
+                    let mut guard_ws_server_status: tokio::sync::MutexGuard<
+                        '_,
+                        ModuleStatus
+                    > = ws_server_status.lock().await;
+                    guard_ws_server_status.panicked = true;
+                    drop(guard_ws_server_status); // Avoid poisoning the mutex lock.
+                    panic!();
+                }
+            };
+            ws_server_config_json_file.read_to_string(&mut ws_server_config_json_string).unwrap();
+            let ws_server_config_json: WsServerConfigJson = serde_json
+                ::from_str(ws_server_config_json_string.as_str())
+                .unwrap();
+            let mut ws_server_external_listeners_by_command: std::collections::HashMap<
+                String,
+                ExternalListener
+            > = std::collections::HashMap::new();
+            for external_listener in ws_server_config_json.external_listeners_list {
+                ws_server_external_listeners_by_command.insert(
+                    external_listener.clone(),
+                    ExternalListener {
+                        command: external_listener,
+                        protocols: std::collections::HashSet::new(),
+                    }
+                );
+            }
+            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.set(
+                new_async_modifiable(ws_server_external_listeners_by_command)
+            ).unwrap();
             // Try to establish a socket for messaging.
             let ws_server_socket: tokio::net::TcpListener;
             let mut ws_server_socket_port: u16 = 9000;

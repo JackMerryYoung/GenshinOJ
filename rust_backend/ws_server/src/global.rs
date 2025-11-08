@@ -143,11 +143,11 @@ pub struct ExternalListener {
 
     **External listeners can be indexed by specifying commands**.
  */
-pub static WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND: std::sync::LazyLock<
+pub static WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND: std::sync::OnceLock<
     AsyncModifiable<std::collections::HashMap<String, ExternalListener>>
-> = std::sync::LazyLock::new(|| new_async_modifiable(std::collections::HashMap::new()));
+> = std::sync::OnceLock::new();
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug)]
 pub struct WebsocketServerJsonMessage {
     pub r#type: String,
     pub content: serde_json::Value,
@@ -227,10 +227,8 @@ pub async fn send_socket_json_message(msg_to_send: &serde_json::Value, to_protoc
     }
 }
 
-pub fn get_parent_path() -> String {
-    // Get the parent path
+pub fn get_pwd() -> String {
     let mut pwd: std::path::PathBuf = std::env::current_dir().unwrap();
-    pwd.pop();
     String::from(pwd.to_str().unwrap())
 }
 

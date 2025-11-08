@@ -63,11 +63,13 @@ pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
                         )
                     {
                         // Received JSON message.
+                        let ws_server_external_listeners_by_command =
+                            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.get().unwrap();
                         let guard_ws_server_external_listeners_by_command =
-                            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.lock().await;
+                            ws_server_external_listeners_by_command.lock().await;
                         let json_msg_with_ws_id: SocketJsonMessageWithWsId =
                             SocketJsonMessageWithWsId {
-                                r#type: json_msg.r#type,
+                                r#type: String::from("on_") + &json_msg.r#type,
                                 content: json_msg.content,
                                 request_key: uuid::Uuid::new_v4().to_string(),
                                 from_protocol: String::from("std_ws_server@0.1.0"),
@@ -93,11 +95,12 @@ pub async fn ws_callback(mut ws: axum::extract::ws::WebSocket) {
                                 "{}",
                                 ansi_term::Color::Yellow.paint(
                                     format!(
-                                        "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to bind a listener whose command is not implemented.",
+                                        "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Someone tried to call the command `{}`, which is not implemented.",
                                         MODULE_IDENTITY,
                                         std::thread::current().id().as_u64(),
                                         file!(),
-                                        line!()
+                                        line!(),
+                                        json_msg_with_ws_id.r#type
                                     )
                                 )
                             );

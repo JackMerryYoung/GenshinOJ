@@ -49,7 +49,6 @@ pub struct SocketJsonMessageContentOnUnbindListener {
 }
 
 pub async fn connect_to_ws_server() {
-    println!("Test! Trying to connect to the Websocket Server.");
     let msg_to_send = SocketJsonMessage {
         r#type: String::from("on_bind_listener"),
         content: serde_json

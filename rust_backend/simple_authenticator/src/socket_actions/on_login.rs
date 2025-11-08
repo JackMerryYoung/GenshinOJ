@@ -11,15 +11,8 @@ struct ContentOnLogin {
     request_key: String,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
-struct SocketJsonMessageContentOnLogin {
-    ws_id: String,
-    json_msg: ContentOnLogin,
-}
-
 pub async fn on_login(msg: SocketJsonMessageWithWsId) {
-    if let Ok(content) = serde_json::from_value::<SocketJsonMessageContentOnLogin>(msg.content) {
-        let unwrapped_content = content.json_msg;
+    if let Ok(unwrapped_content) = serde_json::from_value::<ContentOnLogin>(msg.content) {
         let password_hash: String = get_hash(unwrapped_content.password.as_str());
         println!(
             "{}",
@@ -43,7 +36,7 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
         let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
         let tmp: Result<Vec<String>, _> = conn.query(
             format!(
-                "SELECT password FROM users WHERE username = \"{}\"",
+                "SELECT password FROM GenshinOJ.users WHERE username = \"{}\"",
                 &unwrapped_content.username
             )
         ).await;
@@ -96,7 +89,7 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                             std::collections::HashMap<uuid::Uuid, String>
                         > = USERNAMES_BY_WS_ID.lock().await;
                         guard_usernames_by_ws_id.insert(
-                            uuid::Uuid::from_str(&content.ws_id).unwrap(),
+                            uuid::Uuid::from_str(&msg.ws_id).unwrap(),
                             unwrapped_content.username.clone()
                         );
                         drop(guard_usernames_by_ws_id);
@@ -141,7 +134,7 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                     );
                 }
             }
-            Err(_) => {
+            Err(e) => {
                 println!(
                     "{}",
                     ansi_term::Color::Yellow.paint(
@@ -152,6 +145,20 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                             file!(),
                             line!(),
                             &unwrapped_content.username
+                        )
+                    )
+                );
+
+                println!(
+                    "{}",
+                    ansi_term::Color::Yellow.paint(
+                        format!(
+                            "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] {}",
+                            MODULE_IDENTITY,
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
+                            e
                         )
                     )
                 );

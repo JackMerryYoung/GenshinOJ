@@ -12,8 +12,10 @@ pub async fn on_unbind_listener(msg: SocketJsonMessage) {
             msg.content
         )
     {
+        let ws_server_external_listeners_by_command =
+            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.get().unwrap();
         let mut guard_ws_server_external_listeners_by_command =
-            WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.lock().await;
+            ws_server_external_listeners_by_command.lock().await;
         for command_to_bind in content.commands_to_unbind {
             if
                 let Some(external_listener) =

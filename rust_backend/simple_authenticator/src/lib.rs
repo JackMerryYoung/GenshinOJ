@@ -6,6 +6,8 @@ mod self_management;
 mod socket_message_processing;
 mod simple_authenticator_socket;
 
+use mysql_async::prelude::{ Query, Queryable };
+
 use crate::global::*;
 
 #[unsafe(no_mangle)]
@@ -32,6 +34,29 @@ pub extern "Rust" fn on_init(
         let simple_authenticator_status: AsyncModifiable<ModuleStatus> =
             simple_authenticator_status.clone();
         simple_authenticator_runtime.spawn(async move {
+            let guard_mysql_database_pool: tokio::sync::MutexGuard<
+                '_,
+                mysql_async::Pool
+            > = MYSQL_DATABASE_POOL.lock().await;
+            let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+            let tmp: Vec<String> = conn.query("SHOW DATABASES LIKE \'GenshinOJ\'").await.unwrap();
+            if !tmp.iter().any(|x| x == "GenshinOJ") {
+                "CREATE DATABASE GenshinOJ".ignore(&mut conn).await.unwrap();
+            }
+            let tmp: Vec<String> = conn
+                .query("SHOW TABLES LIKE \'GenshinOJ.users\'").await
+                .unwrap();
+            if !tmp.iter().any(|x| x == "GenshinOJ") {
+                "CREATE TABLE GenshinOJ.users (
+                    id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                    username VARCHAR(256) NOT NULL,
+                    password VARCHAR(256) NOT NULL
+                )"
+                    .ignore(&mut conn).await
+                    .unwrap();
+            }
+            drop(conn);
+            drop(guard_mysql_database_pool);
             let mut guard_simple_authenticator_status: tokio::sync::MutexGuard<
                 '_,
                 ModuleStatus
@@ -131,10 +156,11 @@ pub extern "Rust" fn on_init(
     }
 
     {
-        simple_authenticator_runtime.spawn(async move { 
+        simple_authenticator_runtime.spawn(async move {
             loop {
                 // Waiting for the initialization of ws_server to be completed.
-                let guard_global_module_statuses_by_protocol = global_module_statuses_by_protocol.lock().await;
+                let guard_global_module_statuses_by_protocol =
+                    global_module_statuses_by_protocol.lock().await;
                 if
                     let Some(ws_server_status) =
                         guard_global_module_statuses_by_protocol.get("std_ws_server")
@@ -182,7 +208,7 @@ pub extern "Rust" fn on_init(
                         )
                     );
                 }
-                fake_yield_now(200).await;
+                fake_yield_now(1000).await;
             }
 
             simple_authenticator_socket::connect_to_ws_server().await;

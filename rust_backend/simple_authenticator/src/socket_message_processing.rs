@@ -27,7 +27,7 @@ pub async fn socket_message_processing() {
                                     std::thread::current().id().as_u64(),
                                     file!(),
                                     line!(),
-                                    serde_json::to_string(&msg)
+                                    msg
                                 )
                             )
                         );
