@@ -27,6 +27,15 @@ pub async fn ip_handler(
 pub async fn ws_handler(
     ws_upgrade: axum::extract::ws::WebSocketUpgrade
 ) -> axum::response::Response {
+    loop {
+        if
+            WS_SERVER_CONNECTIONS_CNT.try_lock().is_ok() &&
+            WS_SERVER_CONNECTIONS_BY_WS_ID.try_lock().is_ok()
+        {
+            break;
+        }
+        fake_yield_now(0).await;
+    }
     ws_upgrade.on_upgrade(ws_callback)
 }
 
@@ -152,6 +161,7 @@ pub async fn ws_callback(ws: axum::extract::ws::WebSocket) {
                         >
                     > = WS_SERVER_CONNECTIONS_BY_WS_ID.lock().await;
                     guard_ws_server_connections_by_ws_id.remove(&ws_id.to_string()); // Clear sender.
+                    drop(guard_ws_server_connections_by_ws_id);
                     let mut guard_ws_server_connections_cnt: tokio::sync::MutexGuard<
                         '_,
                         usize
