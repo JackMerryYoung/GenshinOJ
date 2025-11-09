@@ -289,7 +289,7 @@ pub extern "Rust" fn on_init(
                     break;
                 }
                 drop(guard_ws_server_status);
-                fake_yield_now(200).await;
+                fake_yield_now(1000).await;
             }
             // Now processing socket message
             crate::ws_server_socket::socket_message_processing().await;

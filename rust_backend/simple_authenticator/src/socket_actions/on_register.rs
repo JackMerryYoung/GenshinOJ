@@ -41,6 +41,52 @@ fn generate_msg_to_send_quit_on_register_failure(request_key: String) -> MsgToSe
     }
 }
 
+async fn send_json_msg_to_ws_server_on_register_failure(
+    original_ws_id: String,
+    unwrapped_content: ContentOnRegister
+) {
+    let json_msg: SocketJsonMessage = SocketJsonMessage {
+        r#type: String::from("on_send_msg"),
+        content: serde_json
+            ::to_value(SocketJsonMessageContentOnSendMsg {
+                ws_id: original_ws_id,
+                msg_to_send: serde_json
+                    ::to_value(
+                        generate_msg_to_send_quit_on_register_failure(unwrapped_content.request_key)
+                    )
+                    .unwrap(),
+            })
+            .unwrap(),
+        request_key: uuid::Uuid::new_v4().to_string(),
+        from_protocol: String::from("std_authenticator"),
+    };
+    let json_msg_value = serde_json::to_value(json_msg).unwrap();
+    send_socket_json_message(&json_msg_value, "std_ws_server").await;
+}
+
+async fn send_json_msg_to_ws_server_on_register_success(
+    original_ws_id: String,
+    unwrapped_content: ContentOnRegister
+) {
+    let json_msg: SocketJsonMessage = SocketJsonMessage {
+        r#type: String::from("on_send_msg"),
+        content: serde_json
+            ::to_value(SocketJsonMessageContentOnSendMsg {
+                ws_id: original_ws_id,
+                msg_to_send: serde_json
+                    ::to_value(
+                        generate_msg_to_send_quit_on_register_success(unwrapped_content.request_key)
+                    )
+                    .unwrap(),
+            })
+            .unwrap(),
+        request_key: uuid::Uuid::new_v4().to_string(),
+        from_protocol: String::from("std_authenticator"),
+    };
+    let json_msg_value = serde_json::to_value(json_msg).unwrap();
+    send_socket_json_message(&json_msg_value, "std_ws_server").await;
+}
+
 pub async fn on_register(msg: SocketJsonMessageWithWsId) {
     if let Ok(unwrapped_content) = serde_json::from_value::<ContentOnRegister>(msg.content) {
         let password_hash: String = get_hash(unwrapped_content.password.as_str());
@@ -73,6 +119,8 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
         match results {
             Ok(results_unwrapped) => {
                 if results_unwrapped.is_empty() {
+                    // The user doesn't exist.
+                    // Create user.
                     format!(
                         "INSERT INTO GenshinOJ.users (username, password) VALUES (\"{}\", \"{}\")",
                         &unwrapped_content.username,
@@ -80,25 +128,7 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
                     )
                         .ignore(&mut conn).await
                         .unwrap();
-                    let json_msg: SocketJsonMessage = SocketJsonMessage {
-                        r#type: String::from("on_send_msg"),
-                        content: serde_json
-                            ::to_value(SocketJsonMessageContentOnSendMsg {
-                                ws_id: msg.ws_id,
-                                msg_to_send: serde_json
-                                    ::to_value(
-                                        generate_msg_to_send_quit_on_register_success(
-                                            unwrapped_content.request_key
-                                        )
-                                    )
-                                    .unwrap(),
-                            })
-                            .unwrap(),
-                        request_key: uuid::Uuid::new_v4().to_string(),
-                        from_protocol: String::from("std_authenticator"),
-                    };
-                    let json_msg_value = serde_json::to_value(json_msg).unwrap();
-                    send_socket_json_message(&json_msg_value, &String::from("std_ws_server")).await;
+                    // Send successful registration message.
                     println!(
                         "{}",
                         ansi_term::Color::Blue.paint(
@@ -112,26 +142,13 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
                             )
                         )
                     );
+                    send_json_msg_to_ws_server_on_register_success(
+                        msg.ws_id,
+                        unwrapped_content
+                    ).await;
                 } else {
-                    let json_msg: SocketJsonMessage = SocketJsonMessage {
-                        r#type: String::from("on_send_msg"),
-                        content: serde_json
-                            ::to_value(SocketJsonMessageContentOnSendMsg {
-                                ws_id: msg.ws_id,
-                                msg_to_send: serde_json
-                                    ::to_value(
-                                        generate_msg_to_send_quit_on_register_failure(
-                                            unwrapped_content.request_key
-                                        )
-                                    )
-                                    .unwrap(),
-                            })
-                            .unwrap(),
-                        request_key: uuid::Uuid::new_v4().to_string(),
-                        from_protocol: String::from("std_authenticator"),
-                    };
-                    let json_msg_value = serde_json::to_value(json_msg).unwrap();
-                    send_socket_json_message(&json_msg_value, &String::from("std_ws_server")).await;
+                    // The user already exists.
+                    // Send failed registration message.
                     println!(
                         "{}",
                         ansi_term::Color::Yellow.paint(
@@ -145,6 +162,10 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
                             )
                         )
                     );
+                    send_json_msg_to_ws_server_on_register_failure(
+                        msg.ws_id,
+                        unwrapped_content
+                    ).await;
                 }
             }
             Err(e) => {

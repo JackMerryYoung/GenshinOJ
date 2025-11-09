@@ -161,11 +161,9 @@ fn main() {
                     } else {
                         drop(guard_status);
                     }
-                    fake_yield_now(0).await;
                 }
                 drop(guard_module_combinations);
                 drop(guard_module_config_json);
-                fake_yield_now(0).await;
             }
         });
     }
@@ -627,7 +625,6 @@ async fn load_modules(
                         > = status.lock().await;
                         if guard_status.initialized {
                             drop(guard_status);
-                            fake_yield_now(0).await;
                             break;
                         }
                         drop(guard_status);

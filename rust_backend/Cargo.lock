@@ -207,14 +207,11 @@ name = "chat_server"
 version = "0.1.0"
 dependencies = [
  "ansi_term",
- "axum",
  "bytes",
  "chrono",
- "dlopen2",
  "serde",
  "serde_json",
  "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -334,12 +331,7 @@ name = "db_connector"
 version = "0.1.0"
 dependencies = [
  "ansi_term",
- "axum",
- "dlopen2",
- "serde",
- "serde_json",
  "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -385,12 +377,6 @@ dependencies = [
  "quote",
  "syn",
 ]
-
-[[package]]
-name = "dyn-clone"
-version = "1.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c7a8fb8a9fbf66c1f703fe16184d10ca0ee9d23be5b4436400408ba54a95005"
 
 [[package]]
 name = "equivalent"
@@ -858,7 +844,6 @@ version = "0.1.0"
 dependencies = [
  "ansi_term",
  "dlopen2",
- "dyn-clone",
  "once_cell",
  "serde",
  "serde_json",
@@ -1264,15 +1249,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
-name = "retry"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1e211f878258887b3e65dd3c8ff9f530fe109f441a117ee0cdc27f341355032"
-dependencies = [
- "rand 0.9.1",
-]
-
-[[package]]
 name = "rust-crypto"
 version = "0.2.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1417,10 +1393,8 @@ name = "simple_authenticator"
 version = "0.1.0"
 dependencies = [
  "ansi_term",
- "axum",
  "bytes",
  "chrono",
- "dlopen2",
  "mysql_async",
  "rand 0.9.1",
  "rust-crypto",
@@ -1651,19 +1625,7 @@ checksum = "784e0ac535deb450455cbfa28a6f0df145ea1bb7ae51b821cf5e7927fdcfbdd0"
 dependencies = [
  "log",
  "pin-project-lite",
- "tracing-attributes",
  "tracing-core",
-]
-
-[[package]]
-name = "tracing-attributes"
-version = "0.1.30"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81383ab64e72a7a8b8e13130c49e3dab29def6d0c7d76a03087b3cf71c5c6903"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -2040,16 +2002,11 @@ dependencies = [
  "axum-client-ip",
  "bytes",
  "chrono",
- "dlopen2",
- "futures-core",
- "futures-sink",
  "futures-util",
- "retry",
  "serde",
  "serde_json",
  "tokio",
  "tower",
- "tracing",
  "uuid",
 ]
 

@@ -7,7 +7,8 @@ pub async fn self_management(simple_authenticator_status: AsyncModifiable<Module
         let guard_simple_authenticator_status = simple_authenticator_status.lock().await;
         if
             guard_simple_authenticator_status.panicked ||
-            (guard_simple_authenticator_status.initialized && SIMPLE_AUTHENTICATOR_SOCKET.get().is_none())
+            (guard_simple_authenticator_status.initialized &&
+                SIMPLE_AUTHENTICATOR_SOCKET.get().is_none())
         {
             drop(guard_simple_authenticator_status); // Avoid poisoning the mutex lock.
             panic!();
@@ -30,6 +31,6 @@ pub async fn self_management(simple_authenticator_status: AsyncModifiable<Module
             );
             time_last = time_now;
         }
-        fake_yield_now(200).await;
+        fake_yield_now(1000).await;
     }
 }

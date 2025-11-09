@@ -146,7 +146,7 @@ pub extern "Rust" fn on_init(
                     break;
                 }
                 drop(guard_simple_authenticator_status);
-                fake_yield_now(200).await;
+                fake_yield_now(1000).await;
             }
 
             // Now processing socket message

@@ -1,4 +1,5 @@
 use crypto::digest::Digest;
+use rand::Rng;
 use tokio::io::AsyncWriteExt;
 
 pub static MODULE_IDENTITY: &str = "SIMPLE_AUTHENTICATOR";
@@ -37,7 +38,7 @@ pub static LOGGED_IN_USERNAMES: std::sync::LazyLock<tokio::sync::Mutex<std::coll
 );
 
 pub static USERNAMES_BY_WS_ID: std::sync::LazyLock<
-    tokio::sync::Mutex<std::collections::HashMap<uuid::Uuid, String>>
+    tokio::sync::Mutex<std::collections::HashMap<String, String>>
 > = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
 
 #[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug)]
@@ -108,7 +109,9 @@ pub fn generate_session_token(session_token_seed: u32) -> String {
                 .as_str();
         return generated_session_token + generate_session_token(session_token_seed / 5).as_str();
     }
-    String::from("s")
+    rand::rng()
+        .random_range(u32::MAX / 4..=u32::MAX)
+        .to_string()
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -117,20 +120,38 @@ pub struct SocketJsonMessageContentOnSendMsg {
     pub msg_to_send: serde_json::Value,
 }
 
-pub async fn get_socket_port_by_protocol(protocol: &str) -> u16 {
+pub async fn get_socket_port_by_protocol(protocol: &str) -> Option<u16> {
     let guard_global_module_statuses_by_protocol: tokio::sync::MutexGuard<
         '_,
         std::collections::HashMap<String, std::sync::Arc<tokio::sync::Mutex<ModuleStatus>>>
-    > = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get().unwrap().lock().await;
+    > = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get()?.lock().await;
     let guard_status: tokio::sync::MutexGuard<
         '_,
         ModuleStatus
-    > = guard_global_module_statuses_by_protocol.get(protocol).unwrap().lock().await;
-    *guard_status.socket_port.lock().await
+    > = guard_global_module_statuses_by_protocol.get(protocol)?.lock().await;
+    Some(*guard_status.socket_port.lock().await)
 }
 
 pub async fn get_socket_by_protocol(protocol: &str) -> tokio::net::TcpStream {
-    let socket_port: u16 = get_socket_port_by_protocol(protocol).await;
+    let socket_port: u16 = match get_socket_port_by_protocol(protocol).await {
+        Some(x) => x,
+        None => {
+            eprintln!(
+                "{}",
+                ansi_term::Color::Red.paint(
+                    format!(
+                        "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to get the port of the module implemented protocol `{}`.",
+                        MODULE_IDENTITY,
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!(),
+                        protocol
+                    )
+                )
+            );
+            panic!();
+        }
+    };
     match tokio::net::TcpStream::connect(format!("127.0.0.1:{socket_port}")).await {
         Ok(socket) => socket,
         Err(_) => {
@@ -153,7 +174,7 @@ pub async fn get_socket_by_protocol(protocol: &str) -> tokio::net::TcpStream {
     }
 }
 
-pub async fn send_socket_json_message(msg_to_send: &serde_json::Value, to_protocol: &String) {
+pub async fn send_socket_json_message(msg_to_send: &serde_json::Value, to_protocol: &str) {
     let mut socket = get_socket_by_protocol(to_protocol).await;
     let json_msg_str = serde_json::to_string(&msg_to_send).unwrap();
     let result = socket.write_all(json_msg_str.as_bytes()).await;

@@ -110,18 +110,11 @@ pub static WS_SERVER_CONNECTIONS_CNT: std::sync::LazyLock<tokio::sync::Mutex<usi
 
     **Websocket connections can be indexed by specifying `ws_id` (a `String` value, which is unique to each Websocket connection).**
  */
+type AsyncWsSender = AsyncModifiable<
+    futures_util::stream::SplitSink<axum::extract::ws::WebSocket, axum::extract::ws::Message>
+>;
 pub static WS_SERVER_CONNECTIONS_BY_WS_ID: std::sync::LazyLock<
-    tokio::sync::Mutex<
-        std::collections::HashMap<
-            String,
-            AsyncModifiable<
-                futures_util::stream::SplitSink<
-                    axum::extract::ws::WebSocket,
-                    axum::extract::ws::Message
-                >
-            >
-        >
-    >
+    tokio::sync::Mutex<std::collections::HashMap<String, AsyncWsSender>>
 > = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
 
 /*
@@ -236,7 +229,7 @@ pub async fn send_socket_json_message(msg_to_send: &serde_json::Value, to_protoc
 }
 
 pub fn get_pwd() -> String {
-    let mut pwd: std::path::PathBuf = std::env::current_dir().unwrap();
+    let pwd: std::path::PathBuf = std::env::current_dir().unwrap();
     String::from(pwd.to_str().unwrap())
 }
 

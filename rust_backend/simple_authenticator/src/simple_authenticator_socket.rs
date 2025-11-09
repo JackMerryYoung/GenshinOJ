@@ -67,10 +67,7 @@ pub async fn connect_to_ws_server() {
         request_key: uuid::Uuid::new_v4().to_string(),
         from_protocol: String::from("std_authenticator"),
     };
-    send_socket_json_message(
-        &serde_json::to_value(msg_to_send).unwrap(),
-        &String::from("std_ws_server")
-    ).await;
+    send_socket_json_message(&serde_json::to_value(msg_to_send).unwrap(), "std_ws_server").await;
 }
 
 pub async fn disconnect_from_ws_server() {
@@ -94,6 +91,6 @@ pub async fn disconnect_from_ws_server() {
     };
     send_socket_json_message(
         &serde_json::to_value(msg_to_send).unwrap(),
-        &String::from("std_ws_server@0.1.0")
+        "std_ws_server@0.1.0"
     ).await;
 }

@@ -1,7 +1,6 @@
 use crate::global::*;
 
 use rand::Rng;
-use std::str::FromStr;
 use mysql_async::prelude::*;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -9,6 +8,107 @@ struct ContentOnLogin {
     username: String,
     password: String,
     request_key: String,
+}
+
+mod msg_to_send_generator {
+    #[derive(serde::Deserialize, serde::Serialize)]
+    struct ContentInQuitOnLoginFailure {
+        reason: String,
+        request_key: String,
+    }
+
+    #[derive(serde::Deserialize, serde::Serialize)]
+    struct ContentInSessionTokenOnLoginSuccess {
+        session_token: String,
+        request_key: String,
+    }
+
+    #[derive(serde::Deserialize, serde::Serialize)]
+    pub struct SessionTokenOnLoginSuccess {
+        r#type: String,
+        content: ContentInSessionTokenOnLoginSuccess,
+    }
+
+    #[derive(serde::Deserialize, serde::Serialize)]
+    pub struct QuitOnLoginFailure {
+        r#type: String,
+        content: ContentInQuitOnLoginFailure,
+    }
+
+    pub fn generate_quit_on_login_failure(request_key: String) -> QuitOnLoginFailure {
+        QuitOnLoginFailure {
+            r#type: String::from("quit"),
+            content: ContentInQuitOnLoginFailure {
+                reason: String::from("authentication_failure"),
+                request_key,
+            },
+        }
+    }
+
+    pub fn generate_session_token_on_login_success(
+        session_token: String,
+        request_key: String
+    ) -> SessionTokenOnLoginSuccess {
+        SessionTokenOnLoginSuccess {
+            r#type: String::from("session_token"),
+            content: ContentInSessionTokenOnLoginSuccess {
+                session_token,
+                request_key,
+            },
+        }
+    }
+}
+
+async fn send_json_msg_to_ws_server_on_login_failure(
+    original_ws_id: String,
+    unwrapped_content: ContentOnLogin
+) {
+    let json_msg: SocketJsonMessage = SocketJsonMessage {
+        r#type: String::from("on_send_msg"),
+        content: serde_json
+            ::to_value(SocketJsonMessageContentOnSendMsg {
+                ws_id: original_ws_id,
+                msg_to_send: serde_json
+                    ::to_value(
+                        msg_to_send_generator::generate_quit_on_login_failure(
+                            unwrapped_content.request_key
+                        )
+                    )
+                    .unwrap(),
+            })
+            .unwrap(),
+        request_key: uuid::Uuid::new_v4().to_string(),
+        from_protocol: String::from("std_authenticator"),
+    };
+    let json_msg_value = serde_json::to_value(json_msg).unwrap();
+    send_socket_json_message(&json_msg_value, "std_ws_server").await;
+}
+
+async fn send_json_msg_to_ws_server_on_login_success(
+    original_ws_id: String,
+    unwrapped_content: ContentOnLogin,
+    session_token: String
+) {
+    let json_msg: SocketJsonMessage = SocketJsonMessage {
+        r#type: String::from("on_send_msg"),
+        content: serde_json
+            ::to_value(SocketJsonMessageContentOnSendMsg {
+                ws_id: original_ws_id,
+                msg_to_send: serde_json
+                    ::to_value(
+                        msg_to_send_generator::generate_session_token_on_login_success(
+                            session_token,
+                            unwrapped_content.request_key
+                        )
+                    )
+                    .unwrap(),
+            })
+            .unwrap(),
+        request_key: uuid::Uuid::new_v4().to_string(),
+        from_protocol: String::from("std_authenticator"),
+    };
+    let json_msg_value = serde_json::to_value(json_msg).unwrap();
+    send_socket_json_message(&json_msg_value, "std_ws_server").await;
 }
 
 pub async fn on_login(msg: SocketJsonMessageWithWsId) {
@@ -86,10 +186,10 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
 
                         let mut guard_usernames_by_ws_id: tokio::sync::MutexGuard<
                             '_,
-                            std::collections::HashMap<uuid::Uuid, String>
+                            std::collections::HashMap<String, String>
                         > = USERNAMES_BY_WS_ID.lock().await;
                         guard_usernames_by_ws_id.insert(
-                            uuid::Uuid::from_str(&msg.ws_id).unwrap(),
+                            msg.ws_id.clone(),
                             unwrapped_content.username.clone()
                         );
                         drop(guard_usernames_by_ws_id);
@@ -103,6 +203,11 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                             new_session_token.clone()
                         );
                         drop(guard_session_tokens);
+                        send_json_msg_to_ws_server_on_login_success(
+                            msg.ws_id,
+                            unwrapped_content,
+                            new_session_token
+                        ).await;
                     } else {
                         println!(
                             "{}",
@@ -117,6 +222,10 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                                 )
                             )
                         );
+                        send_json_msg_to_ws_server_on_login_failure(
+                            msg.ws_id,
+                            unwrapped_content
+                        ).await;
                     }
                 } else {
                     println!(
@@ -132,6 +241,7 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                             )
                         )
                     );
+                    send_json_msg_to_ws_server_on_login_failure(msg.ws_id, unwrapped_content).await;
                 }
             }
             Err(e) => {
