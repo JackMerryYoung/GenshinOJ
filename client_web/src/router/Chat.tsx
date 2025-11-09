@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy } from "react";
+import { useEffect, useState, lazy, useRef } from "react";
 import { useNavigate, Outlet, useOutletContext } from "react-router-dom";
 
 import {
@@ -11,6 +11,7 @@ import {
     TableBody,
     Divider,
     Spinner,
+    Label,
 } from "@fluentui/react-components";
 
 import { useSelector } from "react-redux";
@@ -23,6 +24,7 @@ import * as globals from "../Globals.ts";
 import { RootState } from "../store.ts";
 
 import "../css/style.css";
+import { ErrorCircle20Color } from "@fluentui/react-icons";
 
 const useStyles = makeStyles({
     root: {
@@ -63,11 +65,26 @@ function isOnlineUsersList(x: object) {
 function useOnlineUsersList(
     sendJsonMessage: globals.SendJsonMessage,
     lastJsonMessage: unknown,
+    setElapsedTime: React.Dispatch<React.SetStateAction<number>>
 ) {
     const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
     const [onlineUsersList, setOnlineUsersList] = useState<string[] | undefined>(undefined);
     const loginUsername = useSelector((state: RootState) => state.loginUsername);
     const [requestKey, setRequestKey] = useState("");
+
+    const elapsedTimerSinceLoaded = useRef(0);
+
+    useEffect(() => {
+        elapsedTimerSinceLoaded.current = setInterval(() => {
+            setElapsedTime(x => x + 1);
+        }, 1000);
+
+        return () => {
+            if (elapsedTimerSinceLoaded.current) {
+                clearInterval(elapsedTimerSinceLoaded.current);
+            }
+        };
+    }, []);
 
     const fetchOnlineUsersList = () => {
         const _requestKey = nanoid();
@@ -112,8 +129,9 @@ export function ChatList({ sendJsonMessage, lastJsonMessage }: {
     sendJsonMessage: globals.SendJsonMessage,
     lastJsonMessage: unknown
 }) {
+    const [elapsedTime, setElapsedTime] = useState(0);
     const [, setWebsocketMessageHistory] = useState([]);
-    const { onlineUsersList, fetchOnlineUsersList } = useOnlineUsersList(sendJsonMessage, lastJsonMessage);
+    const { onlineUsersList, fetchOnlineUsersList } = useOnlineUsersList(sendJsonMessage, lastJsonMessage, setElapsedTime);
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
     const navigate = useNavigate();
 
@@ -136,7 +154,17 @@ export function ChatList({ sendJsonMessage, lastJsonMessage }: {
             <TableBody>
                 {
                     onlineUsersList === undefined ?
-                        <Spinner size="tiny" label="Waiting..." delay={500} />
+                        (
+                            elapsedTime >= 10
+                                ?
+                                <div style={{ display: "flex", blockSize: "100%" }}>
+                                    <ErrorCircle20Color style={{ margin: "auto 0 0 auto" }} />
+                                    <Label style={{ margin: "auto auto 0 0", padding: "0 0 0 8px", fontSize: "14px" }}>
+                                        Failed to fetch the online users list.
+                                    </Label></div>
+                                :
+                                <Spinner size="large" label="Waiting..." delay={500} />
+                        )
                         :
                         onlineUsersList.map((username: string) => (
                             <TableRow key={username}>

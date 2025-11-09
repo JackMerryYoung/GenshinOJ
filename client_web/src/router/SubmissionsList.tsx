@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy } from "react";
+import { useEffect, useState, lazy, useRef } from "react";
 import {
     makeStyles,
     Button,
@@ -23,6 +23,7 @@ const PopupDialog = lazy(() => import("./PopupDialog.tsx"));
 
 import * as globals from "../Globals.ts";
 import { RootState } from "../store.ts";
+import { ErrorCircle20Color } from "@fluentui/react-icons";
 
 function getColorByResult(result: string) {
     if (result === "AC") return "#3AAF00";
@@ -83,11 +84,26 @@ function isSubmissionsListFromFetch(x: object) {
 
 function useSubmissionsList(
     sendJsonMessage: globals.SendJsonMessage,
-    lastJsonMessage: unknown
+    lastJsonMessage: unknown,
+    setElapsedTime: React.Dispatch<React.SetStateAction<number>>
 ) {
     const [requestKey, setRequestKey] = useState("");
     const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
     const [submissionsList, setSubmissionsList] = useState<SubmissionResult[] | SubmissionResultOthers[] | undefined>(undefined);
+
+    const elapsedTimerSinceLoaded = useRef(0);
+
+    useEffect(() => {
+        elapsedTimerSinceLoaded.current = setInterval(() => {
+            setElapsedTime(x => x + 1);
+        }, 1000);
+
+        return () => {
+            if (elapsedTimerSinceLoaded.current) {
+                clearInterval(elapsedTimerSinceLoaded.current);
+            }
+        };
+    }, []);
 
     const loadSubmissionsList = (_submissionsListIndex: number) => {
         const _requestKey = nanoid();
@@ -192,13 +208,14 @@ function useTotalSubmissionsListIndex(
 }
 
 export default function SubmissionsList() {
+    const [elapsedTime, setElapsedTime] = useState(0);
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const [submissionId, setSubmissionId] = useState("-1");
     const [submissionsListIndex, setSubmissionsListIndex] = useState(1);
     const [dialogRequireLoginOpenState, setDialogRequireLoginOpenState] = useState(false);
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
     const { totalSubmissionsListIndex, loadTotalSubmissionsListIndex } = useTotalSubmissionsListIndex(sendJsonMessage, lastJsonMessage)
-    const { submissionsList, loadSubmissionsList } = useSubmissionsList(sendJsonMessage, lastJsonMessage)
+    const { submissionsList, loadSubmissionsList } = useSubmissionsList(sendJsonMessage, lastJsonMessage, setElapsedTime)
     const navigate = useNavigate();
     const rootStyle = useStyles().root;
 
@@ -237,7 +254,19 @@ export default function SubmissionsList() {
             loginStatus.value &&
             (
                 submissionsList === undefined ?
-                    <div style={{ padding: "0.5em 0.5em 0 0.5em" }}><Spinner size="large" label="Waiting..." delay={500} /></div>
+                    <div style={{ padding: "0.5em 0.5em 0 0.5em" }}>
+                        {
+                            elapsedTime >= 10
+                                ?
+                                <div style={{ display: "flex", blockSize: "100%" }}>
+                                    <ErrorCircle20Color style={{ margin: "auto 0 0 auto" }} />
+                                    <Label style={{ margin: "auto auto 0 0", padding: "0 0 0 8px", fontSize: "14px" }}>
+                                        Failed to fetch the submission list.
+                                    </Label></div>
+                                :
+                                <Spinner size="large" label="Waiting..." delay={500} />
+                        }
+                    </div>
                     :
                     <>
                         <div className={rootStyle}>

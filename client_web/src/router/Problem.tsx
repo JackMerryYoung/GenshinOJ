@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy } from "react";
+import { useRef, useEffect, useState, lazy } from "react";
 import { Outlet, useOutletContext, useNavigate } from "react-router-dom";
 
 import {
@@ -11,6 +11,7 @@ import {
     TableBody,
     Divider,
     Spinner,
+    Label,
 } from "@fluentui/react-components";
 
 import { useSelector } from "react-redux";
@@ -24,6 +25,7 @@ import * as globals from "../Globals.ts";
 import { RootState } from "../store.ts";
 
 import "../css/style.css";
+import { ErrorCircle20Color } from "@fluentui/react-icons";
 
 
 const useStyles = makeStyles({
@@ -39,11 +41,25 @@ const useStyles = makeStyles({
 
 function useProblemList(
     sendJsonMessage: globals.SendJsonMessage,
-    lastJsonMessage: unknown
+    lastJsonMessage: unknown,
+    setElapsedTime: React.Dispatch<React.SetStateAction<number>>
 ) {
     const [problemList, setProblemList] = useState<string[] | undefined>(undefined);
     const [requestKey, setRequestKey] = useState<string>("");
     const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
+    const elapsedTimerSinceLoaded = useRef(0);
+
+    useEffect(() => {
+        elapsedTimerSinceLoaded.current = setInterval(() => {
+            setElapsedTime(x => x + 1);
+        }, 1000);
+
+        return () => {
+            if (elapsedTimerSinceLoaded.current) {
+                clearInterval(elapsedTimerSinceLoaded.current);
+            }
+        };
+    }, []);
 
     const loadProblemList = () => {
         const _requestKey = nanoid();
@@ -112,8 +128,9 @@ function TableCellForProblemList({ problem_number }: {
 }
 
 export function ProblemList({ sendJsonMessage, lastJsonMessage }: { sendJsonMessage: globals.SendJsonMessage, lastJsonMessage: unknown }) {
+    const [elapsedTime, setElapsedTime] = useState(0);
     const [, setWebsocketMessageHistory] = useState<unknown[]>([]);
-    const { problemList, loadProblemList } = useProblemList(sendJsonMessage, lastJsonMessage);
+    const { problemList, loadProblemList } = useProblemList(sendJsonMessage, lastJsonMessage, setElapsedTime);
 
     useEffect(() => {
         if (lastJsonMessage !== null)
@@ -144,7 +161,24 @@ export function ProblemList({ sendJsonMessage, lastJsonMessage }: { sendJsonMess
                     </TableBody>
                 </Table>
                 :
-                <Spinner size="tiny" label="Waiting..." delay={500} />
+                <div style={{ display: "flex", blockSize: "100%" }}>
+                    {
+                        elapsedTime >= 10
+                            ?
+                            <div style={{ display: "flex", margin: "50% 10% 50% 10%" }}>
+                                <div style={{ display: "flex", blockSize: "100% 80%" }}>
+                                    <ErrorCircle20Color style={{ margin: "auto" }} />
+                                    <Label style={{ margin: "auto", padding: "0 0 0 8px", fontSize: "14px" }}>
+                                        Failed to fetch the problem list.
+                                    </Label>
+                                </div>
+                            </div>
+                            :
+                            <div style={{ display: "flex", margin: "50% 0% 50% 35%" }}>
+                                <Spinner size="tiny" label="Waiting..." delay={500} style={{ margin: "auto" }} />
+                            </div>
+                    }
+                </div>
         }
     </>;
 }
