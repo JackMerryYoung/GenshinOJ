@@ -138,12 +138,27 @@ pub async fn ws_callback(ws: axum::extract::ws::WebSocket) {
                             )
                         )
                     );
+                    drop(ws_receiver); // Clear receiver.
+                    let mut guard_ws_server_connections_by_ws_id: tokio::sync::MutexGuard<
+                        '_,
+                        std::collections::HashMap<
+                            String,
+                            AsyncModifiable<
+                                futures_util::stream::SplitSink<
+                                    axum::extract::ws::WebSocket,
+                                    axum::extract::ws::Message
+                                >
+                            >
+                        >
+                    > = WS_SERVER_CONNECTIONS_BY_WS_ID.lock().await;
+                    guard_ws_server_connections_by_ws_id.remove(&ws_id.to_string()); // Clear sender.
                     let mut guard_ws_server_connections_cnt: tokio::sync::MutexGuard<
                         '_,
                         usize
                     > = WS_SERVER_CONNECTIONS_CNT.lock().await;
-                    *guard_ws_server_connections_cnt -= 1;
+                    *guard_ws_server_connections_cnt -= 1; // Decrease connections count.
                     drop(guard_ws_server_connections_cnt);
+                    return;
                 }
                 _ => {}
             }

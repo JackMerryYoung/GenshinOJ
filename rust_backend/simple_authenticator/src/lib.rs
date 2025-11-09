@@ -77,7 +77,7 @@ pub extern "Rust" fn on_init(
                 if let Ok(x) = simple_authenticator_socket_result {
                     println!(
                         "{}",
-                        ansi_term::Color::Blue.paint(
+                        ansi_term::Color::Green.paint(
                             format!(
                                 "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
                                 MODULE_IDENTITY,
@@ -168,7 +168,7 @@ pub extern "Rust" fn on_init(
                     if guard_ws_server_status.initialized {
                         println!(
                             "{}",
-                            ansi_term::Color::Blue.paint(
+                            ansi_term::Color::Green.paint(
                                 format!(
                                     "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The Websocket server has been initialized.",
                                     MODULE_IDENTITY,
@@ -234,9 +234,9 @@ pub extern "Rust" fn on_unload() {
 
     println!(
         "{}",
-        ansi_term::Color::Blue.paint(
+        ansi_term::Color::Purple.paint(
             format!(
-                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the simple authenticator...",
+                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Unloading the simple authenticator...",
                 MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
@@ -246,15 +246,27 @@ pub extern "Rust" fn on_unload() {
     );
 
     simple_authenticator_runtime_on_unload.spawn(async move {
-        simple_authenticator_socket::disconnect_from_ws_server().await;
+        let guard_global_module_statuses_by_protocol = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get()
+            .unwrap()
+            .lock().await;
+        if
+            let Some(ws_server_status) =
+                guard_global_module_statuses_by_protocol.get("std_ws_server")
+        {
+            let guard_ws_server_status = ws_server_status.lock().await;
+            if guard_ws_server_status.initialized {
+                simple_authenticator_socket::disconnect_from_ws_server().await;
+            }
+        }
+
         // TODO: To tell main backend to drop this module.
     });
 
     println!(
         "{}",
-        ansi_term::Color::Blue.paint(
+        ansi_term::Color::Purple.paint(
             format!(
-                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the simple authenticator.",
+                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Unloaded the simple authenticator.",
                 MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),

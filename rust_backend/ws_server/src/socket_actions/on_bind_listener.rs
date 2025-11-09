@@ -24,7 +24,7 @@ pub async fn on_bind_listener(msg: SocketJsonMessage) {
                 if external_listener.protocols.insert(content.protocol.clone()) {
                     println!(
                         "{}",
-                        ansi_term::Color::Blue.paint(
+                        ansi_term::Color::Green.paint(
                             format!(
                                 "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Protocol `{}` successfully binded `{}`.",
                                 MODULE_IDENTITY,

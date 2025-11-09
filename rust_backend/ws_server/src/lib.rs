@@ -116,7 +116,7 @@ pub extern "Rust" fn on_init(
                 if let Ok(x) = ws_server_socket_result {
                     println!(
                         "{}",
-                        ansi_term::Color::Blue.paint(
+                        ansi_term::Color::Green.paint(
                             format!(
                                 "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the socket on port {}.",
                                 MODULE_IDENTITY,
@@ -207,11 +207,11 @@ pub extern "Rust" fn on_init(
                 2,
                 1000,
                 {
-                    eprintln!(
+                    println!(
                         "{}",
-                        ansi_term::Color::Red.paint(
+                        ansi_term::Color::Yellow.paint(
                             format!(
-                                "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Failed to initialize the Websocket server. Retrying...",
+                                "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] Failed to initialize the Websocket server. Retrying...",
                                 MODULE_IDENTITY,
                                 std::thread::current().id().as_u64(),
                                 file!(),
@@ -225,7 +225,7 @@ pub extern "Rust" fn on_init(
                 Ok(listener) => {
                     println!(
                         "{}",
-                        ansi_term::Color::Blue.paint(
+                        ansi_term::Color::Green.paint(
                             format!(
                                 "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Initialized the Websocket server.",
                                 MODULE_IDENTITY,
@@ -307,9 +307,9 @@ pub extern "Rust" fn on_init(
 pub extern "Rust" fn on_unload() {
     println!(
         "{}",
-        ansi_term::Color::Blue.paint(
+        ansi_term::Color::Purple.paint(
             format!(
-                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloading the Websocket server...",
+                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Unloading the Websocket server...",
                 MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
@@ -319,9 +319,9 @@ pub extern "Rust" fn on_unload() {
     );
     println!(
         "{}",
-        ansi_term::Color::Blue.paint(
+        ansi_term::Color::Purple.paint(
             format!(
-                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Unloaded the Websocket server.",
+                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Unloaded the Websocket server.",
                 MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),

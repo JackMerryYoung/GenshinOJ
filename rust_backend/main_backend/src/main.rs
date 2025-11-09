@@ -184,9 +184,9 @@ fn main() {
             drop(guard_module_combinations);
             println!(
                 "{}",
-                ansi_term::Color::Blue.paint(
+                ansi_term::Color::Purple.paint(
                     format!(
-                        "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully unloaded all the modules.",
+                        "[MAIN_BACKEND] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Successfully unloaded all the modules.",
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!()
@@ -195,9 +195,9 @@ fn main() {
             );
             println!(
                 "{}",
-                ansi_term::Color::Blue.paint(
+                ansi_term::Color::Purple.paint(
                     format!(
-                        "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
+                        "[MAIN_BACKEND] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Now quitting...",
                         std::thread::current().id().as_u64(),
                         file!(),
                         line!()
@@ -587,7 +587,7 @@ async fn load_modules(
             Ok(module) => {
                 println!(
                     "{}",
-                    ansi_term::Color::Blue.paint(
+                    ansi_term::Color::Green.paint(
                         format!(
                             "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Successfully loaded module `{}` from `{}`.",
                             std::thread::current().id().as_u64(),
@@ -632,7 +632,7 @@ async fn load_modules(
                     }
                     println!(
                         "{}",
-                        ansi_term::Color::Blue.paint(
+                        ansi_term::Color::Green.paint(
                             format!(
                                 "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Module `{}` finished initialization.",
                                 std::thread::current().id().as_u64(),
