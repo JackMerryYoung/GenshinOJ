@@ -53,6 +53,12 @@ pub async fn on_quit(msg: SocketJsonMessageWithWsId) {
                         );
                         guard_session_tokens_by_username.remove(username_by_ws_id);
                         guard_logged_in_usernames.remove(username_by_ws_id);
+                        let mut guard_ws_ids_by_username: tokio::sync::MutexGuard<
+                            '_,
+                            std::collections::HashMap<String, String>
+                        > = WS_IDS_BY_USERNAME.lock().await;
+                        guard_ws_ids_by_username.remove(username_by_ws_id);
+                        drop(guard_ws_ids_by_username);
                         guard_usernames_by_ws_id.remove(&content.ws_id);
                     } else {
                         println!(

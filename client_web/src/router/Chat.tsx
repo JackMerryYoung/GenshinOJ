@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, useRef } from "react";
+import { useEffect, useState, lazy } from "react";
 import { useNavigate, Outlet, useOutletContext } from "react-router-dom";
 
 import {
@@ -12,6 +12,7 @@ import {
     Divider,
     Spinner,
     Label,
+    Input,
 } from "@fluentui/react-components";
 
 import { useSelector } from "react-redux";
@@ -24,7 +25,6 @@ import * as globals from "../Globals.ts";
 import { RootState } from "../store.ts";
 
 import "../css/style.css";
-import { ErrorCircle20Color } from "@fluentui/react-icons";
 
 const useStyles = makeStyles({
     root: {
@@ -45,52 +45,38 @@ const useStyles = makeStyles({
     }
 });
 
-interface OnlineUsersList {
+interface FriendsListMessage {
     type: string;
     content: {
-        online_users: string[],
+        friends: string[],
         request_key: string,
     };
 }
 
-function isOnlineUsersList(x: object) {
+function isFriendsListMessage(x: object) {
     if ('type' in x && 'content' in x && typeof x.content === 'object') {
-        return 'online_users' in (x.content as object) &&
+        return 'friends' in (x.content as object) &&
             'request_key' in (x.content as object);
     }
 
     return false;
 }
 
-function useOnlineUsersList(
+function useFriendsList(
     sendJsonMessage: globals.SendJsonMessage,
     lastJsonMessage: unknown,
-    setElapsedTime: React.Dispatch<React.SetStateAction<number>>
+    loginUsername: string
 ) {
     const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
-    const [onlineUsersList, setOnlineUsersList] = useState<string[] | undefined>(undefined);
-    const loginUsername = useSelector((state: RootState) => state.loginUsername);
+    const [friendsList, setFriendsList] = useState<string[] | undefined>(undefined);
     const [requestKey, setRequestKey] = useState("");
 
-    const elapsedTimerSinceLoaded = useRef(0);
-
-    useEffect(() => {
-        elapsedTimerSinceLoaded.current = setInterval(() => {
-            setElapsedTime(x => x + 1);
-        }, 1000);
-
-        return () => {
-            if (elapsedTimerSinceLoaded.current) {
-                clearInterval(elapsedTimerSinceLoaded.current);
-            }
-        };
-    }, []);
-
-    const fetchOnlineUsersList = () => {
+    const fetchFriendsList = () => {
         const _requestKey = nanoid();
         sendJsonMessage({
-            type: "online_user",
+            type: "friends_list",
             content: {
+                username: loginUsername,
                 request_key: _requestKey
             }
         });
@@ -104,36 +90,70 @@ function useOnlineUsersList(
     }, [lastJsonMessage]);
 
     useEffect(() => {
-        let newOnlineUsersList: string[] = [], changed = false;
+        let changed = false;
+        let newFriendsList: string[] = [];
         const _websocketMessageHistory = websocketMessageHistory;
         _websocketMessageHistory.map((_message, index) => {
-            if (_message && isOnlineUsersList(_message)) {
-                const message = _message as OnlineUsersList;
-                console.log(message);
-                if (message.type === 'online_user' && message.content.request_key === requestKey) {
+            if (_message && isFriendsListMessage(_message)) {
+                const message = _message as FriendsListMessage;
+                if (message.type === 'friends_list' && message.content.request_key === requestKey) {
                     changed = true;
-                    newOnlineUsersList = message.content.online_users;
+                    newFriendsList = message.content.friends;
                     delete _websocketMessageHistory[index];
                 }
             }
         });
 
-        if (changed) setOnlineUsersList(newOnlineUsersList.filter((element) => element !== loginUsername.value));
+        if (changed) setFriendsList(newFriendsList);
         if (!globals.compareArray(_websocketMessageHistory, websocketMessageHistory)) setWebsocketMessageHistory(_websocketMessageHistory);
     }, [websocketMessageHistory, requestKey]);
 
-    return { onlineUsersList, fetchOnlineUsersList };
+    return { friendsList, fetchFriendsList };
 }
 
-export function ChatList({ sendJsonMessage, lastJsonMessage }: {
+interface SearchUsersResultMessage {
+    type: string;
+    content: {
+        users: string[],
+        request_key: string,
+    };
+}
+
+function isSearchUsersResultMessage(x: object) {
+    if ('type' in x && 'content' in x && typeof x.content === 'object') {
+        return 'users' in (x.content as object) &&
+            'request_key' in (x.content as object);
+    }
+
+    return false;
+}
+
+function useSearchUsers(
     sendJsonMessage: globals.SendJsonMessage,
-    lastJsonMessage: unknown
-}) {
-    const [elapsedTime, setElapsedTime] = useState(0);
-    const [, setWebsocketMessageHistory] = useState([]);
-    const { onlineUsersList, fetchOnlineUsersList } = useOnlineUsersList(sendJsonMessage, lastJsonMessage, setElapsedTime);
-    const loginStatus = useSelector((state: RootState) => state.loginStatus);
-    const navigate = useNavigate();
+    lastJsonMessage: unknown,
+    loginUsername: string
+) {
+    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
+    const [searchResults, setSearchResults] = useState<string[] | undefined>(undefined);
+    const [requestKey, setRequestKey] = useState("");
+
+    const searchUsers = (query: string) => {
+        if (query.trim() === "") {
+            setSearchResults(undefined);
+            return;
+        }
+        const _requestKey = nanoid();
+        sendJsonMessage({
+            type: "search_users",
+            content: {
+                query,
+                exclude_username: loginUsername,
+                request_key: _requestKey
+            }
+        });
+
+        setRequestKey(_requestKey);
+    };
 
     useEffect(() => {
         if (lastJsonMessage !== null)
@@ -141,40 +161,115 @@ export function ChatList({ sendJsonMessage, lastJsonMessage }: {
     }, [lastJsonMessage]);
 
     useEffect(() => {
-        if (loginStatus.value === true) fetchOnlineUsersList();
+        let changed = false;
+        let newSearchResults: string[] = [];
+        const _websocketMessageHistory = websocketMessageHistory;
+        _websocketMessageHistory.map((_message, index) => {
+            if (_message && isSearchUsersResultMessage(_message)) {
+                const message = _message as SearchUsersResultMessage;
+                if (message.type === 'search_users_result' && message.content.request_key === requestKey) {
+                    changed = true;
+                    newSearchResults = message.content.users;
+                    delete _websocketMessageHistory[index];
+                }
+            }
+        });
+
+        if (changed) setSearchResults(newSearchResults);
+        if (!globals.compareArray(_websocketMessageHistory, websocketMessageHistory)) setWebsocketMessageHistory(_websocketMessageHistory);
+    }, [websocketMessageHistory, requestKey]);
+
+    return { searchResults, searchUsers };
+}
+
+function UserRow({ username }: { username: string }) {
+    const navigate = useNavigate();
+    return <TableRow key={username}>
+        <TableCell onClick={() => navigate("/chat/user/" + username)}>{username}</TableCell>
+    </TableRow>;
+}
+
+export function ChatList({ sendJsonMessage, lastJsonMessage }: {
+    sendJsonMessage: globals.SendJsonMessage,
+    lastJsonMessage: unknown
+}) {
+    const loginStatus = useSelector((state: RootState) => state.loginStatus);
+    const loginUsername = useSelector((state: RootState) => state.loginUsername);
+    const { friendsList, fetchFriendsList } = useFriendsList(sendJsonMessage, lastJsonMessage, loginUsername.value);
+    const { searchResults, searchUsers } = useSearchUsers(sendJsonMessage, lastJsonMessage, loginUsername.value);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    useEffect(() => {
+        if (loginStatus.value === true) fetchFriendsList();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loginStatus]);
 
-    return <div>
-        <Table size="medium">
-            <TableHeader>
-                <TableRow>
-                    <TableHeaderCell>Online User</TableHeaderCell>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {
-                    onlineUsersList === undefined ?
-                        (
-                            elapsedTime >= 10
+    useEffect(() => {
+        searchUsers(searchQuery);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchQuery]);
+
+    return <div className="scroll-bar-wrap">
+        <div className="scroll-box" style={{ display: "block", overflowY: "auto", maxHeight: "60vh", marginTop: "0.5em" }}>
+            <div style={{ margin: "0.4em" }}>
+                <Input
+                    placeholder="Search users..."
+                    value={searchQuery}
+                    onChange={(_ev, data) => setSearchQuery(data.value)} />
+            </div>
+            {
+                searchQuery.trim() !== "" &&
+                <Table size="medium">
+                    <TableHeader style={{ position: "sticky", top: 0, zIndex: 1, background: "#fff" }}>
+                        <TableRow>
+                            <TableHeaderCell>Search Results</TableHeaderCell>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {
+                            searchResults === undefined
                                 ?
-                                <div style={{ display: "flex", blockSize: "100%" }}>
-                                    <ErrorCircle20Color style={{ margin: "auto 0 0 auto" }} />
-                                    <Label style={{ margin: "auto auto 0 0", padding: "0 0 0 8px", fontSize: "14px" }}>
-                                        Failed to fetch the online users list.
-                                    </Label></div>
+                                <TableRow>
+                                    <TableCell><Spinner size="tiny" label="Searching..." delay={300} /></TableCell>
+                                </TableRow>
                                 :
-                                <Spinner size="large" label="Waiting..." delay={500} />
-                        )
-                        :
-                        onlineUsersList.map((username: string) => (
-                            <TableRow key={username}>
-                                <TableCell onClick={() => navigate("/chat/user/" + username)} >{username}</TableCell>
+                                searchResults.length === 0
+                                    ?
+                                    <TableRow>
+                                        <TableCell><Label>No users found.</Label></TableCell>
+                                    </TableRow>
+                                    :
+                                    searchResults.map((username: string) => <UserRow key={username} username={username} />)
+                        }
+                    </TableBody>
+                </Table>
+            }
+            <Table size="medium">
+                <TableHeader style={{ position: "sticky", top: 0, zIndex: 1, background: "#fff" }}>
+                    <TableRow>
+                        <TableHeaderCell>Friends</TableHeaderCell>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {
+                        friendsList === undefined
+                            ?
+                            <TableRow>
+                                <TableCell><Spinner size="large" label="Waiting..." delay={500} /></TableCell>
                             </TableRow>
-                        )
-                        )
-                }
-            </TableBody>
-        </Table>
+                            :
+                            friendsList.length === 0
+                                ?
+                                <TableRow>
+                                    <TableCell><Label>No friends yet. Search above to find someone to chat with.</Label></TableCell>
+                                </TableRow>
+                                :
+                                friendsList.map((username: string) => <UserRow key={username} username={username} />)
+                    }
+                </TableBody>
+            </Table>
+        </div>
+        <div className="cover-bar" />
     </div>;
 }
 

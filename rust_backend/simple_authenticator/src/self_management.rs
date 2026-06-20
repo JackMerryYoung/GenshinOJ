@@ -31,6 +31,6 @@ pub async fn self_management(simple_authenticator_status: AsyncModifiable<Module
             );
             time_last = time_now;
         }
-        fake_yield_now(1000).await;
+        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
     }
 }

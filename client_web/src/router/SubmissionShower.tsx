@@ -170,7 +170,6 @@ function useSubmissionResult(
 
 export default function SubmissionShower() {
     const { submissionId } = (useLoaderData() as SubmissionInfoFromLoader);
-    const [, setWebsocketMessageHistory] = useState([]);
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const [dialogRequireLoginOpenState, setDialogRequireLoginOpenState] = useState(false);
     const [dialogSubmissionNotFoundOpenState, setDialogSubmissionNotFoundOpenState] = useState(false);
@@ -198,10 +197,6 @@ export default function SubmissionShower() {
         if (loginStatus.value === true)
             loadSubmissionResult(submissionId);
     }, [loginStatus]);
-
-    useEffect(() => {
-        if (lastJsonMessage !== null) setWebsocketMessageHistory((previousMessage) => previousMessage.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
 
     useEffect(() => {
         if (submissionResult !== undefined && submissionResult.result === "SNF") setDialogSubmissionNotFoundOpenState(true);

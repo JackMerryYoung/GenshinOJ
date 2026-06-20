@@ -4,3 +4,6 @@ pub mod on_register;
 pub mod on_login_check;
 pub mod on_online_user;
 pub mod on_close_connection;
+pub mod on_validate_session_and_locate;
+pub mod on_validate_session;
+pub mod on_username_by_ws_id;

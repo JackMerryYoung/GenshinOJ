@@ -10,6 +10,7 @@ pub async fn socket_message_processing() {
     > = SIMPLE_AUTHENTICATOR_SOCKET.get().unwrap().lock().await;
     loop {
         let (mut client, _) = guard_simple_authenticator_socket.accept().await.unwrap();
+        client.set_nodelay(true).ok();
         tokio::spawn(async move {
             let mut buf: bytes::BytesMut = bytes::BytesMut::with_capacity(1024);
             client.read_buf(&mut buf).await.unwrap();
@@ -57,6 +58,44 @@ pub async fn socket_message_processing() {
                                 )
                             );
                         }
+                    } else {
+                        println!(
+                            "{}",
+                            ansi_term::Color::Yellow.paint(
+                                format!(
+                                    "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                                    MODULE_IDENTITY,
+                                    std::thread::current().id().as_u64(),
+                                    file!(),
+                                    line!()
+                                )
+                            )
+                        );
+                    }
+                } else if let Ok(msg) = serde_json::from_value::<SocketJsonMessage>(msg) {
+                    // A direct module-to-module message (no `ws_id`, didn't come through
+                    // ws_server's forwarding).
+                    println!(
+                        "{}",
+                        ansi_term::Color::Blue.paint(
+                            format!(
+                                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Received socket message: {:?}",
+                                MODULE_IDENTITY,
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                msg
+                            )
+                        )
+                    );
+                    if msg.r#type == "on_validate_session_and_locate" {
+                        socket_actions::on_validate_session_and_locate::on_validate_session_and_locate(
+                            msg
+                        ).await;
+                    } else if msg.r#type == "on_username_by_ws_id" {
+                        socket_actions::on_username_by_ws_id::on_username_by_ws_id(msg).await;
+                    } else if msg.r#type == "on_validate_session" {
+                        socket_actions::on_validate_session::on_validate_session(msg).await;
                     } else {
                         println!(
                             "{}",

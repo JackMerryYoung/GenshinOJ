@@ -123,19 +123,13 @@ function TableCellForProblemList({ problem_number }: {
         navigate("/problem/" + problem_number);
     };
     return <TableRow key={problem_number}>
-        <TableCell onClick={handleClick} >{problem_number}</TableCell>
+        <TableCell onClick={handleClick}>{problem_number}</TableCell>
     </TableRow>;
 }
 
 export function ProblemList({ sendJsonMessage, lastJsonMessage }: { sendJsonMessage: globals.SendJsonMessage, lastJsonMessage: unknown }) {
     const [elapsedTime, setElapsedTime] = useState(0);
-    const [, setWebsocketMessageHistory] = useState<unknown[]>([]);
     const { problemList, loadProblemList } = useProblemList(sendJsonMessage, lastJsonMessage, setElapsedTime);
-
-    useEffect(() => {
-        if (lastJsonMessage !== null)
-            setWebsocketMessageHistory((previousMessageHistory) => previousMessageHistory.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
 
     useEffect(() => {
         loadProblemList();
@@ -145,21 +139,23 @@ export function ProblemList({ sendJsonMessage, lastJsonMessage }: { sendJsonMess
         {
             problemList !== undefined
                 ?
-                <Table size="medium">
-                    <TableHeader>
-                        <TableRow>
-                            <TableHeaderCell>Problem List</TableHeaderCell>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {
-                            problemList.map((problem_number: string, index: number) => (
-                                <TableCellForProblemList key={index} problem_number={problem_number} />
-                            )
-                            )
-                        }
-                    </TableBody>
-                </Table>
+                <div style={{ overflowY: "auto", maxHeight: "60vh" }}>
+                    <Table size="medium">
+                        <TableHeader style={{ position: "sticky", top: 0, zIndex: 1, background: "#fff" }}>
+                            <TableRow>
+                                <TableHeaderCell>Problem List</TableHeaderCell>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {
+                                problemList.map((problem_number: string, index: number) => (
+                                    <TableCellForProblemList key={index} problem_number={problem_number} />
+                                )
+                                )
+                            }
+                        </TableBody>
+                    </Table>
+                </div>
                 :
                 <div style={{ display: "flex", blockSize: "100%" }}>
                     {

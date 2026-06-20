@@ -10,6 +10,7 @@ pub struct ModuleStatus {
     initialized: bool,
     panicked: bool,
     socket_port: AsyncModifiable<u16>,
+    init_notify: std::sync::Arc<tokio::sync::Notify>,
 }
 
 static GLOBAL_MODULE_STATUSES_BY_PROTOCOL: std::sync::OnceLock<
@@ -31,6 +32,7 @@ pub extern "Rust" fn on_init(
         initialized: false,
         panicked: false,
         socket_port: new_async_modifiable(0),
+        init_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
     };
     let db_connector_status: AsyncModifiable<ModuleStatus> =
         new_async_modifiable(db_connector_status);
@@ -39,19 +41,22 @@ pub extern "Rust" fn on_init(
     {
         let db_connector_status: AsyncModifiable<ModuleStatus> = db_connector_status.clone();
         db_connector_runtime.spawn(async move {
-            loop {
-                // Waiting for the initialization to be completed.
-                let guard_db_connector_status: tokio::sync::MutexGuard<
-                    '_,
-                    ModuleStatus
-                > = db_connector_status.lock().await;
-                if guard_db_connector_status.initialized {
-                    fake_yield_now(0).await;
-                    drop(guard_db_connector_status);
-                    break;
-                }
-                drop(guard_db_connector_status);
-                fake_yield_now(1000).await;
+            // Wait for initialization, notified instead of polled. The setter uses
+            // notify_waiters() (not notify_one()) because main_backend's own module-loading wait
+            // is a second, independent waiter on this same init_notify; notify_waiters() only
+            // reaches waiters already registered at the moment it's called, so `enable()` must
+            // run here before the flag check to register us immediately. (This module never
+            // actually sets `initialized`, so this branch never fires today — kept consistent
+            // with the other modules regardless.)
+            let init_notify: std::sync::Arc<tokio::sync::Notify> = db_connector_status
+                .lock().await.init_notify
+                .clone();
+            let notified = init_notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            let already_initialized: bool = db_connector_status.lock().await.initialized;
+            if !already_initialized {
+                notified.await;
             }
             // Now start self management
             self_management(db_connector_status).await
@@ -129,19 +134,9 @@ async fn self_management(db_connector_status: AsyncModifiable<ModuleStatus>) {
                 );
                 monitor_time_cnt = 0;
             }
-            fake_yield_now(0).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         } else {
-            fake_yield_now(1000).await;
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         }
-    }
-}
-
-const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
-
-async fn fake_yield_now(tm: u64) {
-    if tm == 0 {
-        tokio::time::sleep(tokio::time::Duration::from_millis(FAKE_YIELD_NOW_MILLISECONDS)).await;
-    } else {
-        tokio::time::sleep(tokio::time::Duration::from_millis(tm)).await;
     }
 }

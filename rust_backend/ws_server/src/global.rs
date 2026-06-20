@@ -79,6 +79,7 @@ pub struct ModuleStatus {
     pub initialized: bool,
     pub panicked: bool,
     pub socket_port: AsyncModifiable<u16>,
+    pub init_notify: std::sync::Arc<tokio::sync::Notify>,
 }
 
 /**
@@ -131,10 +132,11 @@ pub static WS_SERVER_SOCKET: std::sync::OnceLock<AsyncModifiable<tokio::net::Tcp
     **When there's a command received by this Websocket Server, it'll be forwarded to those modules that can received this kind of commands.**
  */
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExternalListener {
     pub command: String, // Represents what command they listen to.
-    pub protocols: std::collections::HashSet<String>, // List of protocols implemented by modules which listen to this command.
+    pub required_protocol_version: semver::VersionReq, // Version range a protocol must satisfy to bind to this command.
+    pub protocols: std::collections::HashMap<String, semver::Version>, // Protocols (by name) implemented by modules which listen to this command, with the version they bound with.
 }
 
 /**
@@ -145,7 +147,7 @@ pub struct ExternalListener {
     **External listeners can be indexed by specifying commands**.
  */
 pub static WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND: std::sync::OnceLock<
-    AsyncModifiable<std::collections::HashMap<String, ExternalListener>>
+    std::sync::RwLock<std::sync::Arc<std::collections::HashMap<String, ExternalListener>>>
 > = std::sync::OnceLock::new();
 
 #[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug)]
@@ -186,7 +188,12 @@ pub async fn get_socket_port_by_protocol(protocol: &str) -> u16 {
 pub async fn get_socket_by_protocol(protocol: &str) -> tokio::net::TcpStream {
     let socket_port: u16 = get_socket_port_by_protocol(protocol).await;
     match tokio::net::TcpStream::connect(format!("127.0.0.1:{socket_port}")).await {
-        Ok(socket) => socket,
+        Ok(socket) => {
+            // Without this, Nagle's algorithm + the peer's delayed ACK can stall these
+            // one-shot connect-write-drop control messages by hundreds of ms to seconds.
+            socket.set_nodelay(true).ok();
+            socket
+        }
         Err(_) => {
             eprintln!(
                 "{}",
@@ -202,7 +209,7 @@ pub async fn get_socket_by_protocol(protocol: &str) -> tokio::net::TcpStream {
                     )
                 )
             );
-            panic!();
+            panic!(); // TODO: Not panicking here but returning a Result would be better.
         }
     }
 }
@@ -233,12 +240,22 @@ pub fn get_pwd() -> String {
     String::from(pwd.to_str().unwrap())
 }
 
-const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
-
-pub async fn fake_yield_now(tm: u64) {
-    if tm == 0 {
-        tokio::time::sleep(tokio::time::Duration::from_millis(FAKE_YIELD_NOW_MILLISECONDS)).await;
-    } else {
-        tokio::time::sleep(tokio::time::Duration::from_millis(tm)).await;
-    }
+// The `avatars` directory lives at the project root, one level above `rust_backend` (where every
+// module's process actually runs from) — mirrors `judge`'s `get_problem_dir_path()` convention.
+pub fn get_avatars_dir_path() -> String {
+    let mut pwd: std::path::PathBuf = std::env::current_dir().unwrap();
+    pwd.pop();
+    pwd.push("avatars");
+    String::from(pwd.to_str().unwrap())
 }
+
+pub const ALLOWED_AVATAR_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp"];
+
+pub const MAX_AVATAR_SIZE_BYTES: usize = 1024 * 1024; // 1 MiB
+
+// In-flight `on_validate_session` RPCs issued by ws_server itself (e.g. to authorize an avatar
+// upload), keyed by request_key. The oneshot sender is fired by
+// `socket_actions::on_validate_session_result` once simple_authenticator's reply arrives.
+pub static PENDING_VALIDATE_SESSION_REQUESTS: std::sync::LazyLock<
+    tokio::sync::Mutex<std::collections::HashMap<String, tokio::sync::oneshot::Sender<bool>>>
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));

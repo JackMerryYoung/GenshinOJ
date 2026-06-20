@@ -34,6 +34,9 @@ a {
   width: 0.4em;
   transition: all 0.5s;
   opacity: 1;
+  /* Purely visual (hides the scrollbar track until hover) — without this, the div sits on top
+     of the real scrollbar and swallows mousedown/drag on the thumb underneath it. */
+  pointer-events: none;
 }
 
 .scroll-bar-wrap:hover > .cover-bar {

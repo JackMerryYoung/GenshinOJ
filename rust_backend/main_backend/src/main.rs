@@ -50,6 +50,10 @@ pub struct ModuleStatus {
     initialized: bool,
     panicked: bool,
     socket_port: AsyncModifiable<u16>,
+    // Lets waiters for `initialized` block on a notification instead of polling on a timer.
+    // notify_one()'s buffered-permit semantics make this race-free regardless of whether the
+    // notify happens before or after a waiter starts waiting.
+    init_notify: std::sync::Arc<tokio::sync::Notify>,
 }
 
 struct ModuleCombination {
@@ -59,6 +63,17 @@ struct ModuleCombination {
 }
 
 fn main() {
+    // Modules are loaded from separately-compiled dylibs, each statically linking their own
+    // copy of tokio. Relying on `tokio::signal::ctrl_c()` here was empirically unreliable once
+    // those modules' own runtimes were doing real socket I/O alongside ours — the signal would
+    // sometimes never resolve the future at all. A raw OS-level flag set directly by `signal-hook`
+    // (no async runtime involved in *noticing* the signal, only in polling the flag) is robust to
+    // however many separate tokio copies exist in the process.
+    let sigint_received: std::sync::Arc<std::sync::atomic::AtomicBool> = std::sync::Arc::new(
+        std::sync::atomic::AtomicBool::new(false)
+    );
+    signal_hook::flag::register(signal_hook::consts::SIGINT, sigint_received.clone()).unwrap();
+
     let module_combinations: AsyncModifiable<Vec<ModuleCombination>> = new_async_modifiable(vec![]);
     let module_statuses_by_protocol: AsyncModifiable<
         std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>
@@ -164,6 +179,8 @@ fn main() {
                 }
                 drop(guard_module_combinations);
                 drop(guard_module_config_json);
+                drop(guard_module_statuses);
+                tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
             }
         });
     }
@@ -171,16 +188,23 @@ fn main() {
     {
         let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
             module_combinations.clone();
+        let module_config_json: AsyncModifiable<ModuleConfigJson> = module_config_json.clone();
         MAIN_TOKIO_RUNTIME.block_on(async move {
-            // Wait fot Ctrl+C.
-            tokio::signal::ctrl_c().await.unwrap();
-            let guard_module_combinations: tokio::sync::MutexGuard<
+            // Wait for Ctrl+C (SIGINT), polling the raw OS-level flag rather than
+            // tokio::signal::ctrl_c() — see the comment where `sigint_received` is registered.
+            while !sigint_received.load(std::sync::atomic::Ordering::Relaxed) {
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            }
+            let mut guard_module_combinations: tokio::sync::MutexGuard<
                 '_,
                 Vec<ModuleCombination>
             > = module_combinations.lock().await;
-            for module in guard_module_combinations.iter() {
-                module.instance.on_unload(); // Unload each module.
-            }
+            let guard_module_config_json: tokio::sync::MutexGuard<
+                '_,
+                ModuleConfigJson
+            > = module_config_json.lock().await;
+            unload_module_combinations(&mut guard_module_combinations, &guard_module_config_json);
+            drop(guard_module_config_json);
             drop(guard_module_combinations);
             println!(
                 "{}",
@@ -211,6 +235,7 @@ fn main() {
     {
         let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
             module_combinations.clone();
+        let module_config_json: AsyncModifiable<ModuleConfigJson> = module_config_json.clone();
         let main_backend_panic_flag: AsyncModifiable<bool> = MAIN_BACKEND_PANIC_FLAG.clone();
         MAIN_TOKIO_RUNTIME.block_on(async move {
             loop {
@@ -225,13 +250,16 @@ fn main() {
 
                 drop(guard_main_backend_panic_flag);
             }
-            let guard_module_combinations: tokio::sync::MutexGuard<
+            let mut guard_module_combinations: tokio::sync::MutexGuard<
                 '_,
                 Vec<ModuleCombination>
             > = module_combinations.lock().await;
-            for module in guard_module_combinations.iter() {
-                module.instance.on_unload(); // Unload each module.
-            }
+            let guard_module_config_json: tokio::sync::MutexGuard<
+                '_,
+                ModuleConfigJson
+            > = module_config_json.lock().await;
+            unload_module_combinations(&mut guard_module_combinations, &guard_module_config_json);
+            drop(guard_module_config_json);
             drop(guard_module_combinations);
             println!(
                 "{}",
@@ -315,7 +343,6 @@ async fn parse_module_config_json() -> ModuleConfigJson {
 }
 
 struct ForwardStarRepresentation {
-    node_cnt: usize,
     edge_cnt: usize,
     edges: Vec<ForwardStarRepresentationEdge>,
     head: Vec<Option<usize>>,
@@ -335,7 +362,6 @@ impl ForwardStarRepresentation {
         let mut edges: Vec<ForwardStarRepresentationEdge> = Vec::with_capacity(node_cnt);
         edges.push(ForwardStarRepresentationEdge { nxt: 0, to: 0 });
         ForwardStarRepresentation {
-            node_cnt,
             edge_cnt: 0,
             edges,
             head,
@@ -401,7 +427,7 @@ async fn load_modules(
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!(),
-                            &module_protocol_without_version
+                            module_protocol_without_version
                         )
                     )
                 );
@@ -427,7 +453,7 @@ async fn load_modules(
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!(),
-                            &module_protocol_without_version
+                            module_protocol_without_version
                         )
                     )
                 );
@@ -447,7 +473,7 @@ async fn load_modules(
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!(),
-                            &module_protocol_without_version
+                            module_protocol_without_version
                         )
                     )
                 );
@@ -467,7 +493,7 @@ async fn load_modules(
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!(),
-                            &module_protocol_without_version
+                            module_protocol_without_version
                         )
                     )
                 );
@@ -511,7 +537,7 @@ async fn load_modules(
                                             std::thread::current().id().as_u64(),
                                             file!(),
                                             line!(),
-                                            &dependencies_protocol_without_version
+                                            dependencies_protocol_without_version
                                         )
                                     )
                                 );
@@ -594,7 +620,7 @@ async fn load_modules(
                             file!(),
                             line!(),
                             module_name,
-                            &module_library_file_path
+                            module_library_file_path
                         )
                     )
                 );
@@ -605,40 +631,51 @@ async fn load_modules(
                 ) = module.on_init(module_statuses_by_protocol.clone());
                 {
                     let status: AsyncModifiable<ModuleStatus> = result.1.clone();
-                    loop {
-                        // Waiting for the initialization to be completed.
-                        println!(
-                            "{}",
-                            ansi_term::Color::Blue.paint(
-                                format!(
-                                    "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Waiting for module `{}` to finish initialization.",
-                                    std::thread::current().id().as_u64(),
-                                    file!(),
-                                    line!(),
-                                    module_name
-                                )
-                            )
-                        );
-                        let guard_status: tokio::sync::MutexGuard<
-                            '_,
-                            ModuleStatus
-                        > = status.lock().await;
-                        if guard_status.initialized {
-                            drop(guard_status);
-                            break;
-                        }
-                        drop(guard_status);
-                        fake_yield_now(1000).await;
-                    }
                     println!(
                         "{}",
-                        ansi_term::Color::Green.paint(
+                        ansi_term::Color::Blue.paint(
                             format!(
-                                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Module `{}` finished initialization.",
+                                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Waiting for module `{}` to finish initialization.",
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),
                                 module_name
+                            )
+                        )
+                    );
+                    // Wait for the module to notify us, instead of polling on a timer. `enable()`
+                    // registers us as a waiter immediately, before we check the flag — required
+                    // because notify_one() only guarantees delivery to a Notified future that has
+                    // already been polled at least once; a bare `notified().await` after the flag
+                    // check leaves a real (if narrow) race window on a multi-threaded runtime
+                    // where the module's notification can be missed.
+                    let init_notify: std::sync::Arc<tokio::sync::Notify> = status
+                        .lock().await.init_notify
+                        .clone();
+                    let notified = init_notify.notified();
+                    tokio::pin!(notified);
+                    notified.as_mut().enable();
+                    let already_initialized: bool = status.lock().await.initialized;
+                    if !already_initialized {
+                        notified.await;
+                    }
+                    let module_socket_port: u16 = {
+                        let guard_status: tokio::sync::MutexGuard<'_, ModuleStatus> =
+                            status.lock().await;
+                        let port: u16 = *guard_status.socket_port.lock().await;
+                        drop(guard_status);
+                        port
+                    };
+                    println!(
+                        "{}",
+                        ansi_term::Color::Green.paint(
+                            format!(
+                                "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Module `{}` finished initialization, listening on port {}.",
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                module_name,
+                                module_socket_port
                             )
                         )
                     );
@@ -689,7 +726,7 @@ async fn load_modules(
                             file!(),
                             line!(),
                             module_name,
-                            &module_library_file_path
+                            module_library_file_path
                         )
                     )
                 );
@@ -714,12 +751,33 @@ async fn load_modules(
     }
 }
 
-const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
-
-async fn fake_yield_now(tm: u64) {
-    if tm == 0 {
-        tokio::time::sleep(tokio::time::Duration::from_millis(FAKE_YIELD_NOW_MILLISECONDS)).await;
-    } else {
-        tokio::time::sleep(tokio::time::Duration::from_millis(tm)).await;
+fn unload_module_combinations(
+    module_combinations: &mut Vec<ModuleCombination>,
+    module_config_json: &ModuleConfigJson
+) {
+    for module in module_combinations.drain(..) {
+        module.instance.on_unload(); // Unload each module.
+        let unload_timeout: usize = module_config_json.working_load
+            .get(&module.name)
+            .map(|config| config.unload_timeout)
+            .unwrap_or(0);
+        println!(
+            "{}",
+            ansi_term::Color::Blue.paint(
+                format!(
+                    "[MAIN_BACKEND] [INFO] [THREAD {}] [FILE `{}` LINE {}] Shutting down the Tokio runtime of module `{}` (timeout {}ms).",
+                    std::thread::current().id().as_u64(),
+                    file!(),
+                    line!(),
+                    module.name,
+                    unload_timeout
+                )
+            )
+        );
+        // Bound the wait for the module's spawned tasks to finish; force-cancel anything still running past the timeout.
+        module.tokio_runtime.shutdown_timeout(
+            std::time::Duration::from_millis(unload_timeout as u64)
+        );
     }
 }
+

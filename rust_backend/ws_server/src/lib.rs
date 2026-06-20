@@ -5,15 +5,22 @@ mod ws_handler;
 mod socket_actions;
 mod self_management;
 mod ws_server_socket;
+mod avatar_routes;
 
 use std::io::Read;
 
 use global::*;
 
 #[derive(serde::Deserialize, serde::Serialize)]
+struct ExternalListenerConfigJson {
+    command: String,
+    required_protocol_version: String,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
 struct WsServerConfigJson {
     restricted_mode: bool,
-    external_listeners_list: Vec<String>,
+    external_listeners_list: Vec<ExternalListenerConfigJson>,
 }
 
 #[unsafe(no_mangle)]
@@ -32,6 +39,7 @@ pub extern "Rust" fn on_init(
         initialized: false,
         panicked: false,
         socket_port: new_async_modifiable(0),
+        init_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
     };
     let ws_server_status: AsyncModifiable<ModuleStatus> = new_async_modifiable(ws_server_status);
     // Initialization
@@ -91,17 +99,38 @@ pub extern "Rust" fn on_init(
                 String,
                 ExternalListener
             > = std::collections::HashMap::new();
-            for external_listener in ws_server_config_json.external_listeners_list {
+            for external_listener_config in ws_server_config_json.external_listeners_list {
+                let required_protocol_version: semver::VersionReq = semver::VersionReq::parse(
+                    &external_listener_config.required_protocol_version
+                ).unwrap_or_else(|e| {
+                    eprintln!(
+                        "{}",
+                        ansi_term::Color::Red.paint(
+                            format!(
+                                "[{}] [ERROR] [THREAD {}] [FILE `{}` LINE {}] Invalid `required_protocol_version` (`{}`) for command `{}` in ws_server_config_rs.json: {}",
+                                MODULE_IDENTITY,
+                                std::thread::current().id().as_u64(),
+                                file!(),
+                                line!(),
+                                external_listener_config.required_protocol_version,
+                                external_listener_config.command,
+                                e
+                            )
+                        )
+                    );
+                    panic!();
+                });
                 ws_server_external_listeners_by_command.insert(
-                    external_listener.clone(),
+                    external_listener_config.command.clone(),
                     ExternalListener {
-                        command: external_listener,
-                        protocols: std::collections::HashSet::new(),
+                        command: external_listener_config.command,
+                        required_protocol_version,
+                        protocols: std::collections::HashMap::new(),
                     }
                 );
             }
             WS_SERVER_EXTERNAL_LISTENERS_BY_COMMAND.set(
-                new_async_modifiable(ws_server_external_listeners_by_command)
+                std::sync::RwLock::new(std::sync::Arc::new(ws_server_external_listeners_by_command))
             ).unwrap();
             // Try to establish a socket for messaging.
             let ws_server_socket: tokio::net::TcpListener;
@@ -111,7 +140,7 @@ pub extern "Rust" fn on_init(
                     tokio::net::TcpListener,
                     std::io::Error
                 > = tokio::net::TcpListener::bind(
-                    format!("127.0.0.1:{}", &ws_server_socket_port)
+                    format!("127.0.0.1:{}", ws_server_socket_port)
                 ).await;
                 if let Ok(x) = ws_server_socket_result {
                     println!(
@@ -159,7 +188,7 @@ pub extern "Rust" fn on_init(
                     panic!();
                 }
                 ws_server_socket_port += 1;
-                fake_yield_now(0).await;
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             };
             let guard_ws_server_status: tokio::sync::MutexGuard<
                 '_,
@@ -190,6 +219,16 @@ pub extern "Rust" fn on_init(
                 .route(
                     "/",
                     axum::routing::get(|| async { "Rust Backend Test" })
+                )
+                .route("/avatar/{username}", axum::routing::get(crate::avatar_routes::serve_avatar))
+                .route(
+                    "/avatar/upload",
+                    // Generous headroom over the 1MB file-size limit enforced inside the
+                    // handler itself, so a slightly-too-big file gets a clean error message
+                    // from our own check rather than the body-limit layer aborting the request.
+                    axum::routing::post(crate::avatar_routes::upload_avatar).layer(
+                        axum::extract::DefaultBodyLimit::max(4 * 1024 * 1024)
+                    )
                 )
                 .merge(
                     axum::Router
@@ -241,6 +280,11 @@ pub extern "Rust" fn on_init(
                         ModuleStatus
                     > = ws_server_status.lock().await;
                     guard_ws_server_status.initialized = true;
+                    // notify_waiters(), not notify_one(): there are two independent waiters on
+                    // this same init_notify — main_backend's module-loading wait, and this
+                    // module's own internal wait below before it starts processing its socket.
+                    // notify_one() only wakes one of them, permanently starving the other.
+                    guard_ws_server_status.init_notify.notify_waiters();
                     drop(guard_ws_server_status);
                     listener
                 }
@@ -278,18 +322,20 @@ pub extern "Rust" fn on_init(
     {
         let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
         ws_server_runtime.spawn(async move {
-            loop {
-                // Waiting for the initialization to be completed.
-                let guard_ws_server_status: tokio::sync::MutexGuard<
-                    '_,
-                    ModuleStatus
-                > = ws_server_status.lock().await;
-                if guard_ws_server_status.initialized {
-                    drop(guard_ws_server_status);
-                    break;
-                }
-                drop(guard_ws_server_status);
-                fake_yield_now(1000).await;
+            // Wait for initialization, notified instead of polled. The setter uses
+            // notify_waiters() (not notify_one()) because main_backend's own module-loading wait
+            // is a second, independent waiter on this same init_notify; notify_waiters() only
+            // reaches waiters already registered at the moment it's called, so `enable()` must
+            // run here before the flag check to register us immediately.
+            let init_notify: std::sync::Arc<tokio::sync::Notify> = {
+                ws_server_status.lock().await.init_notify.clone()
+            };
+            let notified = init_notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            let already_initialized: bool = ws_server_status.lock().await.initialized;
+            if !already_initialized {
+                notified.await;
             }
             // Now processing socket message
             crate::ws_server_socket::socket_message_processing().await;

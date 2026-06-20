@@ -15,6 +15,7 @@ pub struct ModuleStatus {
     pub initialized: bool,
     pub panicked: bool,
     pub socket_port: AsyncModifiable<u16>,
+    pub init_notify: std::sync::Arc<tokio::sync::Notify>,
 }
 
 pub static GLOBAL_MODULE_STATUSES_BY_PROTOCOL: std::sync::OnceLock<
@@ -38,6 +39,10 @@ pub static LOGGED_IN_USERNAMES: std::sync::LazyLock<tokio::sync::Mutex<std::coll
 );
 
 pub static USERNAMES_BY_WS_ID: std::sync::LazyLock<
+    tokio::sync::Mutex<std::collections::HashMap<String, String>>
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
+pub static WS_IDS_BY_USERNAME: std::sync::LazyLock<
     tokio::sync::Mutex<std::collections::HashMap<String, String>>
 > = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
 
@@ -153,7 +158,12 @@ pub async fn get_socket_by_protocol(protocol: &str) -> tokio::net::TcpStream {
         }
     };
     match tokio::net::TcpStream::connect(format!("127.0.0.1:{socket_port}")).await {
-        Ok(socket) => socket,
+        Ok(socket) => {
+            // Without this, Nagle's algorithm + the peer's delayed ACK can stall these
+            // one-shot connect-write-drop control messages by hundreds of ms to seconds.
+            socket.set_nodelay(true).ok();
+            socket
+        }
         Err(_) => {
             eprintln!(
                 "{}",
@@ -192,15 +202,5 @@ pub async fn send_socket_json_message(msg_to_send: &serde_json::Value, to_protoc
                 )
             )
         );
-    }
-}
-
-const FAKE_YIELD_NOW_MILLISECONDS: u64 = 100;
-
-pub async fn fake_yield_now(tm: u64) {
-    if tm == 0 {
-        tokio::time::sleep(tokio::time::Duration::from_millis(FAKE_YIELD_NOW_MILLISECONDS)).await;
-    } else {
-        tokio::time::sleep(tokio::time::Duration::from_millis(tm)).await;
     }
 }

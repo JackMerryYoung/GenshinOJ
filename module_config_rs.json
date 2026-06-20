@@ -39,10 +39,10 @@
             "name": "Judge",
             "id": "judge",
             "protocol": "std_judge@0.1.0",
-            "enabled": false,
+            "enabled": true,
             "dependencies": [
                 "std_ws_server@0.1.0",
-                "std_compilers_manager@0.1.0"
+                "std_authenticator@0.1.0"
             ],
             "unload_timeout": 0
         },
@@ -50,9 +50,20 @@
             "name": "Chat Server",
             "id": "chat_server",
             "protocol": "std_chat_server@0.1.0",
-            "enabled": false,
+            "enabled": true,
             "dependencies": [
                 "std_ws_server@0.1.0"
+            ],
+            "unload_timeout": 0
+        },
+        "userish": {
+            "name": "Userish",
+            "id": "userish",
+            "protocol": "std_userish@0.1.0",
+            "enabled": true,
+            "dependencies": [
+                "std_ws_server@0.1.0",
+                "std_authenticator@0.1.0"
             ],
             "unload_timeout": 0
         },

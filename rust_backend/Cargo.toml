@@ -8,6 +8,8 @@ members = [
     "chat_server",
     "db_connector",
     "simple_authenticator",
+    "judge",
+    "userish",
 ]
 resolver = "2"
 

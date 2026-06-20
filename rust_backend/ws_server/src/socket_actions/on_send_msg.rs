@@ -30,15 +30,13 @@ pub async fn on_send_msg(msg: SocketJsonMessage) {
                     axum::extract::ws::Message
                 >
             > = ws.lock().await;
-            if
-                guard_ws
-                    .send(
-                        axum::extract::ws::Message::from(
-                            serde_json::to_string(&content.msg_to_send).unwrap()
-                        )
-                    ).await
-                    .is_err()
-            {
+            let send_result = guard_ws
+                .send(
+                    axum::extract::ws::Message::from(
+                        serde_json::to_string(&content.msg_to_send).unwrap()
+                    )
+                ).await;
+            if send_result.is_err() {
                 eprintln!(
                     "{}",
                     ansi_term::Color::Red.paint(

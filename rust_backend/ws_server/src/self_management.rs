@@ -16,25 +16,28 @@ pub async fn self_management(ws_server_status: AsyncModifiable<ModuleStatus>) {
         let time_now = Utc::now();
         if time_now - time_last >= TimeDelta::minutes(1) {
             // Show monitoring message per minute.
-            let guard_ws_server_connections_cnt: tokio::sync::MutexGuard<
-                '_,
-                usize
-            > = WS_SERVER_CONNECTIONS_CNT.lock().await;
-            println!(
-                "{}",
-                ansi_term::Color::Blue.paint(
-                    format!(
-                        "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well with {} connection(s) in total.",
-                        MODULE_IDENTITY,
-                        std::thread::current().id().as_u64(),
-                        file!(),
-                        line!(),
-                        *guard_ws_server_connections_cnt
+            {
+                let guard_ws_server_connections_cnt: tokio::sync::MutexGuard<
+                    '_,
+                    usize
+                > = WS_SERVER_CONNECTIONS_CNT.lock().await;
+                println!(
+                    "{}",
+                    ansi_term::Color::Blue.paint(
+                        format!(
+                            "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Status reporting: Working very well with {} connection(s) in total.",
+                            MODULE_IDENTITY,
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!(),
+                            *guard_ws_server_connections_cnt
+                        )
                     )
-                )
-            );
+                );
+            }
+
             time_last = time_now;
         }
-        fake_yield_now(1000).await;
+        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
     }
 }

@@ -1,7 +1,5 @@
 use crate::global::*;
 
-use tokio::io::AsyncWriteExt;
-
 #[derive(serde::Deserialize, serde::Serialize)]
 struct SocketJsonMessageContentOnLoginCheck {
     username: String,
@@ -23,6 +21,7 @@ pub async fn on_login_check(msg: SocketJsonMessageWithWsId) {
         let guard_logged_in_usernames = LOGGED_IN_USERNAMES.lock().await;
         let check_result = (*guard_logged_in_usernames).contains(&content.username);
         drop(guard_logged_in_usernames);
+
         let msg_to_send: SocketJsonMessage = SocketJsonMessage {
             r#type: String::from("on_send_msg"),
             content: serde_json
@@ -37,14 +36,24 @@ pub async fn on_login_check(msg: SocketJsonMessageWithWsId) {
                 })
                 .unwrap(),
             request_key: msg.request_key,
-            from_protocol: String::from("std_authenticator@0.1.0"),
+            from_protocol: String::from("std_authenticator"),
         };
-
-        let mut socket: tokio::net::TcpStream = crate::simple_authenticator_socket::get_socket_by_protocol(
-            &msg_to_send.from_protocol
+        send_socket_json_message(
+            &serde_json::to_value(msg_to_send).unwrap(),
+            "std_ws_server"
         ).await;
-        socket.writable().await.unwrap();
-        socket.write_all(serde_json::to_string(&msg_to_send).unwrap().as_bytes()).await.unwrap();
-        socket.flush().await.unwrap();
+    } else {
+        println!(
+            "{}",
+            ansi_term::Color::Yellow.paint(
+                format!(
+                    "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The JSON message received is in wrong format.",
+                    MODULE_IDENTITY,
+                    std::thread::current().id().as_u64(),
+                    file!(),
+                    line!()
+                )
+            )
+        );
     }
 }

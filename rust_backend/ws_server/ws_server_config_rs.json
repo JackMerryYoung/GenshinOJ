@@ -1,11 +1,24 @@
 {
     "restricted_mode": true,
     "external_listeners_list": [
-        "on_close_connection",
-        "on_login_check",
-        "on_login",
-        "on_online_user",
-        "on_quit",
-        "on_register"
+        { "command": "on_chat_history", "required_protocol_version": "*" },
+        { "command": "on_chat_user", "required_protocol_version": "*" },
+        { "command": "on_close_connection", "required_protocol_version": "*" },
+        { "command": "on_login_check", "required_protocol_version": "*" },
+        { "command": "on_login", "required_protocol_version": "*" },
+        { "command": "on_online_user", "required_protocol_version": "*" },
+        { "command": "on_quit", "required_protocol_version": "*" },
+        { "command": "on_register", "required_protocol_version": "*" },
+        { "command": "on_user_profile", "required_protocol_version": "*" },
+        { "command": "on_follow", "required_protocol_version": "*" },
+        { "command": "on_unfollow", "required_protocol_version": "*" },
+        { "command": "on_friends_list", "required_protocol_version": "*" },
+        { "command": "on_search_users", "required_protocol_version": "*" },
+        { "command": "on_problem_set", "required_protocol_version": "*" },
+        { "command": "on_problem_statement", "required_protocol_version": "*" },
+        { "command": "on_total_submissions_list_index", "required_protocol_version": "*" },
+        { "command": "on_submissions_list", "required_protocol_version": "*" },
+        { "command": "on_submission", "required_protocol_version": "*" },
+        { "command": "on_submission_result", "required_protocol_version": "*" }
     ]
 }

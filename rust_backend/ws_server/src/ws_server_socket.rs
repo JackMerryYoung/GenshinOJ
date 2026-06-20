@@ -10,6 +10,7 @@ pub async fn socket_message_processing() {
     > = WS_SERVER_SOCKET.get().unwrap().lock().await;
     loop {
         let (mut client, _) = guard_ws_server_socket.accept().await.unwrap();
+        client.set_nodelay(true).ok();
         tokio::spawn(async move {
             let mut buf: bytes::BytesMut = bytes::BytesMut::with_capacity(65536);
             client.read_buf(&mut buf).await.unwrap();
@@ -38,6 +39,8 @@ pub async fn socket_message_processing() {
                     socket_actions::on_bind_listener::on_bind_listener(msg).await;
                 } else if msg.r#type == "on_unbind_listener" {
                     socket_actions::on_unbind_listener::on_unbind_listener(msg).await;
+                } else if msg.r#type == "on_validate_session_result" {
+                    socket_actions::on_validate_session_result::on_validate_session_result(msg).await;
                 } else {
                     // WARNING: The JSON message received is not implemented.
                     println!(

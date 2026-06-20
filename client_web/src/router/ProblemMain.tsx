@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useState, lazy } from "react";
 import { useLoaderData, useNavigate, useOutletContext } from "react-router-dom";
 
-import { Button, Dropdown, Spinner, Subtitle1, Tag, Option, Title3, DropdownProps, SelectionEvents, OptionOnSelectData } from "@fluentui/react-components";
+import { Button, Dropdown, Spinner, Subtitle1, Switch, Tag, Option, Title3, DropdownProps, SelectionEvents, OptionOnSelectData } from "@fluentui/react-components";
 import { AlignBottomFilled, AlignBottomRegular, AlignStretchHorizontalFilled, AlignStretchHorizontalRegular, AppGenericFilled, AppGenericRegular, AppsAddInRegular, ArrowRoutingRectangleMultipleRegular } from "@fluentui/react-icons";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
@@ -138,7 +138,7 @@ function useSubmission(
     const loginUsername = useSelector((state: RootState) => state.loginUsername);
     const sessionToken = useSelector((state: RootState) => state.sessionToken);
 
-    const submit = (problemNumber: number, submissionCodeLanguage: string, submissionCode: string) => {
+    const submit = (problemNumber: number, submissionCodeLanguage: string, submissionCode: string, isTestSubmissionMode: boolean) => {
         const _requestKey = nanoid();
         sendJsonMessage({
             type: "submission",
@@ -148,6 +148,7 @@ function useSubmission(
                 problem_number: problemNumber,
                 language: submissionCodeLanguage,
                 code: submissionCode.split('\n'),
+                is_test_submission_mode: isTestSubmissionMode,
                 request_key: _requestKey
             }
         });
@@ -221,6 +222,7 @@ export default function ProblemMain() {
     const [submissionCode, setSubmissionCode] = useState("");
     const [submissionCodeLanguage, setSubmissionCodeLanguage] = useState("cpp");
     const [codeLanguage, setCodeLanguage] = useState("cpp");
+    const [isTestSubmissionMode, setIsTestSubmissionMode] = useState(false);
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const [dialogSubmitSuccessOpenState, setDialogSubmitSuccessOpenState] = useState(false);
     const [convertedMarkdownRenderString, setConvertedMarkdownRenderString] = useState("");
@@ -230,7 +232,7 @@ export default function ProblemMain() {
     const navigate = useNavigate();
 
     const handleSubmitCode = () => {
-        submit(problemNumber, submissionCodeLanguage, submissionCode)
+        submit(problemNumber, submissionCodeLanguage, submissionCode, isTestSubmissionMode)
     };
 
     const handleClickSubmitCode = () => {
@@ -301,6 +303,11 @@ ${statement}
                             </Suspense>
 
                             <div style={{ alignItems: "center", justifyContent: "center", display: "flex" }}>
+                                <Switch
+                                    label="Test Submission Mode"
+                                    checked={isTestSubmissionMode}
+                                    onChange={(_ev, data) => setIsTestSubmissionMode(data.checked)}
+                                    style={{ marginRight: "1em" }} />
                                 <Button appearance="primary" onClick={handleClickSubmitCode}>Submit</Button>
                             </div>
                         </div>
@@ -324,10 +331,8 @@ function CodeLanguageChooser({ setCodeLanguage, setSubmissionCodeLanguage, style
 } & Partial<{
     props: DropdownProps;
 }>) {
-    const [, setSelectedOptions] = useState(["cpp cpp"]);
     const handleOptionSelect = (_ev: SelectionEvents, data: OptionOnSelectData) => {
         if (data.optionValue) {
-            setSelectedOptions(data.selectedOptions);
             setCodeLanguage(data.optionValue.split(' ')[1]);
             setSubmissionCodeLanguage(data.optionValue.split(' ')[0]);
         }

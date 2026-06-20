@@ -7,12 +7,15 @@ if [ ! -e "./modules/ws_server" ]; then
     mkdir ./modules/ws_server
 fi
 
-cargo build -r -p ws_server > /dev/null
+cargo build -r -p ws_server
 if [ -e "./target/release/libws_server.so" ]; then
     if [ -e "./modules/ws_server/libws_server.so" ]; then
         if [ "$(cat ./target/release/libws_server.so)" != "$(cat ./modules/ws_server/libws_server.so)" ]; then
             mv ./target/release/libws_server.so ./modules/ws_server
         fi
+    else
+        echo "Moving ws_server..."
+        mv ./target/release/libws_server.so ./modules/ws_server
     fi
 fi
 
@@ -87,6 +90,50 @@ if [ -e "./target/release/libchat_server.so" ]; then
         echo "Moving chat_server..."
         mv ./target/release/libchat_server.so ./modules/chat_server
     fi  
+fi
+
+###############################################################
+
+# Building Judge
+if [ ! -e "./modules/judge" ]; then
+    mkdir ./modules/judge
+fi
+
+cargo build -r -p judge
+if [ -e "./target/release/libjudge.so" ]; then
+    if [ -e "./modules/judge/libjudge.so" ]; then
+        if [ "$(cat ./target/release/libjudge.so)" != "$(cat ./modules/judge/libjudge.so)" ]; then
+            echo "Moving judge..."
+            mv ./target/release/libjudge.so ./modules/judge
+        else
+            echo "No need to move judge."
+        fi
+    else
+        echo "Moving judge..."
+        mv ./target/release/libjudge.so ./modules/judge
+    fi
+fi
+
+###############################################################
+
+# Building Userish
+if [ ! -e "./modules/userish" ]; then
+    mkdir ./modules/userish
+fi
+
+cargo build -r -p userish
+if [ -e "./target/release/libuserish.so" ]; then
+    if [ -e "./modules/userish/libuserish.so" ]; then
+        if [ "$(cat ./target/release/libuserish.so)" != "$(cat ./modules/userish/libuserish.so)" ]; then
+            echo "Moving userish..."
+            mv ./target/release/libuserish.so ./modules/userish
+        else
+            echo "No need to move userish."
+        fi
+    else
+        echo "Moving userish..."
+        mv ./target/release/libuserish.so ./modules/userish
+    fi
 fi
 
 ###############################################################

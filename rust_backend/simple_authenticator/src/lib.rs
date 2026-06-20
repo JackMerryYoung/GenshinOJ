@@ -26,6 +26,7 @@ pub extern "Rust" fn on_init(
         initialized: false,
         panicked: false,
         socket_port: new_async_modifiable(0),
+        init_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
     };
     let simple_authenticator_status: AsyncModifiable<ModuleStatus> = new_async_modifiable(
         simple_authenticator_status
@@ -49,11 +50,36 @@ pub extern "Rust" fn on_init(
                 "CREATE TABLE users (
                     id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
                     username VARCHAR(256) NOT NULL,
-                    password VARCHAR(256) NOT NULL
+                    password VARCHAR(256) NOT NULL,
+                    accepted INT NOT NULL DEFAULT 0,
+                    test_accepted INT NOT NULL DEFAULT 0,
+                    general INT NOT NULL DEFAULT 0
                 )"
                     .ignore(&mut conn).await
                     .unwrap();
             }
+            for column in ["accepted", "test_accepted", "general"] {
+                let tmp: Vec<String> = conn
+                    .query(
+                        format!(
+                            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'GenshinOJ' AND table_name = 'users' AND column_name = '{column}'"
+                        )
+                    )
+                    .await
+                    .unwrap();
+                if tmp.is_empty() {
+                    format!("ALTER TABLE users ADD COLUMN {column} INT NOT NULL DEFAULT 0")
+                        .ignore(&mut conn).await
+                        .unwrap();
+                }
+            }
+            "CREATE TABLE IF NOT EXISTS follows (
+                follower_username VARCHAR(256) NOT NULL,
+                followee_username VARCHAR(256) NOT NULL,
+                PRIMARY KEY (follower_username, followee_username)
+            )"
+                .ignore(&mut conn).await
+                .unwrap();
             drop(conn);
             drop(guard_mysql_database_pool);
             let mut guard_simple_authenticator_status: tokio::sync::MutexGuard<
@@ -72,7 +98,7 @@ pub extern "Rust" fn on_init(
                     tokio::net::TcpListener,
                     std::io::Error
                 > = tokio::net::TcpListener::bind(
-                    format!("127.0.0.1:{}", &simple_authenticator_socket_port)
+                    format!("127.0.0.1:{}", simple_authenticator_socket_port)
                 ).await;
                 if let Ok(x) = simple_authenticator_socket_result {
                     println!(
@@ -120,13 +146,18 @@ pub extern "Rust" fn on_init(
                     panic!();
                 }
                 simple_authenticator_socket_port += 1;
-                fake_yield_now(0).await;
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             };
             SIMPLE_AUTHENTICATOR_SOCKET.set(
                 new_async_modifiable(simple_authenticator_socket)
             ).unwrap();
             drop(guard_simple_authenticator_status_socket_port);
             guard_simple_authenticator_status.initialized = true;
+            // notify_waiters(), not notify_one(): there are two independent waiters on this same
+            // init_notify — main_backend's module-loading wait, and this module's own internal
+            // wait below before it starts processing its socket. notify_one() only wakes one of
+            // them, permanently starving the other.
+            guard_simple_authenticator_status.init_notify.notify_waiters();
             drop(guard_simple_authenticator_status);
         });
     }
@@ -135,18 +166,20 @@ pub extern "Rust" fn on_init(
         let simple_authenticator_status: AsyncModifiable<ModuleStatus> =
             simple_authenticator_status.clone();
         simple_authenticator_runtime.spawn(async move {
-            loop {
-                // Waiting for the initialization to be completed.
-                let guard_simple_authenticator_status: tokio::sync::MutexGuard<
-                    '_,
-                    ModuleStatus
-                > = simple_authenticator_status.lock().await;
-                if guard_simple_authenticator_status.initialized {
-                    drop(guard_simple_authenticator_status);
-                    break;
-                }
-                drop(guard_simple_authenticator_status);
-                fake_yield_now(1000).await;
+            // Wait for initialization, notified instead of polled. The setter uses
+            // notify_waiters() (not notify_one()) because main_backend's own module-loading wait
+            // is a second, independent waiter on this same init_notify; notify_waiters() only
+            // reaches waiters already registered at the moment it's called, so `enable()` must
+            // run here before the flag check to register us immediately.
+            let init_notify: std::sync::Arc<tokio::sync::Notify> = simple_authenticator_status
+                .lock().await.init_notify
+                .clone();
+            let notified = init_notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            let already_initialized: bool = simple_authenticator_status.lock().await.initialized;
+            if !already_initialized {
+                notified.await;
             }
 
             // Now processing socket message
@@ -156,59 +189,62 @@ pub extern "Rust" fn on_init(
 
     {
         simple_authenticator_runtime.spawn(async move {
-            loop {
-                // Waiting for the initialization of ws_server to be completed.
+            // ws_server doesn't necessarily exist in the map yet (it may not have been loaded by
+            // main_backend at all), so there's no event to wait on for that — poll until it
+            // registers itself.
+            let ws_server_status: AsyncModifiable<ModuleStatus> = loop {
                 let guard_global_module_statuses_by_protocol =
                     global_module_statuses_by_protocol.lock().await;
                 if
                     let Some(ws_server_status) =
                         guard_global_module_statuses_by_protocol.get("std_ws_server")
                 {
-                    let guard_ws_server_status = ws_server_status.lock().await;
-                    if guard_ws_server_status.initialized {
-                        println!(
-                            "{}",
-                            ansi_term::Color::Green.paint(
-                                format!(
-                                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The Websocket server has been initialized.",
-                                    MODULE_IDENTITY,
-                                    std::thread::current().id().as_u64(),
-                                    file!(),
-                                    line!()
-                                )
-                            )
-                        );
-                        break;
-                    } else {
-                        println!(
-                            "{}",
-                            ansi_term::Color::Blue.paint(
-                                format!(
-                                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Waiting for the Websocket server to be initialized...",
-                                    MODULE_IDENTITY,
-                                    std::thread::current().id().as_u64(),
-                                    file!(),
-                                    line!()
-                                )
-                            )
-                        );
-                    }
-                } else {
-                    println!(
-                        "{}",
-                        ansi_term::Color::Blue.paint(
-                            format!(
-                                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Waiting for the Websocket server to be initialized...",
-                                MODULE_IDENTITY,
-                                std::thread::current().id().as_u64(),
-                                file!(),
-                                line!()
-                            )
-                        )
-                    );
+                    let ws_server_status: AsyncModifiable<ModuleStatus> = ws_server_status.clone();
+                    drop(guard_global_module_statuses_by_protocol);
+                    break ws_server_status;
                 }
-                fake_yield_now(1000).await;
+                drop(guard_global_module_statuses_by_protocol);
+                println!(
+                    "{}",
+                    ansi_term::Color::Blue.paint(
+                        format!(
+                            "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] Waiting for the Websocket server to be initialized...",
+                            MODULE_IDENTITY,
+                            std::thread::current().id().as_u64(),
+                            file!(),
+                            line!()
+                        )
+                    )
+                );
+                tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            };
+            // Now that ws_server is registered, wait for it to finish initializing — notified
+            // instead of polled, same as init_notify everywhere else. In practice ws_server only
+            // appears in the map after main_backend's own wait for it already completed, so
+            // `already_initialized` will already be true here; `enable()` is kept for
+            // consistency with the other waiters in case that ordering ever changes.
+            let init_notify: std::sync::Arc<tokio::sync::Notify> = ws_server_status
+                .lock().await.init_notify
+                .clone();
+            let notified = init_notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            let already_initialized: bool = ws_server_status.lock().await.initialized;
+            if !already_initialized {
+                notified.await;
             }
+            println!(
+                "{}",
+                ansi_term::Color::Green.paint(
+                    format!(
+                        "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The Websocket server has been initialized.",
+                        MODULE_IDENTITY,
+                        std::thread::current().id().as_u64(),
+                        file!(),
+                        line!()
+                    )
+                )
+            );
 
             simple_authenticator_socket::connect_to_ws_server().await;
         });
@@ -246,17 +282,21 @@ pub extern "Rust" fn on_unload() {
     );
 
     simple_authenticator_runtime_on_unload.spawn(async move {
-        let guard_global_module_statuses_by_protocol = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get()
-            .unwrap()
-            .lock().await;
-        if
-            let Some(ws_server_status) =
-                guard_global_module_statuses_by_protocol.get("std_ws_server")
-        {
-            let guard_ws_server_status = ws_server_status.lock().await;
-            if guard_ws_server_status.initialized {
-                simple_authenticator_socket::disconnect_from_ws_server().await;
+        // Resolve whether ws_server is up and release both locks before calling
+        // disconnect_from_ws_server() below, since it locks GLOBAL_MODULE_STATUSES_BY_PROTOCOL
+        // itself again internally (via get_socket_port_by_protocol) — holding it here too would
+        // self-deadlock the task on tokio::sync::Mutex, which isn't reentrant.
+        let ws_server_initialized: bool = {
+            let guard_global_module_statuses_by_protocol = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get()
+                .unwrap()
+                .lock().await;
+            match guard_global_module_statuses_by_protocol.get("std_ws_server") {
+                Some(ws_server_status) => ws_server_status.lock().await.initialized,
+                None => false,
             }
+        };
+        if ws_server_initialized {
+            simple_authenticator_socket::disconnect_from_ws_server().await;
         }
 
         // TODO: To tell main backend to drop this module.

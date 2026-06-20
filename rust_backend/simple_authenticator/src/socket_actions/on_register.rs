@@ -99,8 +99,8 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
                     std::thread::current().id().as_u64(),
                     file!(),
                     line!(),
-                    &unwrapped_content.username,
-                    &password_hash
+                    unwrapped_content.username,
+                    password_hash
                 )
             )
         );
@@ -110,23 +110,22 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
             mysql_async::Pool
         > = MYSQL_DATABASE_POOL.lock().await;
         let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
-        let results: Result<Vec<String>, _> = conn.query(
-            format!(
-                "SELECT password FROM GenshinOJ.users WHERE username = \"{}\"",
-                &unwrapped_content.username
-            )
+        let results: Result<Vec<String>, _> = conn.exec(
+            "SELECT password FROM GenshinOJ.users WHERE username = :username",
+            mysql_async::params! { "username" => &unwrapped_content.username }
         ).await;
         match results {
             Ok(results_unwrapped) => {
                 if results_unwrapped.is_empty() {
                     // The user doesn't exist.
                     // Create user.
-                    format!(
-                        "INSERT INTO GenshinOJ.users (username, password) VALUES (\"{}\", \"{}\")",
-                        &unwrapped_content.username,
-                        password_hash
-                    )
-                        .ignore(&mut conn).await
+                    conn.exec_drop(
+                        "INSERT INTO GenshinOJ.users (username, password) VALUES (:username, :password)",
+                        mysql_async::params! {
+                            "username" => &unwrapped_content.username,
+                            "password" => &password_hash
+                        }
+                    ).await
                         .unwrap();
                     // Send successful registration message.
                     println!(
@@ -138,7 +137,7 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),
-                                &unwrapped_content.username
+                                unwrapped_content.username
                             )
                         )
                     );
@@ -158,7 +157,7 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
                                 std::thread::current().id().as_u64(),
                                 file!(),
                                 line!(),
-                                &unwrapped_content.username
+                                unwrapped_content.username
                             )
                         )
                     );
@@ -178,7 +177,7 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
                             std::thread::current().id().as_u64(),
                             file!(),
                             line!(),
-                            &unwrapped_content.username
+                            unwrapped_content.username
                         )
                     )
                 );

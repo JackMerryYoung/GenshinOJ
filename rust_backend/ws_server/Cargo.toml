@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = { version = "0.8.4", features = ["ws"] }
+axum = { version = "0.8.4", features = ["ws", "multipart"] }
 tokio = { version = "1.39.2", features = ["full"] }
 bytes = "1.10.1"
 futures-util = "0.3.31"
@@ -15,6 +15,7 @@ axum-client-ip = "1.1.3"
 tower = "0.5.2"
 ansi_term = "0.12"
 chrono = "0.4.42"
+semver = "1.0.28"
 
 [lib]
 crate-type = ["dylib"]

@@ -1,11 +1,15 @@
-import { useEffect, lazy } from "react";
+import { useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 
 import { FluentProvider, webLightTheme } from "@fluentui/react-components";
 
 import { useSelector, useDispatch } from "react-redux";
 
-import useWebSocket from "react-use-websocket";
+import useWebSocketModule from "react-use-websocket";
+
+const { default: useWebSocket = useWebSocketModule } = useWebSocketModule as unknown as {
+    default: typeof useWebSocketModule;
+};
 
 import { nanoid } from "nanoid";
 
