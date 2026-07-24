@@ -38,7 +38,7 @@ pub async fn on_search_users(msg: SocketJsonMessageWithWsId) {
         let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
         let results: Result<Vec<String>, _> = conn
             .exec(
-                "SELECT username FROM GenshinOJ.users
+                "SELECT username FROM RsOJ.users
                 WHERE username LIKE :pattern AND username != :exclude_username
                 ORDER BY username ASC
                 LIMIT :limit",

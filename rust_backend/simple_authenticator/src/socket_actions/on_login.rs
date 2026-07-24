@@ -135,7 +135,7 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
         > = MYSQL_DATABASE_POOL.lock().await;
         let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
         let results: Result<Vec<String>, _> = conn.exec(
-            "SELECT password FROM GenshinOJ.users WHERE username = :username",
+            "SELECT password FROM RsOJ.users WHERE username = :username",
             mysql_async::params! { "username" => &unwrapped_content.username }
         ).await;
         drop(conn);

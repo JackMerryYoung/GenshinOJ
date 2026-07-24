@@ -2,72 +2,75 @@ a {
   text-decoration: none;
 }
 
+/* One scrollbar style for the whole app: thin, translucent thumb, no (white) track. Both properties
+   are inherited, so this is the baseline for every scrollable element (textareas, panels, lists);
+   the big content regions (.scroll-box / the submissions table) override it to hide the thumb until
+   hover. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
+}
+
 .scroll-bar-wrap {
   margin: -0.4em;
   position: relative;
 }
 
+/* Big content scroll regions reserve a permanent gutter (no layout shift) and keep the thumb hidden
+   until hovered — revealed via the standard scrollbar-color property (Chromium won't repaint the
+   ::-webkit-scrollbar pseudo-elements on container :hover). Transparent track = no white line. */
 .scroll-box {
   overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 
-.scroll-box::-webkit-scrollbar {
-  width: 0.4em;
-}
-
-.scroll-box::-webkit-scrollbar,
-.scroll-box::-webkit-scrollbar-thumb {
-  overflow: visible;
-  border-radius: 4px;
-}
-
-.scroll-box::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.cover-bar {
-  position: absolute;
-  background: #fff;
-  height: 100%;
-  top: 0;
-  right: 0;
-  width: 0.4em;
-  transition: all 0.5s;
-  opacity: 1;
-  /* Purely visual (hides the scrollbar track until hover) — without this, the div sits on top
-     of the real scrollbar and swallows mousedown/drag on the thumb underneath it. */
-  pointer-events: none;
-}
-
-.scroll-bar-wrap:hover > .cover-bar {
-  opacity: 0;
-  transition: all 0.5s;
+.scroll-box:hover {
+  scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
 }
 
 thead.my-table-sticky {
   display: block;
   position: sticky;
   z-index: 1;
-  min-width: calc(100vw - 14.2em);
+  min-width: calc(100vw - 1.2em);
+  /* Reserve the same thin gutter the body keeps, so the header columns stay aligned with the
+     (gutter-inset) body rows. The header never scrolls, so its thumb is always transparent. */
+  overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 
 tbody.my-table-scrollbar {
   display: block;
-  overflow-y: auto;
+  /* `scroll` (not `auto`) keeps the gutter permanently reserved, so the scrollbar appearing/
+     disappearing never shifts the table. */
+  overflow-y: scroll;
   max-height: calc(100vh - 20.7em);
-  width: calc(100vw - 14.2em);
+  width: calc(100vw - 1.2em);
+  /* Hidden thumb (transparent) by default; revealed on hover via the standard scrollbar-color
+     property. NB: the ::-webkit-scrollbar :hover approach does NOT work — Chromium won't repaint
+     the scrollbar pseudo-element when the container's :hover state changes. */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 
+tbody.my-table-scrollbar:hover {
+  scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
+}
+
+/* Rows fill their container's content box (which already excludes the reserved gutter), so body
+   rows and header rows line up. */
 tr.my-table-row-body {
   display: flex;
-  width: calc(100vw - 15.3em);
+  width: 100%;
   align-items: center;
   text-align: left;
 }
 
 tr.my-table-row-header {
   display: flex;
-  width: calc(100vw - 15.3em);
+  width: 100%;
   align-items: center;
   text-align: left;
 }

@@ -106,7 +106,7 @@ pub async fn perform_follow(follower_username: &str, followee_username: &str) ->
     let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
     let result = conn
         .exec_drop(
-            "INSERT IGNORE INTO GenshinOJ.follows (follower_username, followee_username)
+            "INSERT IGNORE INTO RsOJ.follows (follower_username, followee_username)
             VALUES (:follower, :followee)",
             mysql_async::params! {
                 "follower" => follower_username,

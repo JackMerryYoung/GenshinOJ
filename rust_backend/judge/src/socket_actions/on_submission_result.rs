@@ -38,7 +38,7 @@ pub async fn on_submission_result(msg: SocketJsonMessageWithWsId) {
         > = conn
             .exec_first(
                 "SELECT username, problem_number, result, general_score, statuses, scores, code, language
-                FROM GenshinOJ.submissions
+                FROM RsOJ.submissions
                 WHERE submission_id = :submission_id",
                 mysql_async::params! { "submission_id" => content.submission_id }
             )

@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useState, lazy } from "react";
 import { useLoaderData, useNavigate, useOutletContext } from "react-router-dom";
 
-import { Button, Dropdown, Spinner, Subtitle1, Switch, Tag, Option, Title3, DropdownProps, SelectionEvents, OptionOnSelectData } from "@fluentui/react-components";
+import { Button, Dropdown, Spinner, Subtitle1, Switch, Tag, Option, Title3, DropdownProps, SelectionEvents, OptionOnSelectData, TabList, Tab, SelectTabEvent, SelectTabData } from "@fluentui/react-components";
 import { AlignBottomFilled, AlignBottomRegular, AlignStretchHorizontalFilled, AlignStretchHorizontalRegular, AppGenericFilled, AppGenericRegular, AppsAddInRegular, ArrowRoutingRectangleMultipleRegular } from "@fluentui/react-icons";
 
 const Editor = lazy(() => import("@monaco-editor/react"));
@@ -14,6 +14,7 @@ import { useSelector } from "react-redux";
 import { nanoid } from "nanoid";
 
 const PopupDialog = lazy(() => import("./PopupDialog.tsx"));
+const ProblemSolutions = lazy(() => import("./Solutions.tsx"));
 
 import * as globals from "../Globals.ts";
 import { RootState } from "../store.ts";
@@ -226,6 +227,7 @@ export default function ProblemMain() {
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const [dialogSubmitSuccessOpenState, setDialogSubmitSuccessOpenState] = useState(false);
     const [convertedMarkdownRenderString, setConvertedMarkdownRenderString] = useState("");
+    const [selectedTab, setSelectedTab] = useState<string>("statement");
     const { submissionId, submit } = useSubmission(sendJsonMessage, lastJsonMessage);
     const { problemInfo, fetchProblemInfo } = useProblemInfo(sendJsonMessage, lastJsonMessage);
 
@@ -283,34 +285,53 @@ ${statement}
                         </Title3>
                         &nbsp;&nbsp;&nbsp;&nbsp;
                         <DifficultyShower difficulty={(problemInfo as ProblemInfoFromFetcher).difficulty} />
-                        <div style={{ display: "block", marginLeft: "1em" }}>
-                            <Subtitle1>Problem Statement</Subtitle1>
-                            <div style={{ textIndent: "1em", marginTop: "1em" }}>
-                                <Suspense fallback={<Spinner size="tiny" delay={500} />}>
-                                    <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                        {convertedMarkdownRenderString}
-                                    </Markdown>
-                                </Suspense>
-                            </div>
-                            <Subtitle1>Submit Code</Subtitle1>
-                            <CodeLanguageChooser setCodeLanguage={setCodeLanguage} setSubmissionCodeLanguage={setSubmissionCodeLanguage} style={{ marginTop: "0.5em", marginBottom: "1em" }} />
-                            <Suspense fallback={<Spinner size="tiny" delay={500} />}>
-                                <Editor
-                                    height="500px"
-                                    language={codeLanguage}
-                                    onChange={handleEditorContentChange}
-                                    loading={<Spinner delay={200} />} />
-                            </Suspense>
+                        <TabList
+                            selectedValue={selectedTab}
+                            onTabSelect={(_ev: SelectTabEvent, data: SelectTabData) => setSelectedTab(data.value as string)}
+                            style={{ marginTop: "0.5em" }}>
+                            <Tab value="statement">Statement</Tab>
+                            <Tab value="solutions">Solutions</Tab>
+                        </TabList>
+                        {
+                            selectedTab === "statement"
+                                ?
+                                <div style={{ display: "block", marginLeft: "1em" }}>
+                                    <Subtitle1>Problem Statement</Subtitle1>
+                                    <div style={{ textIndent: "1em", marginTop: "1em" }}>
+                                        <Suspense fallback={<Spinner size="tiny" delay={500} />}>
+                                            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                                {convertedMarkdownRenderString}
+                                            </Markdown>
+                                        </Suspense>
+                                    </div>
+                                    <Subtitle1>Submit Code</Subtitle1>
+                                    <CodeLanguageChooser setCodeLanguage={setCodeLanguage} setSubmissionCodeLanguage={setSubmissionCodeLanguage} style={{ marginTop: "0.5em", marginBottom: "1em" }} />
+                                    <Suspense fallback={<Spinner size="tiny" delay={500} />}>
+                                        <Editor
+                                            height="500px"
+                                            language={codeLanguage}
+                                            onChange={handleEditorContentChange}
+                                            loading={<Spinner delay={200} />} />
+                                    </Suspense>
 
-                            <div style={{ alignItems: "center", justifyContent: "center", display: "flex" }}>
-                                <Switch
-                                    label="Test Submission Mode"
-                                    checked={isTestSubmissionMode}
-                                    onChange={(_ev, data) => setIsTestSubmissionMode(data.checked)}
-                                    style={{ marginRight: "1em" }} />
-                                <Button appearance="primary" onClick={handleClickSubmitCode}>Submit</Button>
-                            </div>
-                        </div>
+                                    <div style={{ alignItems: "center", justifyContent: "center", display: "flex" }}>
+                                        <Switch
+                                            label="Test Submission Mode"
+                                            checked={isTestSubmissionMode}
+                                            onChange={(_ev, data) => setIsTestSubmissionMode(data.checked)}
+                                            style={{ marginRight: "1em" }}
+                                            labelPosition="before" />
+                                        <Button appearance="primary" onClick={handleClickSubmitCode}>Submit</Button>
+                                    </div>
+                                </div>
+                                :
+                                <Suspense fallback={<Spinner size="tiny" delay={500} />}>
+                                    <ProblemSolutions
+                                        problemNumber={problemNumber}
+                                        sendJsonMessage={sendJsonMessage}
+                                        lastJsonMessage={lastJsonMessage} />
+                                </Suspense>
+                        }
                     </>
                     :
                     <></>

@@ -117,6 +117,55 @@ pub async fn on_username_by_ws_id_result(msg: SocketJsonMessage) {
         }
         drop(guard_pending_submission_result_fetch_requests);
 
+        // Solution-area reads (list / fetch / comments) resolve the requester's username the same
+        // way, so they share this result handler via their own pending map.
+        let mut guard_pending_solution_lookup_requests: tokio::sync::MutexGuard<
+            '_,
+            std::collections::HashMap<String, PendingSolutionLookupRequest>
+        > = PENDING_SOLUTION_LOOKUP_REQUESTS.lock().await;
+        if
+            let Some(pending_request) = guard_pending_solution_lookup_requests.remove(
+                &content.request_key
+            )
+        {
+            drop(guard_pending_solution_lookup_requests);
+            crate::solutions::handle_lookup(content.username, pending_request).await;
+            return;
+        }
+        drop(guard_pending_solution_lookup_requests);
+
+        // Discussion-area reads share this handler the same way.
+        let mut guard_pending_discussion_lookup_requests: tokio::sync::MutexGuard<
+            '_,
+            std::collections::HashMap<String, PendingDiscussionLookupRequest>
+        > = PENDING_DISCUSSION_LOOKUP_REQUESTS.lock().await;
+        if
+            let Some(pending_request) = guard_pending_discussion_lookup_requests.remove(
+                &content.request_key
+            )
+        {
+            drop(guard_pending_discussion_lookup_requests);
+            crate::discussions::handle_lookup(content.username, pending_request).await;
+            return;
+        }
+        drop(guard_pending_discussion_lookup_requests);
+
+        // Info-center (notifications) reads share this handler the same way.
+        let mut guard_pending_notification_lookup_requests: tokio::sync::MutexGuard<
+            '_,
+            std::collections::HashMap<String, PendingNotificationLookupRequest>
+        > = PENDING_NOTIFICATION_LOOKUP_REQUESTS.lock().await;
+        if
+            let Some(pending_request) = guard_pending_notification_lookup_requests.remove(
+                &content.request_key
+            )
+        {
+            drop(guard_pending_notification_lookup_requests);
+            crate::notifications::handle_lookup(content.username, pending_request).await;
+            return;
+        }
+        drop(guard_pending_notification_lookup_requests);
+
         let mut guard_pending_submissions_list_requests: tokio::sync::MutexGuard<
             '_,
             std::collections::HashMap<String, PendingSubmissionsListRequest>
@@ -158,7 +207,7 @@ pub async fn on_username_by_ws_id_result(msg: SocketJsonMessage) {
         > = conn
             .exec(
                 "SELECT submission_id, username, problem_number, result, general_score, statuses, scores
-                FROM GenshinOJ.submissions
+                FROM RsOJ.submissions
                 ORDER BY submission_id DESC
                 LIMIT :limit OFFSET :offset",
                 mysql_async::params! { "limit" => SUBMISSIONS_LIST_PAGE_SIZE, "offset" => offset }

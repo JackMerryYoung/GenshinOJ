@@ -1,22 +1,90 @@
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
-import { Divider, Avatar, Tab } from "@fluentui/react-components";
-import { ChartMultipleFilled, ChatFilled, ClipboardTaskListLtrFilled } from "@fluentui/react-icons";
+import { Divider, Avatar, Tab, CounterBadge } from "@fluentui/react-components";
+import { ChartMultipleFilled, ChatFilled, ClipboardTaskListLtrFilled, CommentMultipleFilled, AlertFilled, PersonFilled, PersonAddFilled, SignOutFilled, ArrowEnterFilled } from "@fluentui/react-icons";
 
 import { useSelector } from "react-redux";
 
+import { nanoid } from "nanoid";
+
 import { RootState } from "../store";
+import * as globals from "../Globals.ts";
 
 import "../css/style.css";
 
-export default function NavBar() {
+// Track the logged-in user's unread notification count for the navbar badge. Notifications are
+// pull-based (the judge knows the actor's ws_id, not the recipient's), so this polls on a timer and
+// on navigation, and also refreshes immediately whenever a `notification_mark_read_result` flows by
+// (e.g. the Info Center just marked something read on this same shared socket).
+function useUnreadCount(sendJsonMessage: globals.SendJsonMessage, lastJsonMessage: unknown, loggedIn: boolean) {
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [requestKey, setRequestKey] = useState("");
+    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
+
+    const refresh = () => {
+        const _requestKey = nanoid();
+        sendJsonMessage({ type: "notifications_unread_count", content: { request_key: _requestKey } });
+        setRequestKey(_requestKey);
+    };
+
+    useEffect(() => {
+        if (lastJsonMessage !== null) setWebsocketMessageHistory((p) => p.concat(lastJsonMessage as []));
+    }, [lastJsonMessage]);
+
+    useEffect(() => {
+        const h = websocketMessageHistory;
+        let sawMarkRead = false;
+        h.map((_message, i) => {
+            if (_message && typeof _message === 'object' && 'type' in _message) {
+                const type = (_message as { type: string }).type;
+                if (type === "notifications_unread_count") {
+                    const message = _message as { content: { unread_count: number; request_key: string } };
+                    if (message.content.request_key === requestKey) { setUnreadCount(message.content.unread_count); delete h[i]; }
+                } else if (type === "notification_mark_read_result") {
+                    sawMarkRead = true;
+                    delete h[i];
+                }
+            }
+        });
+        if (!globals.compareArray(h, websocketMessageHistory)) setWebsocketMessageHistory(h);
+        if (sawMarkRead && loggedIn) refresh();
+    }, [websocketMessageHistory, requestKey]);
+
+    useEffect(() => {
+        if (!loggedIn) { setUnreadCount(0); return; }
+        refresh();
+        const id = setInterval(refresh, 20000);
+        return () => clearInterval(id);
+    }, [loggedIn]);
+
+    return { unreadCount, refresh };
+}
+
+export default function NavBar({ sendJsonMessage, lastJsonMessage }: {
+    sendJsonMessage: globals.SendJsonMessage;
+    lastJsonMessage: unknown;
+}) {
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
     const navigate = useNavigate();
+    const location = useLocation();
+    const loggedIn = loginStatus.value === true;
+
+    const { unreadCount, refresh } = useUnreadCount(sendJsonMessage, lastJsonMessage, loggedIn);
+
+    // Re-check the unread count whenever the route changes (cheap, and keeps the badge fresh right
+    // after the user reads notifications without waiting for the next poll tick).
+    useEffect(() => {
+        if (loggedIn) refresh();
+    }, [location.pathname]);
+
     const onTabSelect = (value: string) => {
         if (value === "home") navigate("/home");
         if (value === "problem") navigate("/problem");
         if (value === "submission") navigate("/submission");
+        if (value === "discussion") navigate("/discussion");
         if (value === "chat") navigate("/chat");
+        if (value === "notification") navigate("/notification");
         if (value === "user") navigate("/user");
         if (value === "login") navigate("/login");
         if (value === "register") navigate("/register");
@@ -29,21 +97,33 @@ export default function NavBar() {
                 <Tab onClick={() => onTabSelect("home")} style={{ float: "left" }} value="home" icon={<Avatar size={24} image={{ src: "https://img.atcoder.jp/icons/373e4eb93e4b8e5f441eeeea55e5ac84.jpg" }} />}>
                     Genshin OJ
                 </Tab>
-                <Tab onClick={() => onTabSelect("problem")} style={{ float: "left" }} value="problem" icon={<ClipboardTaskListLtrFilled />}>Problem</Tab>
-                <Tab onClick={() => onTabSelect("submission")} style={{ float: "left" }} value="submission" icon={<ChartMultipleFilled />}>Submission</Tab>
-                <Tab onClick={() => onTabSelect("chat")} style={{ float: "left" }} value="chat" icon={<ChatFilled />}>Chat</Tab>
                 {
-                    loginStatus.value === true
+                    loggedIn &&
+                    <>
+                        <Tab onClick={() => onTabSelect("problem")} style={{ float: "left" }} value="problem" icon={<ClipboardTaskListLtrFilled />}>Problem</Tab>
+                        <Tab onClick={() => onTabSelect("submission")} style={{ float: "left" }} value="submission" icon={<ChartMultipleFilled />}>Submission</Tab>
+                        <Tab onClick={() => onTabSelect("discussion")} style={{ float: "left" }} value="discussion" icon={<CommentMultipleFilled />}>Discuss</Tab>
+                        <Tab onClick={() => onTabSelect("notification")} style={{ float: "left" }} value="notification" icon={<AlertFilled />}>
+                            Notification {unreadCount > 0 && <CounterBadge count={unreadCount} size="small" color="danger" />}
+                        </Tab>
+                    </>
+                }
+                {
+                    loggedIn
                         ?
-                        <Tab onClick={() => onTabSelect("logout")} style={{ float: "right" }} value="logout">Sign out</Tab>
+                        // float:right stacks right-to-left in DOM order, so this renders as: Chat | User | Sign out.
+                        <>
+                            <Tab onClick={() => onTabSelect("logout")} style={{ float: "right" }} value="logout" icon={<SignOutFilled />}>Sign out</Tab>
+                            <Tab onClick={() => onTabSelect("user")} style={{ float: "right" }} value="user" icon={<PersonFilled />}>User</Tab>
+                            <Tab onClick={() => onTabSelect("chat")} style={{ float: "right" }} value="chat" icon={<ChatFilled />}>Chat</Tab>
+                        </>
                         :
                         <>
-                            <Tab onClick={() => onTabSelect("login")} style={{ float: "right" }} value="login">Sign in</Tab>
-                            <Tab onClick={() => onTabSelect("register")} style={{ float: "right" }} value="register">Sign up</Tab>
+                            <Tab onClick={() => onTabSelect("login")} style={{ float: "right" }} value="login" icon={<ArrowEnterFilled />}>Sign in</Tab>
+                            <Tab onClick={() => onTabSelect("register")} style={{ float: "right" }} value="register" icon={<PersonAddFilled />}>Sign up</Tab>
                         </>
                 }
 
-                <Tab onClick={() => onTabSelect("user")} style={{ float: "right" }} value="user">User</Tab>
                 <Divider />
             </div>
         </div>

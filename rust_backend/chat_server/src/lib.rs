@@ -36,8 +36,8 @@ pub extern "Rust" fn on_init(
                 mysql_async::Pool
             > = MYSQL_DATABASE_POOL.lock().await;
             let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
-            "CREATE DATABASE IF NOT EXISTS GenshinOJ".ignore(&mut conn).await.unwrap();
-            "USE GenshinOJ".ignore(&mut conn).await.unwrap();
+            "CREATE DATABASE IF NOT EXISTS RsOJ".ignore(&mut conn).await.unwrap();
+            "USE RsOJ".ignore(&mut conn).await.unwrap();
             "CREATE TABLE IF NOT EXISTS chat_messages (
                 id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
                 from_username VARCHAR(256) NOT NULL,

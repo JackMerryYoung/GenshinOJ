@@ -55,7 +55,7 @@ function AvatarUploader({ username, sessionToken, onUploaded }: {
         }
     };
 
-    return <div style={{ display: "flex", flexDirection: "column", margin: "0 0.4em" }}>
+    return <div style={{ display: "flex", flexDirection: "column", margin: "0 0.4em", padding: "0 90% 0 0", }}>
         <input
             ref={fileInputRef}
             type="file"
@@ -65,6 +65,7 @@ function AvatarUploader({ username, sessionToken, onUploaded }: {
         <Button
             appearance="secondary"
             disabled={uploading}
+            style={{ marginTop: "1em" }}
             onClick={() => fileInputRef.current?.click()}>
             {uploading ? "Uploading..." : "Upload Avatar"}
         </Button>
@@ -284,13 +285,13 @@ export default function UserProfile() {
         <>
             {
                 userProfile ?
-                    <div style={{ display: "block", marginLeft: "0.5em", marginTop: "0.4em" }}>
-                        <div style={{ display: "flex", alignItems: "center" }}>
+                    <div style={{ display: "block", marginLeft: "0.5em", marginTop: "1em" }}>
+                        <div style={{ display: "flex", alignItems: "center", marginBottom: "1em", marginLeft: "0.4em" }}>
                             <Avatar
                                 size={64}
                                 name={userProfile.username}
                                 image={{ src: `/avatar/${userProfile.username}?v=${avatarCacheBuster}` }} />
-                            <Label style={{ margin: "0 0.4em" }}>Username: {userProfile.username}</Label>
+                            <Label style={{ margin: "0 1em" }}>Username: {userProfile.username}</Label>
                         </div>
                         <Label style={{ margin: "0 0.4em" }}>Accepted: {userProfile.accepted}</Label>
                         <Label style={{ margin: "0 0.4em" }}>Test Accepted: {userProfile.test_accepted}</Label>

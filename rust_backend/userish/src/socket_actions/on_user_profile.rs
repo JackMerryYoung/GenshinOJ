@@ -42,7 +42,7 @@ pub async fn on_user_profile(msg: SocketJsonMessageWithWsId) {
         let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
         let results: Result<Vec<(i32, i32, i32)>, _> = conn
             .exec(
-                "SELECT accepted, test_accepted, general FROM GenshinOJ.users WHERE username = :username",
+                "SELECT accepted, test_accepted, general FROM RsOJ.users WHERE username = :username",
                 mysql_async::params! { "username" => &content.username }
             )
             .await;
@@ -51,14 +51,14 @@ pub async fn on_user_profile(msg: SocketJsonMessageWithWsId) {
             Some(viewer_username) if viewer_username != &content.username => {
                 let following: Vec<i32> = conn
                     .exec(
-                        "SELECT 1 FROM GenshinOJ.follows WHERE follower_username = :viewer AND followee_username = :target",
+                        "SELECT 1 FROM RsOJ.follows WHERE follower_username = :viewer AND followee_username = :target",
                         mysql_async::params! { "viewer" => viewer_username, "target" => &content.username }
                     )
                     .await
                     .unwrap_or_default();
                 let followed_by: Vec<i32> = conn
                     .exec(
-                        "SELECT 1 FROM GenshinOJ.follows WHERE follower_username = :target AND followee_username = :viewer",
+                        "SELECT 1 FROM RsOJ.follows WHERE follower_username = :target AND followee_username = :viewer",
                         mysql_async::params! { "viewer" => viewer_username, "target" => &content.username }
                     )
                     .await

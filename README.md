@@ -1,4 +1,4 @@
-# GenshinOJ
+# RsOJ
 
 A great Online Judge which judges judgment via websocket. Inspired by [Yur PaintBoard Project](https://github.com/Nikaidou-Shinku/yur-paintboard).
 

@@ -68,7 +68,7 @@ pub async fn store_chat_message(from_username: &str, to_username: &str, messages
     > = MYSQL_DATABASE_POOL.lock().await;
     let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
     conn.exec_drop(
-        "INSERT INTO GenshinOJ.chat_messages (from_username, to_username, messages, created_at) VALUES (:from_username, :to_username, :messages, :created_at)",
+        "INSERT INTO RsOJ.chat_messages (from_username, to_username, messages, created_at) VALUES (:from_username, :to_username, :messages, :created_at)",
         mysql_async::params! {
             "from_username" => from_username,
             "to_username" => to_username,
@@ -96,7 +96,7 @@ pub async fn fetch_chat_history(
     let rows: Vec<(i64, String, String, i64)> = match before_id {
         Some(before_id) => {
             conn.exec(
-                "SELECT id, from_username, messages, created_at FROM GenshinOJ.chat_messages
+                "SELECT id, from_username, messages, created_at FROM RsOJ.chat_messages
                 WHERE ((from_username = :username_a AND to_username = :username_b)
                     OR (from_username = :username_b AND to_username = :username_a))
                     AND id < :before_id
@@ -107,7 +107,7 @@ pub async fn fetch_chat_history(
         }
         None => {
             conn.exec(
-                "SELECT id, from_username, messages, created_at FROM GenshinOJ.chat_messages
+                "SELECT id, from_username, messages, created_at FROM RsOJ.chat_messages
                 WHERE (from_username = :username_a AND to_username = :username_b)
                     OR (from_username = :username_b AND to_username = :username_a)
                 ORDER BY id DESC LIMIT 10",

@@ -10,6 +10,7 @@ members = [
     "simple_authenticator",
     "judge",
     "userish",
+    "control_panel",
 ]
 resolver = "2"
 

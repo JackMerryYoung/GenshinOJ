@@ -31,7 +31,7 @@ pub async fn on_total_submissions_list_index(msg: SocketJsonMessageWithWsId) {
         > = MYSQL_DATABASE_POOL.lock().await;
         let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
         let results: Result<Vec<i64>, _> = conn
-            .query("SELECT COUNT(*) FROM GenshinOJ.submissions")
+            .query("SELECT COUNT(*) FROM RsOJ.submissions")
             .await;
         drop(conn);
         drop(guard_mysql_database_pool);

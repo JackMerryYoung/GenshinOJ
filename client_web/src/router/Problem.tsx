@@ -35,7 +35,9 @@ const useStyles = makeStyles({
         rowGap: "4px",
         columnGap: "4px",
         height: "fill",
-        margin: "0 0.3em",
+        // Top offset cancels the global `.scroll-bar-wrap { margin: -0.4em }` lift in Root, which
+        // otherwise pulls the list's sticky header up into the navbar's bottom divider.
+        margin: "0.4em 0.3em 0 0.3em",
     },
 });
 

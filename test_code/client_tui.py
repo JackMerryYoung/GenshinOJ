@@ -517,7 +517,7 @@ class UserScreen(textual.screen.Screen):
             self.app.exit()
 
 
-class GenshinOJClient(textual.app.App):
+class RsOJClient(textual.app.App):
     CSS_PATH = "client_tui.tcss"
     BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
 
@@ -608,7 +608,7 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        application = GenshinOJClient()
+        application = RsOJClient()
         asyncio.run(main())
         asyncio.get_event_loop().run_forever()
     except KeyboardInterrupt as e:

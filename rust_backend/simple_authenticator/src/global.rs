@@ -72,43 +72,45 @@ pub fn get_hash(text: &str) -> String {
 
 pub fn generate_session_token(session_token_seed: u32) -> String {
     if session_token_seed > 1 {
+        // Use wrapping arithmetic to avoid overflow panics in release mode
+        let seed = session_token_seed as u64;
         let generated_session_token: String =
             char
-                ::from_u32((session_token_seed % 26) + ('a' as u32))
+                ::from_u32(((seed % 26) + ('a' as u64)) as u32)
                 .unwrap()
                 .to_string() +
             char
-                ::from_u32(((session_token_seed * 3) % 26) + ('a' as u32))
+                ::from_u32((((seed * 3) % 26) + ('a' as u64)) as u32)
                 .unwrap()
                 .to_string()
                 .as_str() +
             char
-                ::from_u32(((session_token_seed * 5) % 26) + ('a' as u32))
+                ::from_u32((((seed * 5) % 26) + ('a' as u64)) as u32)
                 .unwrap()
                 .to_string()
                 .as_str() +
             char
-                ::from_u32(((session_token_seed * 7) % 26) + ('a' as u32))
+                ::from_u32((((seed * 7) % 26) + ('a' as u64)) as u32)
                 .unwrap()
                 .to_string()
                 .as_str() +
             char
-                ::from_u32(((session_token_seed * 9) % 26) + ('a' as u32))
+                ::from_u32((((seed * 9) % 26) + ('a' as u64)) as u32)
                 .unwrap()
                 .to_string()
                 .as_str() +
             char
-                ::from_u32(((session_token_seed * 11) % 26) + ('a' as u32))
+                ::from_u32((((seed * 11) % 26) + ('a' as u64)) as u32)
                 .unwrap()
                 .to_string()
                 .as_str() +
             char
-                ::from_u32(((session_token_seed * 13) % 26) + ('a' as u32))
+                ::from_u32((((seed * 13) % 26) + ('a' as u64)) as u32)
                 .unwrap()
                 .to_string()
                 .as_str() +
             char
-                ::from_u32(((session_token_seed * 15) % 26) + ('a' as u32))
+                ::from_u32((((seed * 15) % 26) + ('a' as u64)) as u32)
                 .unwrap()
                 .to_string()
                 .as_str();

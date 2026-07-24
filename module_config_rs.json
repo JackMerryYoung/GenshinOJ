@@ -76,6 +76,14 @@
                 "std_ws_server@0.1.0"
             ],
             "unload_timeout": 0
+        },
+        "control_panel": {
+            "name": "Control Panel",
+            "id": "control_panel",
+            "protocol": "std_control_panel@0.1.0",
+            "enabled": true,
+            "dependencies": [],
+            "unload_timeout": 0
         }
     }
 }

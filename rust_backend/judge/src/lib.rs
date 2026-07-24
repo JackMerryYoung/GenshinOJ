@@ -5,6 +5,9 @@ mod socket_actions;
 mod self_management;
 mod judge_socket;
 mod judging;
+mod solutions;
+mod discussions;
+mod notifications;
 
 use crate::global::*;
 
@@ -38,8 +41,8 @@ pub extern "Rust" fn on_init(
                 mysql_async::Pool
             > = MYSQL_DATABASE_POOL.lock().await;
             let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
-            "CREATE DATABASE IF NOT EXISTS GenshinOJ".ignore(&mut conn).await.unwrap();
-            "USE GenshinOJ".ignore(&mut conn).await.unwrap();
+            "CREATE DATABASE IF NOT EXISTS RsOJ".ignore(&mut conn).await.unwrap();
+            "USE RsOJ".ignore(&mut conn).await.unwrap();
             "CREATE TABLE IF NOT EXISTS submissions (
                 submission_id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
                 username VARCHAR(256) NOT NULL,
@@ -52,6 +55,111 @@ pub extern "Rust" fn on_init(
                 language VARCHAR(16) NOT NULL DEFAULT '',
                 is_test_submission_mode BOOLEAN NOT NULL DEFAULT FALSE,
                 created_at BIGINT NOT NULL
+            )"
+                .ignore(&mut conn).await
+                .unwrap();
+            // User-authored (and, later, official/starred) write-ups for a problem. `content` is a
+            // JSON array of markdown lines, mirroring how `submissions.code` and problem statements
+            // are stored. `likes`/`dislikes` are denormalized running totals kept in sync with the
+            // per-user rows in `solution_votes`.
+            "CREATE TABLE IF NOT EXISTS solutions (
+                solution_id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                problem_number INT NOT NULL,
+                username VARCHAR(256) NOT NULL,
+                title VARCHAR(512) NOT NULL,
+                content TEXT NOT NULL,
+                is_official BOOLEAN NOT NULL DEFAULT FALSE,
+                likes INT NOT NULL DEFAULT 0,
+                dislikes INT NOT NULL DEFAULT 0,
+                created_at BIGINT NOT NULL
+            )"
+                .ignore(&mut conn).await
+                .unwrap();
+            // One row per (user, solution); `vote` is 1 for a like and -1 for a dislike. The
+            // composite primary key enforces a single vote per user per solution.
+            "CREATE TABLE IF NOT EXISTS solution_votes (
+                username VARCHAR(256) NOT NULL,
+                solution_id INT NOT NULL,
+                vote TINYINT NOT NULL,
+                PRIMARY KEY (username, solution_id)
+            )"
+                .ignore(&mut conn).await
+                .unwrap();
+            "CREATE TABLE IF NOT EXISTS solution_comments (
+                comment_id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                solution_id INT NOT NULL,
+                username VARCHAR(256) NOT NULL,
+                content TEXT NOT NULL,
+                likes INT NOT NULL DEFAULT 0,
+                dislikes INT NOT NULL DEFAULT 0,
+                created_at BIGINT NOT NULL
+            )"
+                .ignore(&mut conn).await
+                .unwrap();
+            "CREATE TABLE IF NOT EXISTS solution_comment_votes (
+                username VARCHAR(256) NOT NULL,
+                comment_id INT NOT NULL,
+                vote TINYINT NOT NULL,
+                PRIMARY KEY (username, comment_id)
+            )"
+                .ignore(&mut conn).await
+                .unwrap();
+            // Global discussion forum (not tied to any problem): user-authored threads with a reply
+            // area. Mirrors the solutions tables — `content` is a JSON array of markdown lines, and
+            // `likes`/`dislikes` are running totals kept in sync with the per-user vote rows.
+            "CREATE TABLE IF NOT EXISTS discussions (
+                discussion_id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                username VARCHAR(256) NOT NULL,
+                title VARCHAR(512) NOT NULL,
+                content TEXT NOT NULL,
+                likes INT NOT NULL DEFAULT 0,
+                dislikes INT NOT NULL DEFAULT 0,
+                created_at BIGINT NOT NULL
+            )"
+                .ignore(&mut conn).await
+                .unwrap();
+            "CREATE TABLE IF NOT EXISTS discussion_votes (
+                username VARCHAR(256) NOT NULL,
+                discussion_id INT NOT NULL,
+                vote TINYINT NOT NULL,
+                PRIMARY KEY (username, discussion_id)
+            )"
+                .ignore(&mut conn).await
+                .unwrap();
+            "CREATE TABLE IF NOT EXISTS discussion_replies (
+                reply_id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                discussion_id INT NOT NULL,
+                username VARCHAR(256) NOT NULL,
+                content TEXT NOT NULL,
+                likes INT NOT NULL DEFAULT 0,
+                dislikes INT NOT NULL DEFAULT 0,
+                created_at BIGINT NOT NULL
+            )"
+                .ignore(&mut conn).await
+                .unwrap();
+            "CREATE TABLE IF NOT EXISTS discussion_reply_votes (
+                username VARCHAR(256) NOT NULL,
+                reply_id INT NOT NULL,
+                vote TINYINT NOT NULL,
+                PRIMARY KEY (username, reply_id)
+            )"
+                .ignore(&mut conn).await
+                .unwrap();
+            // Per-user "info center" inbox. One row per delivered notification. `kind` is 'mention'
+            // (the `actor` wrote @recipient) or 'reply' (the `actor` commented on / replied to the
+            // recipient's solution or discussion). `target_url` is the frontend path to open when the
+            // notification is clicked; `excerpt` is a short preview of the triggering text.
+            "CREATE TABLE IF NOT EXISTS notifications (
+                notification_id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                recipient VARCHAR(256) NOT NULL,
+                actor VARCHAR(256) NOT NULL,
+                kind VARCHAR(16) NOT NULL,
+                source_type VARCHAR(32) NOT NULL,
+                target_url VARCHAR(512) NOT NULL,
+                excerpt VARCHAR(512) NOT NULL,
+                is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at BIGINT NOT NULL,
+                INDEX idx_recipient_created (recipient, created_at)
             )"
                 .ignore(&mut conn).await
                 .unwrap();

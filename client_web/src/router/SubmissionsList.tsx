@@ -300,7 +300,7 @@ export default function SubmissionsList() {
                                 </div>
                             </form>
                         </div>
-                        <div style={{ margin: "0.6em 0.25em 0 0.75em", maxWidth: "90%", marginTop: "1em" }} >
+                        <div style={{ margin: "0.6em 0.25em 0 0.75em", marginTop: "1em" }} >
                             <Table size="medium" className="scroll-bar-wrap">
                                 <TableHeader className="my-table-sticky">
                                     <TableRow className="my-table-row-header">
@@ -310,7 +310,7 @@ export default function SubmissionsList() {
                                         <TableHeaderCell style={{ width: "25%" }}>Score</TableHeaderCell>
                                     </TableRow>
                                 </TableHeader>
-                                <TableBody className="scroll-box my-table-scrollbar">
+                                <TableBody className="my-table-scrollbar">
                                     {
                                         submissionsList.map((submissionResult: SubmissionResult | SubmissionResultOthers, key) => (
                                             <TableRow key={key} className="my-table-row-body">
@@ -333,7 +333,6 @@ export default function SubmissionsList() {
                                         )
                                     }
                                 </TableBody>
-                                <div className="cover-bar" />
                             </Table>
                         </div>
                     </>

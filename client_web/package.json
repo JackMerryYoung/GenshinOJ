@@ -19,6 +19,8 @@
     "@types/react-dom": ">=19.0.0",
     "copy-to-clipboard": "^4.0.2",
     "esbuild": "^0.28.1",
+    "highcharts": "^13.0.0",
+    "highcharts-react-official": "^3.2.3",
     "katex": "^0.17.0",
     "nanoid": "^5.1.14",
     "react": "^19.2.7",

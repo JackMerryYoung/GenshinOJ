@@ -89,7 +89,7 @@ class db_connector:
                 user=DATABASE_USER,
                 passwd=DATABASE_PASSWORD,
                 port=DATABASE_PORT,
-                database="GenshinOJ",
+                database="RsOJ",
             )
             self.log("Connection established.")
         except Exception:  # If the database is not established, create it
@@ -100,13 +100,13 @@ class db_connector:
                 port=DATABASE_PORT,
             )
             self.database_cursor = self.database.cursor()
-            self.database_cursor.execute("CREATE DATABASE IF NOT EXISTS GenshinOJ;")
+            self.database_cursor.execute("CREATE DATABASE IF NOT EXISTS RsOJ;")
             self.database = pymysql.connect(
                 host="localhost",
                 user=DATABASE_USER,
                 passwd=DATABASE_PASSWORD,
                 port=DATABASE_PORT,
-                database="GenshinOJ",
+                database="RsOJ",
             )
             self.log("Initialization finished!")
 

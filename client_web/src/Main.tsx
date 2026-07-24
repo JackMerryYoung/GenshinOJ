@@ -20,8 +20,13 @@ const ChatMainUser = lazy(() => import("./router/ChatMainUser.tsx"));
 const Problem = lazy(() => import("./router/Problem.tsx"));
 const ProblemMain = lazy(() => import("./router/ProblemMain.tsx"));
 const SubmissionShower = lazy(() => import("./router/SubmissionShower.tsx"));
+const SolutionShower = lazy(() => import("./router/SolutionShower.tsx"));
+const Discussion = lazy(() => import("./router/Discussion.tsx"));
+const DiscussionShower = lazy(() => import("./router/DiscussionShower.tsx"));
+const InfoCenter = lazy(() => import("./router/InfoCenter.tsx"));
 const SubmissionsList = lazy(() => import("./router/SubmissionsList.tsx"));
 const UserProfile = lazy(() => import("./router/UserProfile.tsx"));
+const ControlPanel = lazy(() => import("./router/ControlPanel.tsx"));
 const ErrorPage = lazy(() => import("./ErrorPage.tsx"));
 
 import store from "./store.ts";
@@ -92,6 +97,32 @@ const router = createBrowserRouter([
                 },
             },
             {
+                path: "/solution/:solution_id",
+                element: <Suspense fallback={<Skeleton />}><SolutionShower /></Suspense>,
+                loader: ({ params }) => {
+                    document.title = "Solution " + params.solution_id;
+                    return { solutionId: Number(params.solution_id) };
+                },
+            },
+            {
+                path: "/discussion",
+                element: <Suspense fallback={<Skeleton />}><Discussion /></Suspense>,
+                loader: () => document.title = "Discussion",
+            },
+            {
+                path: "/discussion/:discussion_id",
+                element: <Suspense fallback={<Skeleton />}><DiscussionShower /></Suspense>,
+                loader: ({ params }) => {
+                    document.title = "Discussion " + params.discussion_id;
+                    return { discussionId: Number(params.discussion_id) };
+                },
+            },
+            {
+                path: "/notification",
+                element: <Suspense fallback={<Skeleton />}><InfoCenter /></Suspense>,
+                loader: () => document.title = "Notification",
+            },
+            {
                 path: "/logout",
                 element: <Suspense fallback={<Skeleton />}><Logout /></Suspense>,
                 loader: () => document.title = "Home Page"
@@ -110,6 +141,11 @@ const router = createBrowserRouter([
                 loader: () => document.title = "Profile of User",
             }
         ]
+    },
+    {
+        path: "/control-panel",
+        element: <Suspense fallback={<Skeleton />}><ControlPanel /></Suspense>,
+        loader: () => document.title = "Control Panel",
     }
 ]);
 

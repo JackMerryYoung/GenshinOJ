@@ -29,7 +29,7 @@ pub async fn on_friends_list(msg: SocketJsonMessageWithWsId) {
         let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
         let results: Result<Vec<String>, _> = conn
             .exec(
-                "SELECT followee_username FROM GenshinOJ.follows
+                "SELECT followee_username FROM RsOJ.follows
                 WHERE follower_username = :username
                 ORDER BY followee_username ASC",
                 mysql_async::params! { "username" => &content.username }

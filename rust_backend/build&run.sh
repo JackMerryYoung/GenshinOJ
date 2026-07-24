@@ -138,6 +138,28 @@ fi
 
 ###############################################################
 
+# Building Control Panel
+if [ ! -e "./modules/control_panel" ]; then
+    mkdir ./modules/control_panel
+fi
+
+cargo build -r -p control_panel
+if [ -e "./target/release/libcontrol_panel.so" ]; then
+    if [ -e "./modules/control_panel/libcontrol_panel.so" ]; then
+        if [ "$(cat ./target/release/libcontrol_panel.so)" != "$(cat ./modules/control_panel/libcontrol_panel.so)" ]; then
+            echo "Moving control_panel..."
+            mv ./target/release/libcontrol_panel.so ./modules/control_panel
+        else
+            echo "No need to move control_panel."
+        fi
+    else
+        echo "Moving control_panel..."
+        mv ./target/release/libcontrol_panel.so ./modules/control_panel
+    fi
+fi
+
+###############################################################
+
 # Building Main Backend
 cargo run -r -p main_backend
 

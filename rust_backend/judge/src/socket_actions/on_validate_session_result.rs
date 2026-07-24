@@ -46,6 +46,67 @@ async fn send_json_msg_to_ws_server(ws_id: String, msg_to_send: serde_json::Valu
 
 pub async fn on_validate_session_result(msg: SocketJsonMessage) {
     if let Ok(content) = serde_json::from_value::<ContentOnValidateSessionResult>(msg.content) {
+        // Solution-area writes (post / vote) validate the session through this same handler, keyed
+        // by their own pending map. Resolve them first; fall through to the submission path below.
+        let mut guard_pending_solution_authed_requests: tokio::sync::MutexGuard<
+            '_,
+            std::collections::HashMap<String, PendingSolutionAuthedRequest>
+        > = PENDING_SOLUTION_AUTHED_REQUESTS.lock().await;
+        if
+            let Some(pending_request) = guard_pending_solution_authed_requests.remove(
+                &content.request_key
+            )
+        {
+            drop(guard_pending_solution_authed_requests);
+            if content.session_valid {
+                crate::solutions::handle_authed_action(pending_request).await;
+            } else {
+                crate::solutions::handle_invalid_session(pending_request).await;
+            }
+            return;
+        }
+        drop(guard_pending_solution_authed_requests);
+
+        // Discussion-area writes validate the session through this same handler.
+        let mut guard_pending_discussion_authed_requests: tokio::sync::MutexGuard<
+            '_,
+            std::collections::HashMap<String, PendingDiscussionAuthedRequest>
+        > = PENDING_DISCUSSION_AUTHED_REQUESTS.lock().await;
+        if
+            let Some(pending_request) = guard_pending_discussion_authed_requests.remove(
+                &content.request_key
+            )
+        {
+            drop(guard_pending_discussion_authed_requests);
+            if content.session_valid {
+                crate::discussions::handle_authed_action(pending_request).await;
+            } else {
+                crate::discussions::handle_invalid_session(pending_request).await;
+            }
+            return;
+        }
+        drop(guard_pending_discussion_authed_requests);
+
+        // Info-center writes (mark notifications read) validate the session through this handler.
+        let mut guard_pending_notification_authed_requests: tokio::sync::MutexGuard<
+            '_,
+            std::collections::HashMap<String, PendingNotificationAuthedRequest>
+        > = PENDING_NOTIFICATION_AUTHED_REQUESTS.lock().await;
+        if
+            let Some(pending_request) = guard_pending_notification_authed_requests.remove(
+                &content.request_key
+            )
+        {
+            drop(guard_pending_notification_authed_requests);
+            if content.session_valid {
+                crate::notifications::handle_authed_action(pending_request).await;
+            } else {
+                crate::notifications::handle_invalid_session(pending_request).await;
+            }
+            return;
+        }
+        drop(guard_pending_notification_authed_requests);
+
         let mut guard_pending_submission_requests = PENDING_SUBMISSION_REQUESTS.lock().await;
         let Some(pending_request) = guard_pending_submission_requests.remove(
             &content.request_key
@@ -90,7 +151,7 @@ pub async fn on_validate_session_result(msg: SocketJsonMessage) {
         let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
         let insert_result = conn
             .exec_drop(
-                "INSERT INTO GenshinOJ.submissions
+                "INSERT INTO RsOJ.submissions
                 (username, problem_number, result, general_score, statuses, scores, code, language, is_test_submission_mode, created_at)
                 VALUES (:username, :problem_number, 'PD', 0, '[]', '[]', :code, :language, :is_test_submission_mode, :created_at)",
                 mysql_async::params! {
@@ -138,7 +199,7 @@ pub async fn on_validate_session_result(msg: SocketJsonMessage) {
         // `general` counts every submission attempt, TSM included.
         let general_update_result = conn
             .exec_drop(
-                "UPDATE GenshinOJ.users SET general = general + 1 WHERE username = :username",
+                "UPDATE RsOJ.users SET general = general + 1 WHERE username = :username",
                 mysql_async::params! { "username" => &pending_request.username }
             )
             .await;
@@ -190,7 +251,7 @@ pub async fn on_validate_session_result(msg: SocketJsonMessage) {
             let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
             let update_result = conn
                 .exec_drop(
-                    "UPDATE GenshinOJ.submissions
+                    "UPDATE RsOJ.submissions
                     SET result = :result, general_score = :general_score, statuses = :statuses, scores = :scores
                     WHERE submission_id = :submission_id",
                     mysql_async::params! {
@@ -227,7 +288,7 @@ pub async fn on_validate_session_result(msg: SocketJsonMessage) {
                 let counter_update_result = conn
                     .exec_drop(
                         format!(
-                            "UPDATE GenshinOJ.users SET {} = {} + 1 WHERE username = :username",
+                            "UPDATE RsOJ.users SET {} = {} + 1 WHERE username = :username",
                             counter_column,
                             counter_column
                         ),

@@ -1,3 +1,4 @@
+use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 
 pub static MODULE_IDENTITY: &str = "WS_SERVER";
@@ -233,6 +234,50 @@ pub async fn send_socket_json_message(msg_to_send: &serde_json::Value, to_protoc
             )
         );
     }
+}
+
+// Like get_socket_port_by_protocol, but never panics: returns None if the module isn't present
+// or hasn't finished initializing (port still 0). Used for best-effort reporting to optional
+// modules such as the control panel.
+async fn try_get_socket_port_by_protocol(protocol: &str) -> Option<u16> {
+    let guard_global_module_statuses_by_protocol = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get()?
+        .lock().await;
+    let status = guard_global_module_statuses_by_protocol.get(protocol)?.clone();
+    drop(guard_global_module_statuses_by_protocol);
+    let port = *status.lock().await.socket_port.lock().await;
+    if port == 0 { None } else { Some(port) }
+}
+
+// Fire-and-forget: tell the control panel (if loaded) that a site visit happened. The control
+// panel is an HTTP service rather than a socket-protocol peer, so we hand-write a minimal HTTP
+// POST over a raw TCP connection. Any failure is swallowed — visit analytics must never affect
+// serving websocket clients.
+pub async fn report_visit_to_control_panel() {
+    let Some(port) = try_get_socket_port_by_protocol("std_control_panel").await else {
+        return;
+    };
+    let Ok(mut stream) = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")).await else {
+        return;
+    };
+    stream.set_nodelay(true).ok();
+    let request: &str =
+        "POST /api/record-visit HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    if stream.write_all(request.as_bytes()).await.is_err() {
+        return;
+    }
+    // Drain the response to EOF before dropping the socket. Closing immediately after the write,
+    // while the server's unread response is still inbound, makes the OS send an RST instead of a
+    // graceful FIN — which cancels the control panel's in-flight handler before it commits the
+    // visit. Bounded by a short timeout so a wedged peer can't hang this task.
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        let mut buf = [0u8; 256];
+        loop {
+            match stream.read(&mut buf).await {
+                Ok(0) | Err(_) => break,
+                Ok(_) => {}
+            }
+        }
+    }).await;
 }
 
 pub fn get_pwd() -> String {

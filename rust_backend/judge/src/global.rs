@@ -4,6 +4,16 @@ pub static MODULE_IDENTITY: &str = "JUDGE";
 
 pub const SUBMISSIONS_LIST_PAGE_SIZE: i64 = 20;
 
+pub const SOLUTIONS_LIST_PAGE_SIZE: i64 = 10;
+pub const SOLUTION_COMMENTS_LIST_PAGE_SIZE: i64 = 8;
+
+pub const DISCUSSIONS_LIST_PAGE_SIZE: i64 = 10;
+pub const DISCUSSION_REPLIES_LIST_PAGE_SIZE: i64 = 20;
+
+pub const NOTIFICATIONS_LIST_PAGE_SIZE: i64 = 10;
+// Cap on usernames returned by the @mention autocomplete prefix search.
+pub const USER_SEARCH_LIMIT: i64 = 8;
+
 pub type AsyncModifiable<T> = std::sync::Arc<tokio::sync::Mutex<T>>;
 
 pub fn new_async_modifiable<T>(x: T) -> AsyncModifiable<T> {
@@ -47,6 +57,7 @@ pub struct ProblemStatementJson {
 }
 
 pub const MYSQL_DATABASE_URL: &str = "mysql://root:123456@127.0.0.1:3306/";
+pub const DATABASE_NAME: &str = "RsOJ";
 
 pub static MYSQL_DATABASE_POOL: std::sync::LazyLock<tokio::sync::Mutex<mysql_async::Pool>> = std::sync::LazyLock::new(
     || { tokio::sync::Mutex::new(mysql_async::Pool::new(MYSQL_DATABASE_URL)) }
@@ -103,6 +114,176 @@ pub struct PendingSubmissionResultFetchRequest {
 
 pub static PENDING_SUBMISSION_RESULT_FETCH_REQUESTS: std::sync::LazyLock<
     tokio::sync::Mutex<std::collections::HashMap<String, PendingSubmissionResultFetchRequest>>
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
+// Session-validated ("authed") solution-area actions waiting on the validate-session round trip to
+// simple_authenticator. Like submissions, judge can't trust the client's claimed identity, so every
+// write (post a solution/comment, cast a vote) is parked here keyed by the validate-session
+// request_key until the session is confirmed, then dispatched by its `action` variant.
+pub enum PendingSolutionAuthedAction {
+    PostSolution {
+        problem_number: i64,
+        title: String,
+        content: Vec<String>,
+        is_official: bool,
+    },
+    VoteSolution {
+        solution_id: i64,
+        // 1 = like, -1 = dislike, 0 = clear the requester's existing vote.
+        vote: i8,
+    },
+    PostComment {
+        solution_id: i64,
+        content: Vec<String>,
+    },
+    VoteComment {
+        comment_id: i64,
+        vote: i8,
+    },
+}
+
+pub struct PendingSolutionAuthedRequest {
+    pub requester_ws_id: String,
+    pub username: String,
+    pub original_request_key: String,
+    pub action: PendingSolutionAuthedAction,
+}
+
+pub static PENDING_SOLUTION_AUTHED_REQUESTS: std::sync::LazyLock<
+    tokio::sync::Mutex<std::collections::HashMap<String, PendingSolutionAuthedRequest>>
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
+// Read-side solution-area actions that need the requester's username before they can answer (to
+// flag the requester's own vote / ownership), resolved the same way submissions_list does — by
+// asking simple_authenticator for the username behind a ws_id. Parked here keyed by that lookup's
+// request_key until the result returns.
+pub enum PendingSolutionLookup {
+    SolutionsList {
+        problem_number: i64,
+        page_index: i64,
+        sort_by_likes: bool,
+    },
+    SolutionFetch {
+        solution_id: i64,
+    },
+    SolutionCommentsList {
+        solution_id: i64,
+        page_index: i64,
+        sort_by_likes: bool,
+    },
+}
+
+pub struct PendingSolutionLookupRequest {
+    pub requester_ws_id: String,
+    pub original_request_key: String,
+    pub lookup: PendingSolutionLookup,
+}
+
+pub static PENDING_SOLUTION_LOOKUP_REQUESTS: std::sync::LazyLock<
+    tokio::sync::Mutex<std::collections::HashMap<String, PendingSolutionLookupRequest>>
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
+// Discussion forum — same two-map pattern as solutions. Session-validated ("authed") writes
+// (post a thread/reply, cast a vote) are parked here keyed by the validate-session request_key
+// until the session is confirmed, then dispatched by their `action` variant.
+pub enum PendingDiscussionAuthedAction {
+    PostDiscussion {
+        title: String,
+        content: Vec<String>,
+    },
+    VoteDiscussion {
+        discussion_id: i64,
+        vote: i8,
+    },
+    PostReply {
+        discussion_id: i64,
+        content: Vec<String>,
+    },
+    VoteReply {
+        reply_id: i64,
+        vote: i8,
+    },
+}
+
+pub struct PendingDiscussionAuthedRequest {
+    pub requester_ws_id: String,
+    pub username: String,
+    pub original_request_key: String,
+    pub action: PendingDiscussionAuthedAction,
+}
+
+pub static PENDING_DISCUSSION_AUTHED_REQUESTS: std::sync::LazyLock<
+    tokio::sync::Mutex<std::collections::HashMap<String, PendingDiscussionAuthedRequest>>
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
+// Read-side discussion actions that need the requester's username before answering (to flag the
+// requester's own vote), resolved by asking simple_authenticator for the username behind a ws_id.
+pub enum PendingDiscussionLookup {
+    DiscussionsList {
+        page_index: i64,
+        sort_by_likes: bool,
+    },
+    DiscussionFetch {
+        discussion_id: i64,
+    },
+    DiscussionRepliesList {
+        discussion_id: i64,
+        page_index: i64,
+        sort_by_likes: bool,
+    },
+}
+
+pub struct PendingDiscussionLookupRequest {
+    pub requester_ws_id: String,
+    pub original_request_key: String,
+    pub lookup: PendingDiscussionLookup,
+}
+
+pub static PENDING_DISCUSSION_LOOKUP_REQUESTS: std::sync::LazyLock<
+    tokio::sync::Mutex<std::collections::HashMap<String, PendingDiscussionLookupRequest>>
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
+// Info-center (notifications) — same two-map pattern. Read-side actions need the requester's
+// username before answering (the inbox is private to its owner), resolved by asking
+// simple_authenticator for the username behind a ws_id. Parked here keyed by that lookup's
+// request_key until the result returns.
+pub enum PendingNotificationLookup {
+    NotificationsList {
+        page_index: i64,
+    },
+    TotalNotificationsListIndex,
+    UnreadCount,
+}
+
+pub struct PendingNotificationLookupRequest {
+    pub requester_ws_id: String,
+    pub original_request_key: String,
+    pub lookup: PendingNotificationLookup,
+}
+
+pub static PENDING_NOTIFICATION_LOOKUP_REQUESTS: std::sync::LazyLock<
+    tokio::sync::Mutex<std::collections::HashMap<String, PendingNotificationLookupRequest>>
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
+// Session-validated ("authed") info-center writes (mark a notification — or all of them — read).
+// Parked here keyed by the validate-session request_key until the session is confirmed, so a user
+// can only ever mutate their own inbox.
+pub enum PendingNotificationAuthedAction {
+    MarkRead {
+        // 0 marks every unread notification for the requester; otherwise the single id.
+        notification_id: i64,
+    },
+}
+
+pub struct PendingNotificationAuthedRequest {
+    pub requester_ws_id: String,
+    pub username: String,
+    pub original_request_key: String,
+    pub action: PendingNotificationAuthedAction,
+}
+
+pub static PENDING_NOTIFICATION_AUTHED_REQUESTS: std::sync::LazyLock<
+    tokio::sync::Mutex<std::collections::HashMap<String, PendingNotificationAuthedRequest>>
 > = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
 
 #[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug)]

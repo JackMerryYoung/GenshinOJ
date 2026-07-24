@@ -98,7 +98,7 @@ pub async fn perform_unfollow(follower_username: &str, followee_username: &str) 
     let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
     let result = conn
         .exec_drop(
-            "DELETE FROM GenshinOJ.follows WHERE follower_username = :follower AND followee_username = :followee",
+            "DELETE FROM RsOJ.follows WHERE follower_username = :follower AND followee_username = :followee",
             mysql_async::params! {
                 "follower" => follower_username,
                 "followee" => followee_username,

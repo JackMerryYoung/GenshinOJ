@@ -111,7 +111,7 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
         > = MYSQL_DATABASE_POOL.lock().await;
         let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
         let results: Result<Vec<String>, _> = conn.exec(
-            "SELECT password FROM GenshinOJ.users WHERE username = :username",
+            "SELECT password FROM RsOJ.users WHERE username = :username",
             mysql_async::params! { "username" => &unwrapped_content.username }
         ).await;
         match results {
@@ -120,10 +120,11 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
                     // The user doesn't exist.
                     // Create user.
                     conn.exec_drop(
-                        "INSERT INTO GenshinOJ.users (username, password) VALUES (:username, :password)",
+                        "INSERT INTO RsOJ.users (username, password, created_at) VALUES (:username, :password, :created_at)",
                         mysql_async::params! {
                             "username" => &unwrapped_content.username,
-                            "password" => &password_hash
+                            "password" => &password_hash,
+                            "created_at" => chrono::Utc::now().timestamp_millis()
                         }
                     ).await
                         .unwrap();

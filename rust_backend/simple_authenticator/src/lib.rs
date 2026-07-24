@@ -40,11 +40,11 @@ pub extern "Rust" fn on_init(
                 mysql_async::Pool
             > = MYSQL_DATABASE_POOL.lock().await;
             let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
-            let tmp: Vec<String> = conn.query("SHOW DATABASES LIKE \'GenshinOJ\'").await.unwrap();
-            if !tmp.iter().any(|x| x == "GenshinOJ") {
-                "CREATE DATABASE GenshinOJ".ignore(&mut conn).await.unwrap();
+            let tmp: Vec<String> = conn.query("SHOW DATABASES LIKE \'RsOJ\'").await.unwrap();
+            if !tmp.iter().any(|x| x == "RsOJ") {
+                "CREATE DATABASE RsOJ".ignore(&mut conn).await.unwrap();
             }
-            "USE GenshinOJ".ignore(&mut conn).await.unwrap();
+            "USE RsOJ".ignore(&mut conn).await.unwrap();
             let tmp: Vec<String> = conn.query("SHOW TABLES LIKE \'users\'").await.unwrap();
             if !tmp.iter().any(|x| x == "users") {
                 "CREATE TABLE users (
@@ -53,7 +53,8 @@ pub extern "Rust" fn on_init(
                     password VARCHAR(256) NOT NULL,
                     accepted INT NOT NULL DEFAULT 0,
                     test_accepted INT NOT NULL DEFAULT 0,
-                    general INT NOT NULL DEFAULT 0
+                    general INT NOT NULL DEFAULT 0,
+                    created_at BIGINT NOT NULL DEFAULT 0
                 )"
                     .ignore(&mut conn).await
                     .unwrap();
@@ -62,13 +63,29 @@ pub extern "Rust" fn on_init(
                 let tmp: Vec<String> = conn
                     .query(
                         format!(
-                            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'GenshinOJ' AND table_name = 'users' AND column_name = '{column}'"
+                            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'RsOJ' AND table_name = 'users' AND column_name = '{column}'"
                         )
                     )
                     .await
                     .unwrap();
                 if tmp.is_empty() {
                     format!("ALTER TABLE users ADD COLUMN {column} INT NOT NULL DEFAULT 0")
+                        .ignore(&mut conn).await
+                        .unwrap();
+                }
+            }
+            // created_at is BIGINT (epoch millis), added later than the columns above. Existing
+            // rows backfill to 0, so pre-existing users fall before any 30-day window and count
+            // only toward the cumulative baseline, never a daily spike.
+            {
+                let tmp: Vec<String> = conn
+                    .query(
+                        "SELECT column_name FROM information_schema.columns WHERE table_schema = 'RsOJ' AND table_name = 'users' AND column_name = 'created_at'"
+                    )
+                    .await
+                    .unwrap();
+                if tmp.is_empty() {
+                    "ALTER TABLE users ADD COLUMN created_at BIGINT NOT NULL DEFAULT 0"
                         .ignore(&mut conn).await
                         .unwrap();
                 }

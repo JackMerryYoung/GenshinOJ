@@ -269,7 +269,6 @@ export function ChatList({ sendJsonMessage, lastJsonMessage }: {
                 </TableBody>
             </Table>
         </div>
-        <div className="cover-bar" />
     </div>;
 }
 

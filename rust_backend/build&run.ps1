@@ -14,4 +14,8 @@ cargo build -r -p chat_server
 rm ./modules/chat_server/chat_server.dll
 move ./target/release/chat_server.dll ./modules/chat_server/
 
+cargo build -r -p control_panel
+rm ./modules/control_panel/control_panel.dll
+move ./target/release/control_panel.dll ./modules/control_panel/
+
 cargo run -r -p main_backend

@@ -286,7 +286,7 @@ export default function ChatMainUser() {
 
     return <>
         <div style={{ display: "block", height: "80%" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "0 0.5em" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "10px 0.5em 20px 0.5em" }}>
                 <Subtitle1>{toUsername}</Subtitle1>
                 <Link onClick={() => navigate("/user/" + toUsername)}>View Profile</Link>
             </div>
@@ -309,16 +309,15 @@ export default function ChatMainUser() {
                         }
                     </div>
                 </div>
-                <div className="cover-bar" />
             </div>
             <div style={{ display: "flex", flexDirection: "row", width: "fill", alignItems: "end" }}>
                 <form>
-                    <Field label="Input to chat" style={{ maxWidth: "300px", flex: 3 }}>
+                    <Field label="Input to chat" style={{ maxWidth: "300px", flex: 3, marginBottom: "3px" }}>
                         <Input type="text" id="chat-input" value={chatMessageToSend} onChange={(props) => setChatMessageToSend(props.target.value)} />
                     </Field>
                     <Popover>
                         <PopoverTrigger disableButtonEnhancement>
-                            <Button icon={<EmojiRegular />} style={{ flex: 1 }} />
+                            <Button icon={<EmojiRegular />} style={{ flex: 1, marginRight: "5px" }} />
                         </PopoverTrigger>
                         <PopoverSurface>
                             <div style={{ display: "flex", flexWrap: "wrap", maxWidth: "240px" }}>
