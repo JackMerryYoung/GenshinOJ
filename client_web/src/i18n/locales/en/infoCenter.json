@@ -1,0 +1,29 @@
+{
+    "notification": {
+        "mentionedInSolution": "mentioned you in a solution",
+        "mentionedInComment": "mentioned you in a comment",
+        "mentionedInDiscussion": "mentioned you in a discussion",
+        "mentionedInReply": "mentioned you in a reply",
+        "mentionedYou": "mentioned you",
+        "commentedOnSolution": "commented on your solution",
+        "repliedToDiscussion": "replied to your discussion",
+        "repliedToYou": "replied to you"
+    },
+    "pagination": {
+        "page": "Page {{index}} / {{total}}",
+        "previous": "Previous",
+        "next": "Next"
+    },
+    "action": {
+        "markAllRead": "Mark all read"
+    },
+    "loading": {
+        "notifications": "Loading notifications..."
+    },
+    "empty": {
+        "noNotifications": "No notifications yet."
+    },
+    "dialog": {
+        "pleaseLoginFirst": "Please login first."
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "failedToFetch": "Failed to fetch the submission list.",
+    "waiting": "Waiting...",
+    "field": {
+        "submissionId": "Submission ID"
+    },
+    "action": {
+        "jumpTo": "Jump to",
+        "previous": "Previous",
+        "next": "Next",
+        "backward10": "Backward 10",
+        "forward10": "Forward 10"
+    },
+    "indexPage": "Submission Index Page of {{current}} / {{total}}",
+    "column": {
+        "submissionId": "Submission ID",
+        "problemNumber": "Problem Number",
+        "status": "Status",
+        "score": "Score"
+    },
+    "pleaseLoginFirst": "Please login first."
+}

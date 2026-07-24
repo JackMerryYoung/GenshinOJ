@@ -14,6 +14,7 @@ import {
     Spinner,
 } from "@fluentui/react-components";
 import { useNavigate, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useSelector } from "react-redux";
 
@@ -218,6 +219,7 @@ export default function SubmissionsList() {
     const { submissionsList, loadSubmissionsList } = useSubmissionsList(sendJsonMessage, lastJsonMessage, setElapsedTime)
     const navigate = useNavigate();
     const rootStyle = useStyles().root;
+    const { t } = useTranslation("submissionsList");
 
     useEffect(() => {
         const localLoginStatus = localStorage.getItem("loginStatus");
@@ -261,41 +263,41 @@ export default function SubmissionsList() {
                                 <div style={{ display: "flex", blockSize: "100%" }}>
                                     <ErrorCircle20Color style={{ margin: "auto 0 0 auto" }} />
                                     <Label style={{ margin: "auto auto 0 0", padding: "0 0 0 8px", fontSize: "14px" }}>
-                                        Failed to fetch the submission list.
+                                        {t("failedToFetch")}
                                     </Label></div>
                                 :
-                                <Spinner size="large" label="Waiting..." delay={500} />
+                                <Spinner size="large" label={t("waiting")} delay={500} />
                         }
                     </div>
                     :
                     <>
                         <div className={rootStyle}>
                             <form style={{ padding: "0 0.9em" }}>
-                                <Field label="Submission ID">
+                                <Field label={t("field.submissionId")}>
                                     <div style={{ display: "flex", columnGap: "0.25em" }}>
                                         <Input onChange={(props) => setSubmissionId(props.target.value)} style={{ flex: "75%" }} />
                                         <Button appearance="primary"
                                             style={{ flex: "25%" }}
-                                            onClick={() => { navigate("/submission/" + String(submissionId)); }}>Jump to</Button>
+                                            onClick={() => { navigate("/submission/" + String(submissionId)); }}>{t("action.jumpTo")}</Button>
                                     </div>
                                 </Field>
                                 <div style={{ marginTop: "1em" }}>
                                     <div style={{ margin: "0 0 0.25em 0" }}>
-                                        <Label>Submission Index Page of {submissionsListIndex} / {Math.max(totalSubmissionsListIndex, 1)}</Label>
+                                        <Label>{t("indexPage", { current: submissionsListIndex, total: Math.max(totalSubmissionsListIndex, 1) })}</Label>
                                     </div>
                                     <div style={{ display: "flex", columnGap: "0.25em" }}>
                                         <Button appearance="primary"
                                             style={{ flex: "25%" }}
-                                            onClick={() => { setSubmissionsListIndex((c) => (Math.max(1, c - 1))); }}>Previous</Button>
+                                            onClick={() => { setSubmissionsListIndex((c) => (Math.max(1, c - 1))); }}>{t("action.previous")}</Button>
                                         <Button appearance="primary"
                                             style={{ flex: "25%" }}
-                                            onClick={() => { setSubmissionsListIndex((c) => (Math.max(1, Math.min(totalSubmissionsListIndex, c + 1)))); }}>Next</Button>
+                                            onClick={() => { setSubmissionsListIndex((c) => (Math.max(1, Math.min(totalSubmissionsListIndex, c + 1)))); }}>{t("action.next")}</Button>
                                         <Button appearance="secondary"
                                             style={{ flex: "25%" }}
-                                            onClick={() => { setSubmissionsListIndex((c) => (Math.max(1, c - 10))); }}>Backward 10</Button>
+                                            onClick={() => { setSubmissionsListIndex((c) => (Math.max(1, c - 10))); }}>{t("action.backward10")}</Button>
                                         <Button appearance="secondary"
                                             style={{ flex: "25%" }}
-                                            onClick={() => { setSubmissionsListIndex((c) => (Math.max(1, Math.min(1, totalSubmissionsListIndex, c + 10)))); }}>Forward 10</Button>
+                                            onClick={() => { setSubmissionsListIndex((c) => (Math.max(1, Math.min(1, totalSubmissionsListIndex, c + 10)))); }}>{t("action.forward10")}</Button>
                                     </div>
                                 </div>
                             </form>
@@ -304,10 +306,10 @@ export default function SubmissionsList() {
                             <Table size="medium" className="scroll-bar-wrap">
                                 <TableHeader className="my-table-sticky">
                                     <TableRow className="my-table-row-header">
-                                        <TableHeaderCell style={{ width: "25%" }} className="my-table-cell">Submission ID</TableHeaderCell>
-                                        <TableHeaderCell style={{ width: "25%" }}>Problem Number</TableHeaderCell>
-                                        <TableHeaderCell style={{ width: "25%" }}>Status</TableHeaderCell>
-                                        <TableHeaderCell style={{ width: "25%" }}>Score</TableHeaderCell>
+                                        <TableHeaderCell style={{ width: "25%" }} className="my-table-cell">{t("column.submissionId")}</TableHeaderCell>
+                                        <TableHeaderCell style={{ width: "25%" }}>{t("column.problemNumber")}</TableHeaderCell>
+                                        <TableHeaderCell style={{ width: "25%" }}>{t("column.status")}</TableHeaderCell>
+                                        <TableHeaderCell style={{ width: "25%" }}>{t("column.score")}</TableHeaderCell>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody className="my-table-scrollbar">
@@ -341,7 +343,7 @@ export default function SubmissionsList() {
         <PopupDialog
             open={dialogRequireLoginOpenState}
             setPopupDialogOpenState={setDialogRequireLoginOpenState}
-            text="Please login first."
+            text={t("pleaseLoginFirst")}
             onClose={handleNavigateLogin} />
     </>;
 }

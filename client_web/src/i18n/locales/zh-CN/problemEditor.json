@@ -1,0 +1,74 @@
+{
+    "title": {
+        "edit": "编辑题目 #{{number}}",
+        "create": "创建新题目"
+    },
+    "tabs": {
+        "basic": "基本信息",
+        "statement": "题目描述",
+        "testdata": "测试数据"
+    },
+    "basic": {
+        "problemNumber": {
+            "label": "题目编号",
+            "placeholder": "请输入题目编号"
+        },
+        "problemName": {
+            "label": "题目名称",
+            "placeholder": "请输入题目名称"
+        },
+        "difficulty": {
+            "label": "难度",
+            "unknown": "未知",
+            "beginner": "入门",
+            "primary": "初级",
+            "junior": "普及",
+            "senior": "提高",
+            "advanced": "进阶",
+            "hard": "困难",
+            "grand": "顶级"
+        },
+        "timeLimit": {
+            "label": "时间限制 (毫秒)"
+        },
+        "memoryLimit": {
+            "label": "内存限制 (MB)"
+        }
+    },
+    "statement": {
+        "label": "题目描述 (Markdown + LaTeX)",
+        "preview": "预览",
+        "placeholder": "使用 Markdown 输入题目描述。行内公式请使用 $...$，块级公式请使用 $$...$$。",
+        "tip": "提示：使用 $x^2$ 表示行内公式，$$\\int_0^1 f(x)dx$$ 表示块级公式"
+    },
+    "testdata": {
+        "title": "测试用例",
+        "addTestCase": "添加测试用例",
+        "empty": "暂无测试用例，点击“添加测试用例”创建一个。",
+        "caseTitle": "测试用例 {{number}}",
+        "inputFile": {
+            "label": "输入文件",
+            "placeholder": "尚未上传文件"
+        },
+        "outputFile": {
+            "label": "输出文件",
+            "placeholder": "尚未上传文件"
+        },
+        "timeLimit": {
+            "label": "时间限制 (毫秒)"
+        },
+        "memoryLimit": {
+            "label": "内存限制 (MB)"
+        },
+        "score": {
+            "label": "分数"
+        },
+        "uploading": "正在上传..."
+    },
+    "message": {
+        "saveFailedWithReason": "保存题目失败：{{message}}",
+        "saveFailedGeneric": "保存题目失败",
+        "uploadFailedWithReason": "上传失败：{{message}}",
+        "uploadFailedGeneric": "上传失败"
+    }
+}

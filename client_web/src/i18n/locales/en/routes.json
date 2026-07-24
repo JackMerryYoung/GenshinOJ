@@ -1,0 +1,21 @@
+{
+    "title": {
+        "root": "RsOJ Root Page",
+        "login": "Sign in",
+        "register": "Sign up",
+        "home": "Home Page",
+        "chat": "Chat",
+        "chatUser": "Chat User",
+        "problem": "Problem",
+        "problemNumber": "Problem {{number}}",
+        "submissionsList": "Submissions List",
+        "submissionId": "Submission {{id}}",
+        "solutionId": "Solution {{id}}",
+        "discussion": "Discussion",
+        "discussionId": "Discussion {{id}}",
+        "notification": "Notification",
+        "profileOfUser": "Profile of User {{username}}",
+        "profileOfUserDefault": "Profile of User",
+        "controlPanel": "Control Panel"
+    }
+}

@@ -1,5 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useLoaderData, useNavigate, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
     Button,
@@ -379,6 +380,7 @@ function VoteButtons({ likes, dislikes, myVote, onVote }: {
 // ---------------------------------------------------------------------------
 
 export default function SolutionShower() {
+    const { t } = useTranslation("solutionShower");
     const { solutionId } = (useLoaderData() as SolutionInfoFromLoader);
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const navigate = useNavigate();
@@ -472,13 +474,13 @@ export default function SolutionShower() {
                 <div style={{ display: "flex", alignItems: "center", columnGap: "0.5em" }}>
                     {solution.is_official && <StarFilled style={{ color: "#E3B341" }} />}
                     <Title3>{solution.title}</Title3>
-                    {solution.is_official && <Tag size="small" appearance="outline">Official</Tag>}
+                    {solution.is_official && <Tag size="small" appearance="outline">{t("official")}</Tag>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", columnGap: "1em", margin: "0.5em 0" }}>
-                    <Label>By {solution.username}</Label>
+                    <Label>{t("byUsername", { username: solution.username })}</Label>
                     <Label style={{ color: "#4183C4", cursor: "pointer" }}
                         onClick={() => navigate("/problem/" + String(solution.problem_number))}>
-                        Problem {solution.problem_number}
+                        {t("problemNumber", { number: solution.problem_number })}
                     </Label>
                     <Label style={{ fontSize: "0.85em", color: "#666" }}>{formatTimestamp(solution.created_at)}</Label>
                     <VoteButtons
@@ -495,21 +497,21 @@ export default function SolutionShower() {
                 <Divider style={{ margin: "1.5em 0 1em 0" }} />
 
                 <div style={{ display: "flex", alignItems: "center", columnGap: "0.75em", marginBottom: "0.75em" }}>
-                    <Subtitle1>Comments</Subtitle1>
+                    <Subtitle1>{t("comments")}</Subtitle1>
                     <Dropdown
                         style={{ minWidth: "9em" }}
-                        defaultValue="Newest"
+                        defaultValue={t("sort.newest")}
                         defaultSelectedOptions={["time"]}
                         onOptionSelect={handleCommentSortSelect}>
-                        <Option value="time">Newest</Option>
-                        <Option value="likes">Most liked</Option>
+                        <Option value="time">{t("sort.newest")}</Option>
+                        <Option value="likes">{t("sort.mostLiked")}</Option>
                     </Dropdown>
                 </div>
 
                 <div style={{ marginBottom: "1em" }}>
                     <MentionTextarea
                         style={{ width: "100%" }}
-                        placeholder="Write a comment... (Markdown, @mention)"
+                        placeholder={t("commentPlaceholder")}
                         value={newComment}
                         onChange={setNewComment}
                         sendJsonMessage={sendJsonMessage}
@@ -519,18 +521,18 @@ export default function SolutionShower() {
                         <Suspense fallback={<></>}>
                             <EmojiPicker onPick={(emoji) => setNewComment((c) => c + emoji)} />
                         </Suspense>
-                        <Button appearance="primary" onClick={() => postComment(solutionId, replaceEmojiShortcuts(newComment))}>Comment</Button>
+                        <Button appearance="primary" onClick={() => postComment(solutionId, replaceEmojiShortcuts(newComment))}>{t("commentButton")}</Button>
                     </div>
                 </div>
 
                 {
                     commentsList === undefined
                         ?
-                        <Spinner size="small" label="Loading comments..." delay={300} />
+                        <Spinner size="small" label={t("loadingComments")} delay={300} />
                         :
                         commentsList.length === 0
                             ?
-                            <Label>No comments yet.</Label>
+                            <Label>{t("noComments")}</Label>
                             :
                             <>
                                 <div className="scroll-box" style={{ maxHeight: "34em" }}>
@@ -554,9 +556,9 @@ export default function SolutionShower() {
                                 }
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", columnGap: "0.5em", marginTop: "0.75em" }}>
-                                    <Label>Page {commentsListIndex} / {Math.max(totalCommentsListIndex, 1)}</Label>
-                                    <Button appearance="secondary" onClick={() => setCommentsListIndex((c) => Math.max(1, c - 1))}>Previous</Button>
-                                    <Button appearance="secondary" onClick={() => setCommentsListIndex((c) => Math.max(1, Math.min(totalCommentsListIndex, c + 1)))}>Next</Button>
+                                    <Label>{t("page", { current: commentsListIndex, total: Math.max(totalCommentsListIndex, 1) })}</Label>
+                                    <Button appearance="secondary" onClick={() => setCommentsListIndex((c) => Math.max(1, c - 1))}>{t("previous")}</Button>
+                                    <Button appearance="secondary" onClick={() => setCommentsListIndex((c) => Math.max(1, Math.min(totalCommentsListIndex, c + 1)))}>{t("next")}</Button>
                                 </div>
                             </>
                 }
@@ -567,21 +569,21 @@ export default function SolutionShower() {
             <PopupDialog
                 open={dialogNotFoundOpenState}
                 setPopupDialogOpenState={setDialogNotFoundOpenState}
-                text={`Solution ${solutionId} is not found!`}
+                text={t("solutionNotFound", { solutionId })}
                 onClose={() => navigate(-1)} />
             <PopupDialog
                 open={dialogRequireLoginOpenState}
                 setPopupDialogOpenState={setDialogRequireLoginOpenState}
-                text="Please login first."
+                text={t("pleaseLoginFirst")}
                 onClose={() => navigate("/login")} />
             <PopupDialog
                 open={dialogCommentFailureOpen}
                 setPopupDialogOpenState={setDialogCommentFailureOpen}
                 text={postFailureReason === "empty"
-                    ? "Comment can't be empty."
+                    ? t("commentFailure.empty")
                     : postFailureReason === "invalid_session"
-                        ? "Your session is invalid. Please login again."
-                        : "Failed to post the comment."}
+                        ? t("commentFailure.invalidSession")
+                        : t("commentFailure.generic")}
                 onClose={() => setDialogCommentFailureOpen(false)} />
         </Suspense>
     </>;

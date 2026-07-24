@@ -1,0 +1,29 @@
+{
+    "notification": {
+        "mentionedInSolution": "在一篇题解中提到了你",
+        "mentionedInComment": "在一条评论中提到了你",
+        "mentionedInDiscussion": "在一篇讨论中提到了你",
+        "mentionedInReply": "在一条回复中提到了你",
+        "mentionedYou": "提到了你",
+        "commentedOnSolution": "评论了你的题解",
+        "repliedToDiscussion": "回复了你的讨论",
+        "repliedToYou": "回复了你"
+    },
+    "pagination": {
+        "page": "第 {{index}} / {{total}} 页",
+        "previous": "上一页",
+        "next": "下一页"
+    },
+    "action": {
+        "markAllRead": "全部标记为已读"
+    },
+    "loading": {
+        "notifications": "正在加载通知..."
+    },
+    "empty": {
+        "noNotifications": "暂无通知。"
+    },
+    "dialog": {
+        "pleaseLoginFirst": "请先登录。"
+    }
+}

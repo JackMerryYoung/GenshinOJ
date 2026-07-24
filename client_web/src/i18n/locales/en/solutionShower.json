@@ -1,0 +1,24 @@
+{
+    "official": "Official",
+    "byUsername": "By {{username}}",
+    "problemNumber": "Problem {{number}}",
+    "comments": "Comments",
+    "sort": {
+        "newest": "Newest",
+        "mostLiked": "Most liked"
+    },
+    "commentPlaceholder": "Write a comment... (Markdown, @mention)",
+    "commentButton": "Comment",
+    "loadingComments": "Loading comments...",
+    "noComments": "No comments yet.",
+    "page": "Page {{current}} / {{total}}",
+    "previous": "Previous",
+    "next": "Next",
+    "solutionNotFound": "Solution {{solutionId}} is not found!",
+    "pleaseLoginFirst": "Please login first.",
+    "commentFailure": {
+        "empty": "Comment can't be empty.",
+        "invalidSession": "Your session is invalid. Please login again.",
+        "generic": "Failed to post the comment."
+    }
+}

@@ -1,0 +1,19 @@
+{
+    "byUsername": "By {{username}}",
+    "replies": "Replies",
+    "sort": {
+        "newest": "Newest",
+        "mostLiked": "Most liked"
+    },
+    "replyPlaceholder": "Write a reply... (Markdown, @mention)",
+    "loadingReplies": "Loading replies...",
+    "noRepliesYet": "No replies yet.",
+    "pageOf": "Page {{current}} / {{total}}",
+    "previous": "Previous",
+    "next": "Next",
+    "discussionNotFound": "Discussion {{discussionId}} is not found!",
+    "pleaseLoginFirst": "Please login first.",
+    "replyEmpty": "Reply can't be empty.",
+    "sessionInvalid": "Your session is invalid. Please login again.",
+    "replyPostFailed": "Failed to post the reply."
+}

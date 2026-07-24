@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, lazy } from "react";
 import { Outlet, useOutletContext, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
     makeStyles,
@@ -130,6 +131,7 @@ function TableCellForProblemList({ problem_number }: {
 }
 
 export function ProblemList({ sendJsonMessage, lastJsonMessage }: { sendJsonMessage: globals.SendJsonMessage, lastJsonMessage: unknown }) {
+    const { t } = useTranslation("problem");
     const [elapsedTime, setElapsedTime] = useState(0);
     const { problemList, loadProblemList } = useProblemList(sendJsonMessage, lastJsonMessage, setElapsedTime);
 
@@ -145,7 +147,7 @@ export function ProblemList({ sendJsonMessage, lastJsonMessage }: { sendJsonMess
                     <Table size="medium">
                         <TableHeader style={{ position: "sticky", top: 0, zIndex: 1, background: "#fff" }}>
                             <TableRow>
-                                <TableHeaderCell>Problem List</TableHeaderCell>
+                                <TableHeaderCell>{t("list.title")}</TableHeaderCell>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -167,13 +169,13 @@ export function ProblemList({ sendJsonMessage, lastJsonMessage }: { sendJsonMess
                                 <div style={{ display: "flex", blockSize: "100% 80%" }}>
                                     <ErrorCircle20Color style={{ margin: "auto" }} />
                                     <Label style={{ margin: "auto", padding: "0 0 0 8px", fontSize: "14px" }}>
-                                        Failed to fetch the problem list.
+                                        {t("error.fetchFailed")}
                                     </Label>
                                 </div>
                             </div>
                             :
                             <div style={{ display: "flex", margin: "50% 0% 50% 35%" }}>
-                                <Spinner size="tiny" label="Waiting..." delay={500} style={{ margin: "auto" }} />
+                                <Spinner size="tiny" label={t("loading.waiting")} delay={500} style={{ margin: "auto" }} />
                             </div>
                     }
                 </div>
@@ -182,6 +184,7 @@ export function ProblemList({ sendJsonMessage, lastJsonMessage }: { sendJsonMess
 }
 
 export default function Problem() {
+    const { t } = useTranslation("problem");
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const navigate = useNavigate();
     const [dialogRequireLoginOpenState, setDialogRequireLoginOpenState] = useState(false);
@@ -219,7 +222,7 @@ export default function Problem() {
         <PopupDialog
             open={dialogRequireLoginOpenState}
             setPopupDialogOpenState={setDialogRequireLoginOpenState}
-            text="Please login first."
+            text={t("dialog.pleaseLoginFirst")}
             onClose={handleCloseDialogRequireLogin} />
     </>;
 }

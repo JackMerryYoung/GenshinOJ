@@ -1,0 +1,21 @@
+{
+    "title": {
+        "root": "RsOJ首页",
+        "login": "登录",
+        "register": "注册",
+        "home": "主页",
+        "chat": "聊天",
+        "chatUser": "聊天用户",
+        "problem": "题目",
+        "problemNumber": "题目 {{number}}",
+        "submissionsList": "提交记录",
+        "submissionId": "提交 {{id}}",
+        "solutionId": "题解 {{id}}",
+        "discussion": "讨论",
+        "discussionId": "讨论 {{id}}",
+        "notification": "通知",
+        "profileOfUser": "用户 {{username}} 的资料",
+        "profileOfUserDefault": "用户资料",
+        "controlPanel": "控制面板"
+    }
+}

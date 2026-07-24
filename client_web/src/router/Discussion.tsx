@@ -1,5 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
     makeStyles,
@@ -208,6 +209,7 @@ function usePostDiscussion(sendJsonMessage: globals.SendJsonMessage, lastJsonMes
 }
 
 export default function Discussion() {
+    const { t } = useTranslation(["discussion", "common"]);
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const navigate = useNavigate();
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
@@ -252,10 +254,10 @@ export default function Discussion() {
     useEffect(() => {
         if (postFailureReason !== undefined) {
             setDialogText(postFailureReason === "empty"
-                ? "Title and content can't be empty."
+                ? t("error.titleContentEmpty")
                 : postFailureReason === "invalid_session"
-                    ? "Your session is invalid. Please login again."
-                    : "Failed to post the discussion.");
+                    ? t("error.invalidSession")
+                    : t("error.postFailed"));
             setDialogOpen(true);
         }
     }, [postFailureReason]);
@@ -269,27 +271,27 @@ export default function Discussion() {
             loginStatus.value &&
             <div className={rootStyle}>
                 <div style={{ display: "flex", alignItems: "center", columnGap: "0.75em", marginBottom: "0.75em" }}>
-                    <Label>Sort by</Label>
+                    <Label>{t("sortBy")}</Label>
                     <Dropdown
                         style={{ minWidth: "10em" }}
-                        defaultValue="Newest"
+                        defaultValue={t("sort.newest")}
                         defaultSelectedOptions={["time"]}
                         onOptionSelect={handleSortSelect}>
-                        <Option value="time">Newest</Option>
-                        <Option value="likes">Most liked</Option>
+                        <Option value="time">{t("sort.newest")}</Option>
+                        <Option value="likes">{t("sort.mostLiked")}</Option>
                     </Dropdown>
                     <Button appearance="primary" onClick={() => setShowPostForm((x) => !x)} style={{ marginLeft: "auto" }}>
-                        {showPostForm ? "Cancel" : "New discussion"}
+                        {showPostForm ? t("action.cancel", { ns: "common" }) : t("newDiscussion")}
                     </Button>
                 </div>
 
                 {
                     showPostForm &&
                     <div style={{ marginBottom: "1em", padding: "0.75em", border: "1px solid #e0e0e0", borderRadius: "4px", maxWidth: "60em" }}>
-                        <Field label="Title">
+                        <Field label={t("titleLabel")}>
                             <Input value={newTitle} onChange={(_e, d) => setNewTitle(d.value)} />
                         </Field>
-                        <Field label="Content (Markdown, @mention)" style={{ marginTop: "0.5em" }}>
+                        <Field label={t("contentLabel")} style={{ marginTop: "0.5em" }}>
                             <MentionTextarea
                                 value={newContent}
                                 onChange={setNewContent}
@@ -301,7 +303,7 @@ export default function Discussion() {
                             <Suspense fallback={<></>}>
                                 <EmojiPicker onPick={(emoji) => setNewContent((c) => c + emoji)} />
                             </Suspense>
-                            <Button appearance="primary" onClick={() => postDiscussion(newTitle, replaceEmojiShortcuts(newContent))}>Post</Button>
+                            <Button appearance="primary" onClick={() => postDiscussion(newTitle, replaceEmojiShortcuts(newContent))}>{t("post")}</Button>
                         </div>
                     </div>
                 }
@@ -309,20 +311,20 @@ export default function Discussion() {
                 {
                     discussionsList === undefined
                         ?
-                        <Spinner size="small" label="Loading discussions..." delay={300} />
+                        <Spinner size="small" label={t("loadingDiscussions")} delay={300} />
                         :
                         discussionsList.length === 0
                             ?
-                            <Label>No discussions yet. Start one!</Label>
+                            <Label>{t("noDiscussionsYet")}</Label>
                             :
                             <>
                                 <Table size="medium">
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHeaderCell style={{ width: "50%" }}>Title</TableHeaderCell>
-                                            <TableHeaderCell style={{ width: "20%" }}>Author</TableHeaderCell>
-                                            <TableHeaderCell style={{ width: "15%" }}>Votes</TableHeaderCell>
-                                            <TableHeaderCell style={{ width: "15%" }}>Posted</TableHeaderCell>
+                                            <TableHeaderCell style={{ width: "50%" }}>{t("column.title")}</TableHeaderCell>
+                                            <TableHeaderCell style={{ width: "20%" }}>{t("column.author")}</TableHeaderCell>
+                                            <TableHeaderCell style={{ width: "15%" }}>{t("column.votes")}</TableHeaderCell>
+                                            <TableHeaderCell style={{ width: "15%" }}>{t("column.posted")}</TableHeaderCell>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -347,9 +349,9 @@ export default function Discussion() {
                                     </TableBody>
                                 </Table>
                                 <div style={{ display: "flex", alignItems: "center", columnGap: "0.5em", marginTop: "0.75em" }}>
-                                    <Label>Page {discussionsListIndex} / {Math.max(totalDiscussionsListIndex, 1)}</Label>
-                                    <Button appearance="secondary" onClick={() => setDiscussionsListIndex((c) => Math.max(1, c - 1))}>Previous</Button>
-                                    <Button appearance="secondary" onClick={() => setDiscussionsListIndex((c) => Math.max(1, Math.min(totalDiscussionsListIndex, c + 1)))}>Next</Button>
+                                    <Label>{t("pageOf", { current: discussionsListIndex, total: Math.max(totalDiscussionsListIndex, 1) })}</Label>
+                                    <Button appearance="secondary" onClick={() => setDiscussionsListIndex((c) => Math.max(1, c - 1))}>{t("previous")}</Button>
+                                    <Button appearance="secondary" onClick={() => setDiscussionsListIndex((c) => Math.max(1, Math.min(totalDiscussionsListIndex, c + 1)))}>{t("next")}</Button>
                                 </div>
                             </>
                 }
@@ -365,7 +367,7 @@ export default function Discussion() {
             <PopupDialog
                 open={dialogRequireLoginOpenState}
                 setPopupDialogOpenState={setDialogRequireLoginOpenState}
-                text="Please login first."
+                text={t("pleaseLoginFirst")}
                 onClose={() => navigate("/login")} />
         </Suspense>
     </>;

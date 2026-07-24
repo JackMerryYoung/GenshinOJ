@@ -1,0 +1,22 @@
+{
+    "action": {
+        "submit": "提交",
+        "cancel": "取消",
+        "confirm": "确认",
+        "save": "保存",
+        "delete": "删除",
+        "edit": "编辑",
+        "close": "关闭",
+        "back": "返回",
+        "loading": "加载中...",
+        "search": "搜索",
+        "send": "发送",
+        "reply": "回复",
+        "ok": "好的"
+    },
+    "language": {
+        "label": "语言",
+        "en": "English",
+        "zhCN": "简体中文"
+    }
+}

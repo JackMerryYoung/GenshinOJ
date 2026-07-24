@@ -1,0 +1,14 @@
+{
+    "field": {
+        "username": "Login Username",
+        "password": "Login Password"
+    },
+    "button": {
+        "login": "Login"
+    },
+    "dialog": {
+        "alreadyLoggedIn": "You have already logged in.",
+        "loginFailed": "Login failed. Maybe you used a wrong password or username?",
+        "loginSuccess": "Login successfully."
+    }
+}

@@ -1,0 +1,74 @@
+{
+    "title": {
+        "edit": "Edit Problem #{{number}}",
+        "create": "Create New Problem"
+    },
+    "tabs": {
+        "basic": "Basic Info",
+        "statement": "Problem Statement",
+        "testdata": "Test Data"
+    },
+    "basic": {
+        "problemNumber": {
+            "label": "Problem Number",
+            "placeholder": "Enter problem number"
+        },
+        "problemName": {
+            "label": "Problem Name",
+            "placeholder": "Enter problem name"
+        },
+        "difficulty": {
+            "label": "Difficulty",
+            "unknown": "Unknown",
+            "beginner": "Beginner",
+            "primary": "Primary",
+            "junior": "Junior",
+            "senior": "Senior",
+            "advanced": "Advanced",
+            "hard": "Hard",
+            "grand": "Grand"
+        },
+        "timeLimit": {
+            "label": "Time Limit (ms)"
+        },
+        "memoryLimit": {
+            "label": "Memory Limit (MB)"
+        }
+    },
+    "statement": {
+        "label": "Problem Statement (Markdown + LaTeX)",
+        "preview": "Preview",
+        "placeholder": "Enter problem statement using Markdown. Use $...$ for inline math and $$...$$ for block math.",
+        "tip": "Tip: Use $x^2$ for inline math, $$\\int_0^1 f(x)dx$$ for block math"
+    },
+    "testdata": {
+        "title": "Test Cases",
+        "addTestCase": "Add Test Case",
+        "empty": "No test cases yet. Click \"Add Test Case\" to create one.",
+        "caseTitle": "Test Case {{number}}",
+        "inputFile": {
+            "label": "Input File",
+            "placeholder": "No file uploaded"
+        },
+        "outputFile": {
+            "label": "Output File",
+            "placeholder": "No file uploaded"
+        },
+        "timeLimit": {
+            "label": "Time Limit (ms)"
+        },
+        "memoryLimit": {
+            "label": "Memory Limit (MB)"
+        },
+        "score": {
+            "label": "Score"
+        },
+        "uploading": "Uploading..."
+    },
+    "message": {
+        "saveFailedWithReason": "Failed to save problem: {{message}}",
+        "saveFailedGeneric": "Failed to save problem",
+        "uploadFailedWithReason": "Upload failed: {{message}}",
+        "uploadFailedGeneric": "Upload failed"
+    }
+}

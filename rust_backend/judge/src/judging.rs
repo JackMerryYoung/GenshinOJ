@@ -110,7 +110,7 @@ pub async fn judge_submission(
         }
     };
 
-    let tmp_dir = std::env::temp_dir().join(format!("genshinoj_judge_{}", uuid::Uuid::new_v4()));
+    let tmp_dir = std::env::temp_dir().join(format!("rsoj_judge_{}", uuid::Uuid::new_v4()));
     if std::fs::create_dir_all(&tmp_dir).is_err() {
         return all_failed(testcase_config.testcases.len(), "JE");
     }

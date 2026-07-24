@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogSurface,
@@ -39,6 +40,7 @@ interface ProblemEditorProps {
 }
 
 export default function ProblemEditor({ isOpen, onClose, problemNumber, onSuccess }: ProblemEditorProps) {
+  const { t } = useTranslation(['problemEditor', 'common']);
   const [activeTab, setActiveTab] = useState<'basic' | 'statement' | 'testdata'>('basic');
   const [loading, setLoading] = useState(false);
 
@@ -194,10 +196,10 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
         onSuccess();
         onClose();
       } else {
-        alert(`Failed to save problem: ${data.message}`);
+        alert(t('message.saveFailedWithReason', { message: data.message }));
       }
     } catch (err) {
-      alert('Failed to save problem');
+      alert(t('message.saveFailedGeneric'));
     } finally {
       setLoading(false);
     }
@@ -229,10 +231,10 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
         }
         setTestCases(newTestCases);
       } else {
-        alert(`Upload failed: ${data.message}`);
+        alert(t('message.uploadFailedWithReason', { message: data.message }));
       }
     } catch (err) {
-      alert('Upload failed');
+      alert(t('message.uploadFailedGeneric'));
     } finally {
       setUploadingData(false);
     }
@@ -282,25 +284,25 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
         />
       )}
       <DialogSurface style={{ maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-        <DialogTitle>{displayNumber ? `Edit Problem #${displayNumber}` : 'Create New Problem'}</DialogTitle>
+        <DialogTitle>{displayNumber ? t('title.edit', { number: displayNumber }) : t('title.create')}</DialogTitle>
         <DialogBody style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
           <DialogContent style={{ overflowY: 'auto', flex: 1, minHeight: 0, maxHeight: '65vh' }}>
             {loading ? (
-              <Spinner label="Loading..." />
+              <Spinner label={t('action.loading', { ns: 'common' })} />
             ) : (
               <>
                 <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #e0e0e0' }}>
                   {(
                     [
-                      { value: 'basic', label: 'Basic Info' },
-                      { value: 'statement', label: 'Problem Statement' },
-                      { value: 'testdata', label: 'Test Data' },
+                      { value: 'basic', label: t('tabs.basic') },
+                      { value: 'statement', label: t('tabs.statement') },
+                      { value: 'testdata', label: t('tabs.testdata') },
                     ] as const
-                  ).map((t) => (
+                  ).map((tab) => (
                     <button
-                      key={t.value}
+                      key={tab.value}
                       type="button"
-                      onClick={() => setActiveTab(t.value)}
+                      onClick={() => setActiveTab(tab.value)}
                       style={{
                         appearance: 'none',
                         background: 'none',
@@ -309,12 +311,12 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                         padding: '8px 16px',
                         fontSize: '14px',
                         fontFamily: 'inherit',
-                        color: activeTab === t.value ? '#0f6cbd' : '#242424',
-                        borderBottom: activeTab === t.value ? '2px solid #0f6cbd' : '2px solid transparent',
+                        color: activeTab === tab.value ? '#0f6cbd' : '#242424',
+                        borderBottom: activeTab === tab.value ? '2px solid #0f6cbd' : '2px solid transparent',
                         marginBottom: '-2px',
                       }}
                     >
-                      {t.label}
+                      {tab.label}
                     </button>
                   ))}
                 </div>
@@ -323,38 +325,38 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                   {activeTab === 'basic' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       {!displayNumber && (
-                        <Field label="Problem Number" required>
+                        <Field label={t('basic.problemNumber.label')} required>
                           <Input
                             type="number"
                             value={newProblemNumber}
                             onChange={(_ev, data) => setNewProblemNumber(data.value)}
-                            placeholder="Enter problem number"
+                            placeholder={t('basic.problemNumber.placeholder')}
                           />
                         </Field>
                       )}
-                      <Field label="Problem Name" required>
+                      <Field label={t('basic.problemName.label')} required>
                         <Input
                           value={problemName}
                           onChange={(_ev, data) => setProblemName(data.value)}
-                          placeholder="Enter problem name"
+                          placeholder={t('basic.problemName.placeholder')}
                         />
                       </Field>
 
-                      <Field label="Difficulty" required>
+                      <Field label={t('basic.difficulty.label')} required>
                         <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
-                          <option value="0">Unknown</option>
-                          <option value="1">Beginner</option>
-                          <option value="2">Primary</option>
-                          <option value="3">Junior</option>
-                          <option value="4">Senior</option>
-                          <option value="5">Advanced</option>
-                          <option value="6">Hard</option>
-                          <option value="7">Grand</option>
+                          <option value="0">{t('basic.difficulty.unknown')}</option>
+                          <option value="1">{t('basic.difficulty.beginner')}</option>
+                          <option value="2">{t('basic.difficulty.primary')}</option>
+                          <option value="3">{t('basic.difficulty.junior')}</option>
+                          <option value="4">{t('basic.difficulty.senior')}</option>
+                          <option value="5">{t('basic.difficulty.advanced')}</option>
+                          <option value="6">{t('basic.difficulty.hard')}</option>
+                          <option value="7">{t('basic.difficulty.grand')}</option>
                         </Select>
                       </Field>
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <Field label="Time Limit (ms)">
+                        <Field label={t('basic.timeLimit.label')}>
                           <Input
                             type="number"
                             value={timeLimit}
@@ -362,7 +364,7 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                           />
                         </Field>
 
-                        <Field label="Memory Limit (MB)">
+                        <Field label={t('basic.memoryLimit.label')}>
                           <Input
                             type="number"
                             value={memoryLimit}
@@ -376,12 +378,12 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                   {activeTab === 'statement' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text weight="semibold">Problem Statement (Markdown + LaTeX)</Text>
+                        <Text weight="semibold">{t('statement.label')}</Text>
                         <Button
                           appearance="subtle"
                           onClick={() => setShowPreview(!showPreview)}
                         >
-                          {showPreview ? 'Edit' : 'Preview'}
+                          {showPreview ? t('action.edit', { ns: 'common' }) : t('statement.preview')}
                         </Button>
                       </div>
 
@@ -398,14 +400,14 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                         <Textarea
                           value={statement}
                           onChange={(_ev, data) => setStatement(data.value)}
-                          placeholder="Enter problem statement using Markdown. Use $...$ for inline math and $$...$$ for block math."
+                          placeholder={t('statement.placeholder')}
                           rows={20}
                           style={{ fontFamily: 'monospace' }}
                         />
                       )}
 
                       <Text size={200} style={{ color: 'gray' }}>
-                        Tip: Use $x^2$ for inline math, $$\int_0^1 f(x)dx$$ for block math
+                        {t('statement.tip')}
                       </Text>
                     </div>
                   )}
@@ -413,23 +415,23 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                   {activeTab === 'testdata' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text weight="semibold">Test Cases</Text>
+                        <Text weight="semibold">{t('testdata.title')}</Text>
                         <Button
                           appearance="primary"
                           icon={<AddRegular />}
                           onClick={addTestCase}
                         >
-                          Add Test Case
+                          {t('testdata.addTestCase')}
                         </Button>
                       </div>
 
                       {testCases.length === 0 ? (
-                        <Text>No test cases yet. Click "Add Test Case" to create one.</Text>
+                        <Text>{t('testdata.empty')}</Text>
                       ) : (
                         testCases.map((tc, index) => (
                           <Card key={index} style={{ padding: '16px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                              <Text weight="semibold">Test Case {index + 1}</Text>
+                              <Text weight="semibold">{t('testdata.caseTitle', { number: index + 1 })}</Text>
                               <Button
                                 appearance="subtle"
                                 icon={<DeleteRegular />}
@@ -438,12 +440,12 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                              <Field label="Input File">
+                              <Field label={t('testdata.inputFile.label')}>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                   <Input
                                     value={tc.input_file}
                                     readOnly
-                                    placeholder="No file uploaded"
+                                    placeholder={t('testdata.inputFile.placeholder')}
                                     style={{ flex: 1 }}
                                   />
                                   <Button
@@ -460,12 +462,12 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                                 </div>
                               </Field>
 
-                              <Field label="Output File">
+                              <Field label={t('testdata.outputFile.label')}>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                   <Input
                                     value={tc.output_file}
                                     readOnly
-                                    placeholder="No file uploaded"
+                                    placeholder={t('testdata.outputFile.placeholder')}
                                     style={{ flex: 1 }}
                                   />
                                   <Button
@@ -482,7 +484,7 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                                 </div>
                               </Field>
 
-                              <Field label="Time Limit (ms)">
+                              <Field label={t('testdata.timeLimit.label')}>
                                 <Input
                                   type="number"
                                   value={tc.time_limit.toString()}
@@ -490,7 +492,7 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                                 />
                               </Field>
 
-                              <Field label="Memory Limit (MB)">
+                              <Field label={t('testdata.memoryLimit.label')}>
                                 <Input
                                   type="number"
                                   value={tc.memory_limit.toString()}
@@ -498,7 +500,7 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                                 />
                               </Field>
 
-                              <Field label="Score">
+                              <Field label={t('testdata.score.label')}>
                                 <Input
                                   type="number"
                                   value={tc.score.toString()}
@@ -510,7 +512,7 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
                         ))
                       )}
 
-                      {uploadingData && <Spinner label="Uploading..." />}
+                      {uploadingData && <Spinner label={t('testdata.uploading')} />}
                     </div>
                   )}
                 </div>
@@ -520,10 +522,10 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
         </DialogBody>
         <DialogActions style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e0e0e0' }}>
           <Button appearance="secondary" onClick={onClose}>
-            Cancel
+            {t('action.cancel', { ns: 'common' })}
           </Button>
           <Button appearance="primary" onClick={handleSave} disabled={loading || !problemName}>
-            Save
+            {t('action.save', { ns: 'common' })}
           </Button>
         </DialogActions>
       </DialogSurface>

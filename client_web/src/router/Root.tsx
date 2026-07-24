@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { FluentProvider, webLightTheme, Toaster, useToastController, useId, Toast, ToastTitle, ToastBody } from "@fluentui/react-components";
 
@@ -28,6 +29,7 @@ import Footer from "./Footer.tsx";
 const AFK_CLOSE_CODE = 4000;
 
 export default function Root() {
+    const { t } = useTranslation("root");
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
     const loginUsername = useSelector((state: RootState) => state.loginUsername);
     const sessionToken = useSelector((state: RootState) => state.sessionToken);
@@ -63,8 +65,8 @@ export default function Root() {
             if (event.code === AFK_CLOSE_CODE || event.reason === "afk_timeout") {
                 dispatchToast(
                     <Toast>
-                        <ToastTitle>Disconnected</ToastTitle>
-                        <ToastBody>You were disconnected after 10 minutes of inactivity. Please sign in again.</ToastBody>
+                        <ToastTitle>{t("toast.disconnected.title")}</ToastTitle>
+                        <ToastBody>{t("toast.disconnected.body")}</ToastBody>
                     </Toast>,
                     { intent: "warning", timeout: 8000 }
                 );

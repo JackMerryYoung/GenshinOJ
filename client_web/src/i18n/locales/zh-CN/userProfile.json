@@ -1,0 +1,16 @@
+{
+    "avatarUploader": {
+        "fileTooLarge": "文件超过 1MB 限制。",
+        "uploadFailed": "头像上传失败。",
+        "uploading": "上传中...",
+        "uploadAvatar": "上传头像"
+    },
+    "follow": "关注",
+    "mutualFollowed": "互相关注",
+    "followed": "已关注",
+    "usernameLabel": "用户名：{{username}}",
+    "acceptedLabel": "已通过：{{count}}",
+    "testAcceptedLabel": "测试通过：{{count}}",
+    "generalLabel": "综合：{{count}}",
+    "pleaseLoginFirst": "请先登录。"
+}

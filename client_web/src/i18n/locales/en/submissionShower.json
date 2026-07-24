@@ -1,0 +1,19 @@
+{
+    "action": {
+        "copy": "Copy",
+        "copied": "Copied"
+    },
+    "submissionId": "Submission ID",
+    "submissionProblem": "Submission Problem",
+    "status": "Status",
+    "waiting": "Waiting...",
+    "score": "Score",
+    "language": "Language",
+    "submitter": "Submitter",
+    "column": {
+        "testCaseId": "Test Case ID"
+    },
+    "code": "Code",
+    "submissionNotFound": "Submission {{submissionId}} is not found!",
+    "pleaseLoginFirst": "Please login first."
+}

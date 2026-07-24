@@ -1,0 +1,19 @@
+{
+    "action": {
+        "copy": "复制",
+        "copied": "已复制"
+    },
+    "submissionId": "提交 ID",
+    "submissionProblem": "提交题目",
+    "status": "状态",
+    "waiting": "等待中...",
+    "score": "分数",
+    "language": "语言",
+    "submitter": "提交者",
+    "column": {
+        "testCaseId": "测试点 ID"
+    },
+    "code": "代码",
+    "submissionNotFound": "未找到提交 {{submissionId}}！",
+    "pleaseLoginFirst": "请先登录。"
+}

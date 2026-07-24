@@ -1,0 +1,14 @@
+{
+    "list": {
+        "title": "Problem List"
+    },
+    "error": {
+        "fetchFailed": "Failed to fetch the problem list."
+    },
+    "loading": {
+        "waiting": "Waiting..."
+    },
+    "dialog": {
+        "pleaseLoginFirst": "Please login first."
+    }
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useLoaderData, useNavigate, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { Input, Button, Field, Popover, PopoverTrigger, PopoverSurface, Link, Subtitle1 } from "@fluentui/react-components";
 import { EmojiRegular } from "@fluentui/react-icons";
@@ -231,6 +232,7 @@ interface ChatInfo {
 }
 
 export default function ChatMainUser() {
+    const { t } = useTranslation(["chatMainUser", "common"]);
     const { toUsername } = (useLoaderData() as ChatInfo);
     const navigate = useNavigate();
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
@@ -288,7 +290,7 @@ export default function ChatMainUser() {
         <div style={{ display: "block", height: "80%" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "10px 0.5em 20px 0.5em" }}>
                 <Subtitle1>{toUsername}</Subtitle1>
-                <Link onClick={() => navigate("/user/" + toUsername)}>View Profile</Link>
+                <Link onClick={() => navigate("/user/" + toUsername)}>{t("viewProfile")}</Link>
             </div>
             <div className="scroll-bar-wrap">
                 <div
@@ -312,7 +314,7 @@ export default function ChatMainUser() {
             </div>
             <div style={{ display: "flex", flexDirection: "row", width: "fill", alignItems: "end" }}>
                 <form>
-                    <Field label="Input to chat" style={{ maxWidth: "300px", flex: 3, marginBottom: "3px" }}>
+                    <Field label={t("inputToChat")} style={{ maxWidth: "300px", flex: 3, marginBottom: "3px" }}>
                         <Input type="text" id="chat-input" value={chatMessageToSend} onChange={(props) => setChatMessageToSend(props.target.value)} />
                     </Field>
                     <Popover>
@@ -336,7 +338,7 @@ export default function ChatMainUser() {
                             </div>
                         </PopoverSurface>
                     </Popover>
-                    <Button onClick={handleClickSendChatMessage} style={{ flex: 1 }} appearance="primary">Send</Button>
+                    <Button onClick={handleClickSendChatMessage} style={{ flex: 1 }} appearance="primary">{t("action.send", { ns: "common" })}</Button>
                 </form>
             </div>
         </div>

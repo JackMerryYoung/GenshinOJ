@@ -1,5 +1,6 @@
 import { useEffect, useState, lazy } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 const PopupDialog = lazy(() => import("./PopupDialog.tsx"));
 
@@ -9,6 +10,7 @@ import { RootState } from "../store.ts";
 
 
 export default function Logout() {
+    const { t } = useTranslation("logout");
     const { sendJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const [dialogLogoutSuccessOpenState, setDialogLogoutSuccessOpenState] = useState(false);
 
@@ -32,7 +34,7 @@ export default function Logout() {
         <PopupDialog
             open={dialogLogoutSuccessOpenState}
             setPopupDialogOpenState={setDialogLogoutSuccessOpenState}
-            text="Logout Successfully. Navigating to Home Page..."
+            text={t("logoutSuccessMessage")}
             onClose={handleGoHome} />
     </>;
 }

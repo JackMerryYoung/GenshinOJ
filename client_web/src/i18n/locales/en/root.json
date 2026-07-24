@@ -1,0 +1,8 @@
+{
+    "toast": {
+        "disconnected": {
+            "title": "Disconnected",
+            "body": "You were disconnected after 10 minutes of inactivity. Please sign in again."
+        }
+    }
+}

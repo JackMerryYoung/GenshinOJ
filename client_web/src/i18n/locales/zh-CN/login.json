@@ -1,0 +1,14 @@
+{
+    "field": {
+        "username": "登录用户名",
+        "password": "登录密码"
+    },
+    "button": {
+        "login": "登录"
+    },
+    "dialog": {
+        "alreadyLoggedIn": "您已经登录过了。",
+        "loginFailed": "登录失败。可能是用户名或密码错误？",
+        "loginSuccess": "登录成功。"
+    }
+}

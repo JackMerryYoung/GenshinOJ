@@ -1,0 +1,22 @@
+{
+    "difficulty": {
+        "unknown": "Unknown",
+        "beginner": "Beginner",
+        "primary": "Primary",
+        "junior": "Junior",
+        "senior": "Senior",
+        "advanced": "Advanced",
+        "hard": "Hard",
+        "grand": "Grand"
+    },
+    "problemTitle": "P{{number}} - {{name}}",
+    "tab": {
+        "statement": "Statement",
+        "solutions": "Solutions"
+    },
+    "problemStatement": "Problem Statement",
+    "submitCode": "Submit Code",
+    "testSubmissionMode": "Test Submission Mode",
+    "submitSuccessNavigating": "Submit Successfully. Navigating to your submission...",
+    "codeLanguage": "Code Language"
+}

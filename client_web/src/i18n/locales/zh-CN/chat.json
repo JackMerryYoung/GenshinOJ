@@ -1,0 +1,10 @@
+{
+    "searchUsersPlaceholder": "搜索用户...",
+    "searchResults": "搜索结果",
+    "searching": "搜索中...",
+    "noUsersFound": "未找到用户。",
+    "friends": "好友",
+    "waiting": "加载中...",
+    "noFriendsYet": "还没有好友。请在上方搜索以找到聊天对象。",
+    "pleaseLoginFirst": "请先登录。"
+}

@@ -1,0 +1,22 @@
+{
+    "difficulty": {
+        "unknown": "未知",
+        "beginner": "入门",
+        "primary": "基础",
+        "junior": "普及",
+        "senior": "提高",
+        "advanced": "进阶",
+        "hard": "困难",
+        "grand": "顶尖"
+    },
+    "problemTitle": "P{{number}} - {{name}}",
+    "tab": {
+        "statement": "题目描述",
+        "solutions": "题解"
+    },
+    "problemStatement": "题目描述",
+    "submitCode": "提交代码",
+    "testSubmissionMode": "测试提交模式",
+    "submitSuccessNavigating": "提交成功，正在跳转到你的提交记录……",
+    "codeLanguage": "代码语言"
+}

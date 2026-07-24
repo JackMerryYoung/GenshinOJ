@@ -473,7 +473,7 @@ class UserScreen(textual.screen.Screen):
 
     def compose(self) -> textual.app.ComposeResult:
         yield textual.containers.Grid(
-            textual.widgets.Label("Genshin OJ Client (Main)"),
+            textual.widgets.Label("RsOJ Client (Main)"),
             textual.widgets.Input(placeholder="Command Input", id="command_input"),
             textual.widgets.Button("Exit", variant="error", id="command_exit_button"),
             textual.widgets.Button("Confirm", id="command_confirm_button"),
@@ -522,7 +522,7 @@ class RsOJClient(textual.app.App):
     BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
 
     def compose(self) -> textual.app.ComposeResult:
-        self.title = "Genshin OJ Client (TUI)"
+        self.title = "RsOJ Client (TUI)"
         self.sub_title = "Startup Session"
         self.id = "main_tui_app"
         self.buttonLogin = textual.widgets.Button("Login", id="login")

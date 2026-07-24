@@ -1,5 +1,6 @@
 import { useState, useEffect, BaseSyntheticEvent, lazy, ReactNode, Suspense } from "react";
 import { useLoaderData, useNavigate, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { ClipboardCheckmarkRegular, ClipboardCodeRegular, ClipboardTaskFilled, ReOrderDotsHorizontalRegular, StatusRegular } from "@fluentui/react-icons";
 import { Label, Spinner, Table, TableBody, TableHeader, TableHeaderCell, TableCell, TableRow } from "@fluentui/react-components";
@@ -38,18 +39,19 @@ interface SubmissionResult {
 function CopyToTheClipboardButton({ content }: {
     content: string;
 }) {
-    const [tipText, setTipText] = useState("Copy");
+    const { t } = useTranslation("submissionShower");
+    const [tipText, setTipText] = useState(t("action.copy"));
     const [tipIcon, setTipIcon] = useState<ReactNode>(<ClipboardCodeRegular fontSize="1.1em" style={{ margin: "0 0.25em 0 0" }} />);
     useEffect(() => {
-        if (tipText === "Copied")
+        if (tipText === t("action.copied"))
             setTimeout(() => {
-                if (tipText === "Copied") setTipText("Copy"), setTipIcon(<ClipboardCodeRegular fontSize="1.1em" style={{ margin: "0 0.25em 0 0" }} />);
+                if (tipText === t("action.copied")) setTipText(t("action.copy")), setTipIcon(<ClipboardCodeRegular fontSize="1.1em" style={{ margin: "0 0.25em 0 0" }} />);
             }, 500);
     }, [tipText]);
 
     const handleOnClick = (_: BaseSyntheticEvent) => {
         copy(content);
-        setTipText("Copied");
+        setTipText(t("action.copied"));
         setTipIcon(<ClipboardTaskFilled fontSize="1.1em" style={{ margin: "0 0.25em 0 0" }} />);
     };
 
@@ -176,6 +178,7 @@ export default function SubmissionShower() {
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
     const { submissionResult, loadSubmissionResult } = useSubmissionResult(sendJsonMessage, lastJsonMessage, submissionId);
     const navigate = useNavigate();
+    const { t } = useTranslation("submissionShower");
 
     const convertCodeToRenderString = (x: string[]) => {
         let renderString: string = "";
@@ -215,12 +218,12 @@ export default function SubmissionShower() {
             loginStatus.value && (
                 <div style={{ padding: "0.25em 0", maxWidth: "90%" }}>
                     <div style={{ display: "flex", marginBottom: "0.75em" }}>
-                        <Label style={{ margin: "0.20em 0.15em 0.20em 0.85em" }}>Submission ID: {submissionResult?.submission_id}</Label>
+                        <Label style={{ margin: "0.20em 0.15em 0.20em 0.85em" }}>{t("submissionId")}: {submissionResult?.submission_id}</Label>
                         {
                             submissionResult !== undefined && submissionResult.result !== "SNF"
                                 ?
                                 <>
-                                    <div style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>Submission Problem:&nbsp;
+                                    <div style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>{t("submissionProblem")}:&nbsp;
                                         <Label style={{ color: "#4183C4" }}
                                             onMouseEnter={(e) => { (e.target as HTMLTableCellElement).style.color = "#0056B3"; (e.target as HTMLTableCellElement).style.cursor = "pointer"; }}
                                             onMouseLeave={(e) => { (e.target as HTMLTableCellElement).style.color = "#4183C4"; (e.target as HTMLTableCellElement).style.cursor = "default"; }}
@@ -233,15 +236,15 @@ export default function SubmissionShower() {
                                             submissionResult.result === "PD"
                                                 ?
                                                 <>
-                                                    <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>Status:&nbsp;</Label>
-                                                    <Spinner style={{ margin: "0.20em 0" }} size="tiny" label="Waiting..." delay={500} />
+                                                    <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>{t("status")}:&nbsp;</Label>
+                                                    <Spinner style={{ margin: "0.20em 0" }} size="tiny" label={t("waiting")} delay={500} />
                                                 </>
                                                 :
                                                 (
                                                     submissionResult.result === "AC"
                                                         ?
                                                         <>
-                                                            <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>Status:&nbsp;</Label>
+                                                            <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>{t("status")}:&nbsp;</Label>
                                                             <Label style={{ margin: "0.20em 0", color: "#3AAF00" }}>AC</Label>
                                                         </>
                                                         :
@@ -249,7 +252,7 @@ export default function SubmissionShower() {
                                                             submissionResult.result === "CE"
                                                                 ?
                                                                 <>
-                                                                    <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>Status:&nbsp;</Label>
+                                                                    <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>{t("status")}:&nbsp;</Label>
                                                                     <Label style={{ margin: "0.20em 0", color: "#FDDB10" }}>CE</Label>
                                                                 </>
                                                                 :
@@ -257,7 +260,7 @@ export default function SubmissionShower() {
                                                                     submissionResult.result === "WA"
                                                                         ?
                                                                         <>
-                                                                            <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>Status:&nbsp;</Label>
+                                                                            <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>{t("status")}:&nbsp;</Label>
                                                                             <Label style={{ margin: "0.20em 0", color: "#DA3737" }}>WA</Label>
                                                                         </>
                                                                         :
@@ -269,7 +272,7 @@ export default function SubmissionShower() {
                                                 )
                                         )
                                     }
-                                    <Label style={{ margin: "0.20em 0.15em 0.20em 1.85em" }}>Score:&nbsp;</Label>
+                                    <Label style={{ margin: "0.20em 0.15em 0.20em 1.85em" }}>{t("score")}:&nbsp;</Label>
                                     {
                                         submissionResult.general_score !== undefined
                                             ?
@@ -283,8 +286,8 @@ export default function SubmissionShower() {
                                             <Label>{`-`}</Label>
                                     }
 
-                                    <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>Language:&nbsp;{submissionResult.language}</Label>
-                                    <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>Submitter:&nbsp;{submissionResult.username}</Label>
+                                    <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>{t("language")}:&nbsp;{submissionResult.language}</Label>
+                                    <Label style={{ margin: "0.20em 0.15em 0.20em 1.55em" }}>{t("submitter")}:&nbsp;{submissionResult.username}</Label>
                                 </>
                                 :
                                 <></>
@@ -297,9 +300,9 @@ export default function SubmissionShower() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHeaderCell><ReOrderDotsHorizontalRegular fontSize="1.4em" /><Label>Test Case ID</Label></TableHeaderCell>
-                                            <TableHeaderCell><StatusRegular fontSize="1.4em" /><Label>Status</Label></TableHeaderCell>
-                                            <TableHeaderCell><ClipboardCheckmarkRegular fontSize="1.4em" /><Label>Score</Label></TableHeaderCell>
+                                            <TableHeaderCell><ReOrderDotsHorizontalRegular fontSize="1.4em" /><Label>{t("column.testCaseId")}</Label></TableHeaderCell>
+                                            <TableHeaderCell><StatusRegular fontSize="1.4em" /><Label>{t("status")}</Label></TableHeaderCell>
+                                            <TableHeaderCell><ClipboardCheckmarkRegular fontSize="1.4em" /><Label>{t("score")}</Label></TableHeaderCell>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -329,7 +332,7 @@ export default function SubmissionShower() {
                             ?
                             <div>
                                 <div style={{ marginLeft: "0.85em", display: "flex" }}>
-                                    <Label style={{ marginRight: "auto" }}>Code:&nbsp;</Label>
+                                    <Label style={{ marginRight: "auto" }}>{t("code")}:&nbsp;</Label>
                                     <CopyToTheClipboardButton content={convertCodeToRenderString(submissionResult.code)} />
                                 </div>
                                 <div>
@@ -348,12 +351,12 @@ export default function SubmissionShower() {
         <PopupDialog
             open={dialogSubmissionNotFoundOpenState}
             setPopupDialogOpenState={setDialogSubmissionNotFoundOpenState}
-            text={`Submission ${submissionId} is not found!`}
+            text={t("submissionNotFound", { submissionId })}
             onClose={handleNavigateBackward} />
         <PopupDialog
             open={dialogRequireLoginOpenState}
             setPopupDialogOpenState={setDialogRequireLoginOpenState}
-            text="Please login first."
+            text={t("pleaseLoginFirst")}
             onClose={handleNavigateLogin} />
     </>
 }

@@ -1,0 +1,13 @@
+{
+    "tab": {
+        "problem": "Problem",
+        "submission": "Submission",
+        "discuss": "Discuss",
+        "notification": "Notification",
+        "signOut": "Sign out",
+        "user": "User",
+        "chat": "Chat",
+        "signIn": "Sign in",
+        "signUp": "Sign up"
+    }
+}

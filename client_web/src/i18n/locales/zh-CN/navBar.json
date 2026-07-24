@@ -1,0 +1,13 @@
+{
+    "tab": {
+        "problem": "题目",
+        "submission": "提交",
+        "discuss": "讨论",
+        "notification": "通知",
+        "signOut": "退出登录",
+        "user": "用户",
+        "chat": "聊天",
+        "signIn": "登录",
+        "signUp": "注册"
+    }
+}

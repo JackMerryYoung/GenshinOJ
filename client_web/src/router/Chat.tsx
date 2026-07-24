@@ -1,5 +1,6 @@
 import { useEffect, useState, lazy } from "react";
 import { useNavigate, Outlet, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
     makeStyles,
@@ -198,6 +199,7 @@ export function ChatList({ sendJsonMessage, lastJsonMessage }: {
     const { friendsList, fetchFriendsList } = useFriendsList(sendJsonMessage, lastJsonMessage, loginUsername.value);
     const { searchResults, searchUsers } = useSearchUsers(sendJsonMessage, lastJsonMessage, loginUsername.value);
     const [searchQuery, setSearchQuery] = useState("");
+    const { t } = useTranslation("chat");
 
     useEffect(() => {
         if (loginStatus.value === true) fetchFriendsList();
@@ -213,7 +215,7 @@ export function ChatList({ sendJsonMessage, lastJsonMessage }: {
         <div className="scroll-box" style={{ display: "block", overflowY: "auto", maxHeight: "60vh", marginTop: "0.5em" }}>
             <div style={{ margin: "0.4em" }}>
                 <Input
-                    placeholder="Search users..."
+                    placeholder={t("searchUsersPlaceholder")}
                     value={searchQuery}
                     onChange={(_ev, data) => setSearchQuery(data.value)} />
             </div>
@@ -222,7 +224,7 @@ export function ChatList({ sendJsonMessage, lastJsonMessage }: {
                 <Table size="medium">
                     <TableHeader style={{ position: "sticky", top: 0, zIndex: 1, background: "#fff" }}>
                         <TableRow>
-                            <TableHeaderCell>Search Results</TableHeaderCell>
+                            <TableHeaderCell>{t("searchResults")}</TableHeaderCell>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -230,13 +232,13 @@ export function ChatList({ sendJsonMessage, lastJsonMessage }: {
                             searchResults === undefined
                                 ?
                                 <TableRow>
-                                    <TableCell><Spinner size="tiny" label="Searching..." delay={300} /></TableCell>
+                                    <TableCell><Spinner size="tiny" label={t("searching")} delay={300} /></TableCell>
                                 </TableRow>
                                 :
                                 searchResults.length === 0
                                     ?
                                     <TableRow>
-                                        <TableCell><Label>No users found.</Label></TableCell>
+                                        <TableCell><Label>{t("noUsersFound")}</Label></TableCell>
                                     </TableRow>
                                     :
                                     searchResults.map((username: string) => <UserRow key={username} username={username} />)
@@ -247,7 +249,7 @@ export function ChatList({ sendJsonMessage, lastJsonMessage }: {
             <Table size="medium">
                 <TableHeader style={{ position: "sticky", top: 0, zIndex: 1, background: "#fff" }}>
                     <TableRow>
-                        <TableHeaderCell>Friends</TableHeaderCell>
+                        <TableHeaderCell>{t("friends")}</TableHeaderCell>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -255,13 +257,13 @@ export function ChatList({ sendJsonMessage, lastJsonMessage }: {
                         friendsList === undefined
                             ?
                             <TableRow>
-                                <TableCell><Spinner size="large" label="Waiting..." delay={500} /></TableCell>
+                                <TableCell><Spinner size="large" label={t("waiting")} delay={500} /></TableCell>
                             </TableRow>
                             :
                             friendsList.length === 0
                                 ?
                                 <TableRow>
-                                    <TableCell><Label>No friends yet. Search above to find someone to chat with.</Label></TableCell>
+                                    <TableCell><Label>{t("noFriendsYet")}</Label></TableCell>
                                 </TableRow>
                                 :
                                 friendsList.map((username: string) => <UserRow key={username} username={username} />)
@@ -278,6 +280,7 @@ export default function Chat() {
     const [dialogRequireLoginOpenState, setDialogRequireLoginOpenState] = useState(false);
     const navigate = useNavigate();
     const style = useStyles();
+    const { t } = useTranslation("chat");
 
     useEffect(() => {
         const localLoginStatus = localStorage.getItem("loginStatus");
@@ -307,7 +310,7 @@ export default function Chat() {
         <PopupDialog
             open={dialogRequireLoginOpenState}
             setPopupDialogOpenState={setDialogRequireLoginOpenState}
-            text="Please login first."
+            text={t("pleaseLoginFirst")}
             onClose={() => navigate("/login")} />
     </>;
 }

@@ -1,0 +1,30 @@
+{
+    "error": {
+        "emptyTitleContent": "Title and content can't be empty.",
+        "invalidSession": "Your session is invalid. Please login again.",
+        "postFailed": "Failed to post the solution."
+    },
+    "sortBy": "Sort by",
+    "sort": {
+        "newest": "Newest",
+        "mostLiked": "Most liked"
+    },
+    "writeASolution": "Write a solution",
+    "field": {
+        "title": "Title",
+        "content": "Content (Markdown, @mention)"
+    },
+    "post": "Post",
+    "loadingSolutions": "Loading solutions...",
+    "noSolutionsYet": "No solutions yet. Be the first to write one!",
+    "column": {
+        "title": "Title",
+        "author": "Author",
+        "votes": "Votes",
+        "posted": "Posted"
+    },
+    "official": "Official",
+    "page": "Page {{current}} / {{total}}",
+    "previous": "Previous",
+    "next": "Next"
+}

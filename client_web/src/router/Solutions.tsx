@@ -1,5 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
     Button,
@@ -242,6 +243,7 @@ export default function ProblemSolutions({ problemNumber, sendJsonMessage, lastJ
     sendJsonMessage: globals.SendJsonMessage;
     lastJsonMessage: unknown;
 }) {
+    const { t } = useTranslation(["solutions", "common"]);
     const navigate = useNavigate();
     const [solutionsListIndex, setSolutionsListIndex] = useState(1);
     const [sort, setSort] = useState("time");
@@ -275,10 +277,10 @@ export default function ProblemSolutions({ problemNumber, sendJsonMessage, lastJ
     useEffect(() => {
         if (postFailureReason !== undefined) {
             setDialogText(postFailureReason === "empty"
-                ? "Title and content can't be empty."
+                ? t("error.emptyTitleContent")
                 : postFailureReason === "invalid_session"
-                    ? "Your session is invalid. Please login again."
-                    : "Failed to post the solution.");
+                    ? t("error.invalidSession")
+                    : t("error.postFailed"));
             setDialogOpen(true);
         }
     }, [postFailureReason]);
@@ -292,27 +294,27 @@ export default function ProblemSolutions({ problemNumber, sendJsonMessage, lastJ
 
     return <div style={{ margin: "0.5em 1em" }}>
         <div style={{ display: "flex", alignItems: "center", columnGap: "0.75em", marginBottom: "0.75em" }}>
-            <Label>Sort by</Label>
+            <Label>{t("sortBy")}</Label>
             <Dropdown
                 style={{ minWidth: "10em" }}
-                defaultValue="Newest"
+                defaultValue={t("sort.newest")}
                 defaultSelectedOptions={["time"]}
                 onOptionSelect={handleSortSelect}>
-                <Option value="time">Newest</Option>
-                <Option value="likes">Most liked</Option>
+                <Option value="time">{t("sort.newest")}</Option>
+                <Option value="likes">{t("sort.mostLiked")}</Option>
             </Dropdown>
             <Button appearance="primary" onClick={() => setShowPostForm((x) => !x)} style={{ marginLeft: "auto" }}>
-                {showPostForm ? "Cancel" : "Write a solution"}
+                {showPostForm ? t("action.cancel", { ns: "common" }) : t("writeASolution")}
             </Button>
         </div>
 
         {
             showPostForm &&
             <div style={{ marginBottom: "1em", padding: "0.75em", border: "1px solid #e0e0e0", borderRadius: "4px" }}>
-                <Field label="Title">
+                <Field label={t("field.title")}>
                     <Input value={newTitle} onChange={(_e, d) => setNewTitle(d.value)} />
                 </Field>
-                <Field label="Content (Markdown, @mention)" style={{ marginTop: "0.5em" }}>
+                <Field label={t("field.content")} style={{ marginTop: "0.5em" }}>
                     <MentionTextarea
                         value={newContent}
                         onChange={setNewContent}
@@ -324,7 +326,7 @@ export default function ProblemSolutions({ problemNumber, sendJsonMessage, lastJ
                     <Suspense fallback={<></>}>
                         <EmojiPicker onPick={(emoji) => setNewContent((c) => c + emoji)} />
                     </Suspense>
-                    <Button appearance="primary" onClick={() => postSolution(problemNumber, newTitle, replaceEmojiShortcuts(newContent))}>Post</Button>
+                    <Button appearance="primary" onClick={() => postSolution(problemNumber, newTitle, replaceEmojiShortcuts(newContent))}>{t("post")}</Button>
                 </div>
             </div>
         }
@@ -332,20 +334,20 @@ export default function ProblemSolutions({ problemNumber, sendJsonMessage, lastJ
         {
             solutionsList === undefined
                 ?
-                <Spinner size="small" label="Loading solutions..." delay={300} />
+                <Spinner size="small" label={t("loadingSolutions")} delay={300} />
                 :
                 solutionsList.length === 0
                     ?
-                    <Label>No solutions yet. Be the first to write one!</Label>
+                    <Label>{t("noSolutionsYet")}</Label>
                     :
                     <>
                         <Table size="medium">
                             <TableHeader>
                                 <TableRow>
-                                    <TableHeaderCell style={{ width: "45%" }}>Title</TableHeaderCell>
-                                    <TableHeaderCell style={{ width: "20%" }}>Author</TableHeaderCell>
-                                    <TableHeaderCell style={{ width: "20%" }}>Votes</TableHeaderCell>
-                                    <TableHeaderCell style={{ width: "15%" }}>Posted</TableHeaderCell>
+                                    <TableHeaderCell style={{ width: "45%" }}>{t("column.title")}</TableHeaderCell>
+                                    <TableHeaderCell style={{ width: "20%" }}>{t("column.author")}</TableHeaderCell>
+                                    <TableHeaderCell style={{ width: "20%" }}>{t("column.votes")}</TableHeaderCell>
+                                    <TableHeaderCell style={{ width: "15%" }}>{t("column.posted")}</TableHeaderCell>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -357,7 +359,7 @@ export default function ProblemSolutions({ problemNumber, sendJsonMessage, lastJ
                                                 onClick={() => navigate("/solution/" + String(solution.solution_id))}>
                                                 {solution.is_official && <StarFilled style={{ color: "#E3B341", marginRight: "0.35em", verticalAlign: "middle" }} />}
                                                 {solution.title}
-                                                {solution.is_official && <Tag size="extra-small" appearance="outline" style={{ marginLeft: "0.5em" }}>Official</Tag>}
+                                                {solution.is_official && <Tag size="extra-small" appearance="outline" style={{ marginLeft: "0.5em" }}>{t("official")}</Tag>}
                                             </TableCell>
                                             <TableCell>{solution.username}</TableCell>
                                             <TableCell>
@@ -372,9 +374,9 @@ export default function ProblemSolutions({ problemNumber, sendJsonMessage, lastJ
                             </TableBody>
                         </Table>
                         <div style={{ display: "flex", alignItems: "center", columnGap: "0.5em", marginTop: "0.75em" }}>
-                            <Label>Page {solutionsListIndex} / {Math.max(totalSolutionsListIndex, 1)}</Label>
-                            <Button appearance="secondary" onClick={() => setSolutionsListIndex((c) => Math.max(1, c - 1))}>Previous</Button>
-                            <Button appearance="secondary" onClick={() => setSolutionsListIndex((c) => Math.max(1, Math.min(totalSolutionsListIndex, c + 1)))}>Next</Button>
+                            <Label>{t("page", { current: solutionsListIndex, total: Math.max(totalSolutionsListIndex, 1) })}</Label>
+                            <Button appearance="secondary" onClick={() => setSolutionsListIndex((c) => Math.max(1, c - 1))}>{t("previous")}</Button>
+                            <Button appearance="secondary" onClick={() => setSolutionsListIndex((c) => Math.max(1, Math.min(totalSolutionsListIndex, c + 1)))}>{t("next")}</Button>
                         </div>
                     </>
         }

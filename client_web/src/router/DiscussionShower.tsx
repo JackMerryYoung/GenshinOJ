@@ -1,5 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useLoaderData, useNavigate, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
     Button,
@@ -305,6 +306,7 @@ function VoteButtons({ likes, dislikes, myVote, onVote }: {
 }
 
 export default function DiscussionShower() {
+    const { t } = useTranslation(["discussionShower", "common"]);
     const { discussionId } = (useLoaderData() as DiscussionInfoFromLoader);
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const navigate = useNavigate();
@@ -392,7 +394,7 @@ export default function DiscussionShower() {
             <div style={{ padding: "0.5em 1em", maxWidth: "70em" }}>
                 <Title3>{discussion.title}</Title3>
                 <div style={{ display: "flex", alignItems: "center", columnGap: "1em", margin: "0.5em 0" }}>
-                    <Label>By {discussion.username}</Label>
+                    <Label>{t("byUsername", { username: discussion.username })}</Label>
                     <Label style={{ fontSize: "0.85em", color: "#666" }}>{formatTimestamp(discussion.created_at)}</Label>
                     <VoteButtons
                         likes={discussion.likes}
@@ -408,21 +410,21 @@ export default function DiscussionShower() {
                 <Divider style={{ margin: "1.5em 0 1em 0" }} />
 
                 <div style={{ display: "flex", alignItems: "center", columnGap: "0.75em", marginBottom: "0.75em" }}>
-                    <Subtitle1>Replies</Subtitle1>
+                    <Subtitle1>{t("replies")}</Subtitle1>
                     <Dropdown
                         style={{ minWidth: "9em" }}
-                        defaultValue="Newest"
+                        defaultValue={t("sort.newest")}
                         defaultSelectedOptions={["time"]}
                         onOptionSelect={handleReplySortSelect}>
-                        <Option value="time">Newest</Option>
-                        <Option value="likes">Most liked</Option>
+                        <Option value="time">{t("sort.newest")}</Option>
+                        <Option value="likes">{t("sort.mostLiked")}</Option>
                     </Dropdown>
                 </div>
 
                 <div style={{ marginBottom: "1em" }}>
                     <MentionTextarea
                         style={{ width: "100%" }}
-                        placeholder="Write a reply... (Markdown, @mention)"
+                        placeholder={t("replyPlaceholder")}
                         value={newReply}
                         onChange={setNewReply}
                         sendJsonMessage={sendJsonMessage}
@@ -432,18 +434,18 @@ export default function DiscussionShower() {
                         <Suspense fallback={<></>}>
                             <EmojiPicker onPick={(emoji) => setNewReply((r) => r + emoji)} />
                         </Suspense>
-                        <Button appearance="primary" onClick={() => postReply(discussionId, replaceEmojiShortcuts(newReply))}>Reply</Button>
+                        <Button appearance="primary" onClick={() => postReply(discussionId, replaceEmojiShortcuts(newReply))}>{t("action.reply", { ns: "common" })}</Button>
                     </div>
                 </div>
 
                 {
                     repliesList === undefined
                         ?
-                        <Spinner size="small" label="Loading replies..." delay={300} />
+                        <Spinner size="small" label={t("loadingReplies")} delay={300} />
                         :
                         repliesList.length === 0
                             ?
-                            <Label>No replies yet.</Label>
+                            <Label>{t("noRepliesYet")}</Label>
                             :
                             <>
                                 {
@@ -465,9 +467,9 @@ export default function DiscussionShower() {
                                     ))
                                 }
                                 <div style={{ display: "flex", alignItems: "center", columnGap: "0.5em", marginTop: "0.75em" }}>
-                                    <Label>Page {repliesListIndex} / {Math.max(totalRepliesListIndex, 1)}</Label>
-                                    <Button appearance="secondary" onClick={() => setRepliesListIndex((c) => Math.max(1, c - 1))}>Previous</Button>
-                                    <Button appearance="secondary" onClick={() => setRepliesListIndex((c) => Math.max(1, Math.min(totalRepliesListIndex, c + 1)))}>Next</Button>
+                                    <Label>{t("pageOf", { current: repliesListIndex, total: Math.max(totalRepliesListIndex, 1) })}</Label>
+                                    <Button appearance="secondary" onClick={() => setRepliesListIndex((c) => Math.max(1, c - 1))}>{t("previous")}</Button>
+                                    <Button appearance="secondary" onClick={() => setRepliesListIndex((c) => Math.max(1, Math.min(totalRepliesListIndex, c + 1)))}>{t("next")}</Button>
                                 </div>
                             </>
                 }
@@ -478,21 +480,21 @@ export default function DiscussionShower() {
             <PopupDialog
                 open={dialogNotFoundOpenState}
                 setPopupDialogOpenState={setDialogNotFoundOpenState}
-                text={`Discussion ${discussionId} is not found!`}
+                text={t("discussionNotFound", { discussionId })}
                 onClose={() => navigate(-1)} />
             <PopupDialog
                 open={dialogRequireLoginOpenState}
                 setPopupDialogOpenState={setDialogRequireLoginOpenState}
-                text="Please login first."
+                text={t("pleaseLoginFirst")}
                 onClose={() => navigate("/login")} />
             <PopupDialog
                 open={dialogReplyFailureOpen}
                 setPopupDialogOpenState={setDialogReplyFailureOpen}
                 text={postFailureReason === "empty"
-                    ? "Reply can't be empty."
+                    ? t("replyEmpty")
                     : postFailureReason === "invalid_session"
-                        ? "Your session is invalid. Please login again."
-                        : "Failed to post the reply."}
+                        ? t("sessionInvalid")
+                        : t("replyPostFailed")}
                 onClose={() => setDialogReplyFailureOpen(false)} />
         </Suspense>
     </>;

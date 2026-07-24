@@ -1,0 +1,114 @@
+{
+  "auth": {
+    "title": "RsOJ 控制面板",
+    "loading": "加载中...",
+    "loginRequired": "您必须登录才能访问控制面板",
+    "accessDenied": "访问被拒绝：需要管理员权限",
+    "verifyFailed": "验证管理员权限失败",
+    "goToLogin": "前往登录"
+  },
+  "roles": {
+    "problemAdmin": "题目管理员",
+    "communityAdmin": "社区管理员",
+    "superAdmin": "超级管理员",
+    "default": "管理员"
+  },
+  "sidebar": {
+    "title": "控制面板",
+    "dashboard": "仪表盘",
+    "systemMonitor": "系统监控",
+    "users": "用户",
+    "problems": "题目",
+    "settings": "设置"
+  },
+  "dashboard": {
+    "title": "仪表盘",
+    "loading": "正在加载统计数据...",
+    "noData": "暂无统计数据。请使用系统以生成数据。",
+    "dailyCount": "每日数量",
+    "cumulativeTotal": "累计总数",
+    "daily": "每日",
+    "cumulative": "累计"
+  },
+  "systemMonitor": {
+    "title": "系统监控",
+    "loading": "正在加载系统状态...",
+    "database": "数据库",
+    "connected": "已连接",
+    "disconnected": "已断开",
+    "activeWebSocket": "活跃 WebSocket 连接",
+    "uptime": "运行时间",
+    "memoryUsage": "内存占用",
+    "databaseStatistics": "数据库统计",
+    "totalUsers": "用户总数",
+    "totalProblems": "题目总数",
+    "totalSubmissions": "提交总数",
+    "totalDiscussions": "讨论总数",
+    "databaseSize": "数据库大小"
+  },
+  "users": {
+    "title": "用户管理",
+    "searchPlaceholder": "搜索用户...",
+    "loading": "正在加载用户...",
+    "confirmDelete": "确定要删除此用户吗？此操作无法撤销。",
+    "deleteFailed": "删除用户失败：{{message}}",
+    "deleteFailedGeneric": "删除用户失败",
+    "table": {
+      "id": "ID",
+      "username": "用户名",
+      "accepted": "已通过",
+      "submissions": "提交数",
+      "discussions": "讨论数",
+      "created": "创建时间",
+      "actions": "操作"
+    },
+    "pagination": {
+      "previous": "上一页",
+      "next": "下一页",
+      "pageInfo": "第 {{page}} 页，共 {{totalPages}} 页（共 {{total}} 条）"
+    }
+  },
+  "problems": {
+    "title": "题目管理",
+    "searchPlaceholder": "搜索题目...",
+    "createProblem": "创建题目",
+    "loading": "正在加载题目...",
+    "confirmDelete": "确定要删除此题目吗？所有提交和题解都将被删除。",
+    "deleteFailed": "删除题目失败：{{message}}",
+    "deleteFailedGeneric": "删除题目失败",
+    "table": {
+      "number": "编号",
+      "name": "名称",
+      "difficulty": "难度",
+      "submissions": "提交数",
+      "accepted": "已通过",
+      "acceptRate": "通过率",
+      "actions": "操作"
+    },
+    "pagination": {
+      "previous": "上一页",
+      "next": "下一页",
+      "pageInfo": "第 {{page}} 页，共 {{totalPages}} 页（共 {{total}} 条）"
+    },
+    "difficulty": {
+      "unknown": "未知",
+      "beginner": "入门",
+      "primary": "初级",
+      "junior": "中初级",
+      "senior": "中级",
+      "advanced": "中高级",
+      "hard": "高级",
+      "grand": "大师"
+    }
+  },
+  "settings": {
+    "title": "设置",
+    "dangerZone": "危险操作区",
+    "dangerZoneDescription": "这些操作不可撤销，且会影响所有用户。",
+    "clearDatabase": "清空数据库",
+    "confirmClear1": "确定要清空整个数据库吗？此操作无法撤销！",
+    "confirmClear2": "这将删除所有数据，包括用户、题目、提交和讨论。您确定要继续吗？",
+    "clearFailed": "失败：{{message}}",
+    "clearFailedGeneric": "清空数据库失败"
+  }
+}

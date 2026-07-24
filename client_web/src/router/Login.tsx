@@ -1,5 +1,6 @@
 import { useEffect, useState, lazy } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { makeStyles, Input, Field, Button } from "@fluentui/react-components";
 import { PersonRegular, PasswordRegular } from "@fluentui/react-icons";
@@ -25,6 +26,7 @@ const useStyles = makeStyles({
 });
 
 export default function Login() {
+    const { t } = useTranslation("login");
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const [loginUsernameFromInput, setLoginUsernameFromInput] = useState("");
     const [loginPasswordFromInput, setLoginPasswordFromInput] = useState("");
@@ -79,30 +81,30 @@ export default function Login() {
         <>
             <div className={useStyles().root}>
                 <form>
-                    <Field label="Login Username" required>
+                    <Field label={t("field.username")} required>
                         <Input contentBefore={<PersonRegular />}
                             onChange={(props) => setLoginUsernameFromInput(props.target.value)} />
                     </Field>
-                    <Field label="Login Password" required>
+                    <Field label={t("field.password")} required>
                         <Input contentBefore={<PasswordRegular />} type="password"
                             onChange={(props) => setLoginPasswordFromInput(props.target.value)} />
                     </Field>
                     <Button appearance="primary" style={{ marginTop: "1em" }}
-                        onClick={handleClickLogin}>Login</Button>
+                        onClick={handleClickLogin}>{t("button.login")}</Button>
                 </form>
                 <PopupDialog
                     open={dialogLoggedInOpenState}
                     setPopupDialogOpenState={setDialogLoggedInOpenState}
-                    text="You have already logged in."
+                    text={t("dialog.alreadyLoggedIn")}
                     onClose={handleNavigateBackward} />
                 <PopupDialog
                     open={dialogLoginFailureOpenState}
                     setPopupDialogOpenState={setDialogLoginFailureOpenState}
-                    text="Login failed. Maybe you used a wrong password or username?" />
+                    text={t("dialog.loginFailed")} />
                 <PopupDialog
                     open={dialogLoginSuccessOpenState}
                     setPopupDialogOpenState={setDialogLoginSuccessOpenState}
-                    text="Login successfully."
+                    text={t("dialog.loginSuccess")}
                     onClose={handleNavigateBackward} />
             </div>
         </>

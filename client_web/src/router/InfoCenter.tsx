@@ -1,5 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { TFunction } from "i18next";
 
 import {
     Button,
@@ -33,18 +35,18 @@ interface NotificationItem {
 }
 
 // Human-readable summary of why this notification arrived.
-function describe(item: NotificationItem) {
+function describe(item: NotificationItem, t: TFunction) {
     if (item.kind === "mention") {
-        if (item.source_type === "solution") return "mentioned you in a solution";
-        if (item.source_type === "solution_comment") return "mentioned you in a comment";
-        if (item.source_type === "discussion") return "mentioned you in a discussion";
-        if (item.source_type === "discussion_reply") return "mentioned you in a reply";
-        return "mentioned you";
+        if (item.source_type === "solution") return t("notification.mentionedInSolution");
+        if (item.source_type === "solution_comment") return t("notification.mentionedInComment");
+        if (item.source_type === "discussion") return t("notification.mentionedInDiscussion");
+        if (item.source_type === "discussion_reply") return t("notification.mentionedInReply");
+        return t("notification.mentionedYou");
     }
     // kind === "reply"
-    if (item.source_type === "solution_comment") return "commented on your solution";
-    if (item.source_type === "discussion_reply") return "replied to your discussion";
-    return "replied to you";
+    if (item.source_type === "solution_comment") return t("notification.commentedOnSolution");
+    if (item.source_type === "discussion_reply") return t("notification.repliedToDiscussion");
+    return t("notification.repliedToYou");
 }
 
 function isNotificationsListFromFetch(x: object) {
@@ -144,6 +146,7 @@ function useMarkRead(sendJsonMessage: globals.SendJsonMessage) {
 }
 
 export default function InfoCenter() {
+    const { t } = useTranslation("infoCenter");
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const navigate = useNavigate();
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
@@ -186,21 +189,21 @@ export default function InfoCenter() {
             loginStatus.value &&
             <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "0.9em 1em 0 1em", boxSizing: "border-box" }}>
                 <div style={{ display: "flex", alignItems: "center", columnGap: "0.6em", flexWrap: "wrap", paddingBottom: "0.6em", borderBottom: "1px solid #e0e0e0" }}>
-                    <Label>Page {index} / {Math.max(totalIndex, 1)}</Label>
-                    <Button appearance="secondary" onClick={() => setIndex((c) => Math.max(1, c - 1))}>Previous</Button>
-                    <Button appearance="secondary" onClick={() => setIndex((c) => Math.max(1, Math.min(totalIndex, c + 1)))}>Next</Button>
-                    <Button appearance="secondary" onClick={markAllRead} style={{ marginLeft: "auto" }}>Mark all read</Button>
+                    <Label>{t("pagination.page", { index, total: Math.max(totalIndex, 1) })}</Label>
+                    <Button appearance="secondary" onClick={() => setIndex((c) => Math.max(1, c - 1))}>{t("pagination.previous")}</Button>
+                    <Button appearance="secondary" onClick={() => setIndex((c) => Math.max(1, Math.min(totalIndex, c + 1)))}>{t("pagination.next")}</Button>
+                    <Button appearance="secondary" onClick={markAllRead} style={{ marginLeft: "auto" }}>{t("action.markAllRead")}</Button>
                 </div>
 
                 <div className="scroll-box" style={{ flex: 1, minHeight: 0, marginTop: "0.5em" }}>
                 {
                     notificationsList === undefined
                         ?
-                        <Spinner size="small" label="Loading notifications..." delay={300} />
+                        <Spinner size="small" label={t("loading.notifications")} delay={300} />
                         :
                         notificationsList.length === 0
                             ?
-                            <Label>No notifications yet.</Label>
+                            <Label>{t("empty.noNotifications")}</Label>
                             :
                             <>
                                 {
@@ -229,7 +232,7 @@ export default function InfoCenter() {
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ display: "flex", alignItems: "center", columnGap: "0.5em" }}>
                                                     <Label weight="semibold">{item.actor}</Label>
-                                                    <Label>{describe(item)}</Label>
+                                                    <Label>{describe(item, t)}</Label>
                                                     {!item.is_read && <Badge size="extra-small" color="danger" />}
                                                 </div>
                                                 {
@@ -255,7 +258,7 @@ export default function InfoCenter() {
             <PopupDialog
                 open={dialogRequireLoginOpenState}
                 setPopupDialogOpenState={setDialogRequireLoginOpenState}
-                text="Please login first."
+                text={t("dialog.pleaseLoginFirst")}
                 onClose={() => navigate("/login")} />
         </Suspense>
     </>;

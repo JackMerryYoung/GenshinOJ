@@ -1,0 +1,114 @@
+{
+  "auth": {
+    "title": "RsOJ Control Panel",
+    "loading": "Loading...",
+    "loginRequired": "You must be logged in to access the control panel",
+    "accessDenied": "Access denied: Administrator privileges required",
+    "verifyFailed": "Failed to verify admin access",
+    "goToLogin": "Go to Login"
+  },
+  "roles": {
+    "problemAdmin": "Problem Administrator",
+    "communityAdmin": "Community Administrator",
+    "superAdmin": "Super Administrator",
+    "default": "Administrator"
+  },
+  "sidebar": {
+    "title": "Control Panel",
+    "dashboard": "Dashboard",
+    "systemMonitor": "System Monitor",
+    "users": "Users",
+    "problems": "Problems",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "loading": "Loading statistics...",
+    "noData": "No statistics available yet. Use the system to generate data.",
+    "dailyCount": "Daily Count",
+    "cumulativeTotal": "Cumulative Total",
+    "daily": "Daily",
+    "cumulative": "Cumulative"
+  },
+  "systemMonitor": {
+    "title": "System Monitor",
+    "loading": "Loading system status...",
+    "database": "Database",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "activeWebSocket": "Active WebSocket",
+    "uptime": "Uptime",
+    "memoryUsage": "Memory Usage",
+    "databaseStatistics": "Database Statistics",
+    "totalUsers": "Total Users",
+    "totalProblems": "Total Problems",
+    "totalSubmissions": "Total Submissions",
+    "totalDiscussions": "Total Discussions",
+    "databaseSize": "Database Size"
+  },
+  "users": {
+    "title": "User Management",
+    "searchPlaceholder": "Search users...",
+    "loading": "Loading users...",
+    "confirmDelete": "Are you sure you want to delete this user? This action cannot be undone.",
+    "deleteFailed": "Failed to delete user: {{message}}",
+    "deleteFailedGeneric": "Failed to delete user",
+    "table": {
+      "id": "ID",
+      "username": "Username",
+      "accepted": "Accepted",
+      "submissions": "Submissions",
+      "discussions": "Discussions",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "pageInfo": "Page {{page}} of {{totalPages}} ({{total}} total)"
+    }
+  },
+  "problems": {
+    "title": "Problem Management",
+    "searchPlaceholder": "Search problems...",
+    "createProblem": "Create Problem",
+    "loading": "Loading problems...",
+    "confirmDelete": "Are you sure you want to delete this problem? All submissions and solutions will be deleted.",
+    "deleteFailed": "Failed to delete problem: {{message}}",
+    "deleteFailedGeneric": "Failed to delete problem",
+    "table": {
+      "number": "Number",
+      "name": "Name",
+      "difficulty": "Difficulty",
+      "submissions": "Submissions",
+      "accepted": "Accepted",
+      "acceptRate": "Accept Rate",
+      "actions": "Actions"
+    },
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "pageInfo": "Page {{page}} of {{totalPages}} ({{total}} total)"
+    },
+    "difficulty": {
+      "unknown": "Unknown",
+      "beginner": "Beginner",
+      "primary": "Primary",
+      "junior": "Junior",
+      "senior": "Senior",
+      "advanced": "Advanced",
+      "hard": "Hard",
+      "grand": "Grand"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "dangerZone": "Danger Zone",
+    "dangerZoneDescription": "These actions are irreversible and will affect all users.",
+    "clearDatabase": "Clear Database",
+    "confirmClear1": "Are you sure you want to clear the entire database? This action cannot be undone!",
+    "confirmClear2": "This will delete ALL data including users, problems, submissions, and discussions. Are you absolutely sure?",
+    "clearFailed": "Failed: {{message}}",
+    "clearFailedGeneric": "Failed to clear database"
+  }
+}

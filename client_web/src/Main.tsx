@@ -30,39 +30,42 @@ const ControlPanel = lazy(() => import("./router/ControlPanel.tsx"));
 const ErrorPage = lazy(() => import("./ErrorPage.tsx"));
 
 import store from "./store.ts";
+import i18n from "./i18n";
+
+const t = (key: string, options?: Record<string, unknown>) => i18n.t(key, { ns: "routes", ...options });
 
 const router = createBrowserRouter([
     {
         path: "/",
         element: <Suspense fallback={<Skeleton />}><Root /></Suspense>,
-        loader: () => document.title = "Genshin OJ Root Page",
+        loader: () => document.title = t("title.root"),
         errorElement: <ErrorPage />,
         children: [
             {
                 path: "/login",
                 element: <Suspense fallback={<Skeleton />}><Login /></Suspense>,
-                loader: () => document.title = "Sign in"
+                loader: () => document.title = t("title.login")
             },
             {
                 path: "/register",
                 element: <Suspense fallback={<Skeleton />}><Register /></Suspense>,
-                loader: () => document.title = "Sign up"
+                loader: () => document.title = t("title.register")
             },
             {
                 path: "/home",
                 element: <Suspense fallback={<Skeleton />}><Home /></Suspense>,
-                loader: () => document.title = "Home Page"
+                loader: () => document.title = t("title.home")
             },
             {
                 path: "/chat",
                 element: <Suspense fallback={<Skeleton />}><Chat /></Suspense>,
-                loader: () => document.title = "Chat",
+                loader: () => document.title = t("title.chat"),
                 children: [
                     {
                         path: "/chat/user/:username",
                         element: <Suspense fallback={<Skeleton />}><ChatMainUser /></Suspense>,
                         loader: ({ params }) => {
-                            document.title = "Chat User";
+                            document.title = t("title.chatUser");
                             return { toUsername: params.username };
                         },
                     }
@@ -71,13 +74,13 @@ const router = createBrowserRouter([
             {
                 path: "/problem",
                 element: <Suspense fallback={<Skeleton />}><Problem /></Suspense>,
-                loader: () => document.title = "Problem",
+                loader: () => document.title = t("title.problem"),
                 children: [
                     {
                         path: "/problem/:problem_number",
                         element: <Suspense fallback={<Skeleton />}><ProblemMain /></Suspense>,
                         loader: ({ params }) => {
-                            document.title = "Problem " + params.problem_number;
+                            document.title = t("title.problemNumber", { number: params.problem_number });
                             return { problemNumber: Number(params.problem_number) };
                         },
                     }
@@ -86,13 +89,13 @@ const router = createBrowserRouter([
             {
                 path: "/submission",
                 element: <Suspense fallback={<Skeleton />}><SubmissionsList /></Suspense>,
-                loader: () => document.title = "Submissions List",
+                loader: () => document.title = t("title.submissionsList"),
             },
             {
                 path: "/submission/:submission_id",
                 element: <Suspense fallback={<Skeleton />}><SubmissionShower /></Suspense>,
                 loader: ({ params }) => {
-                    document.title = "Submission " + params.submission_id;
+                    document.title = t("title.submissionId", { id: params.submission_id });
                     return { submissionId: Number(params.submission_id) };
                 },
             },
@@ -100,52 +103,52 @@ const router = createBrowserRouter([
                 path: "/solution/:solution_id",
                 element: <Suspense fallback={<Skeleton />}><SolutionShower /></Suspense>,
                 loader: ({ params }) => {
-                    document.title = "Solution " + params.solution_id;
+                    document.title = t("title.solutionId", { id: params.solution_id });
                     return { solutionId: Number(params.solution_id) };
                 },
             },
             {
                 path: "/discussion",
                 element: <Suspense fallback={<Skeleton />}><Discussion /></Suspense>,
-                loader: () => document.title = "Discussion",
+                loader: () => document.title = t("title.discussion"),
             },
             {
                 path: "/discussion/:discussion_id",
                 element: <Suspense fallback={<Skeleton />}><DiscussionShower /></Suspense>,
                 loader: ({ params }) => {
-                    document.title = "Discussion " + params.discussion_id;
+                    document.title = t("title.discussionId", { id: params.discussion_id });
                     return { discussionId: Number(params.discussion_id) };
                 },
             },
             {
                 path: "/notification",
                 element: <Suspense fallback={<Skeleton />}><InfoCenter /></Suspense>,
-                loader: () => document.title = "Notification",
+                loader: () => document.title = t("title.notification"),
             },
             {
                 path: "/logout",
                 element: <Suspense fallback={<Skeleton />}><Logout /></Suspense>,
-                loader: () => document.title = "Home Page"
+                loader: () => document.title = t("title.home")
             },
             {
                 path: "/user/:username",
                 element: <Suspense fallback={<Skeleton />}><UserProfile /></Suspense>,
                 loader: ({ params }) => {
-                    document.title = "Profile of User " + params.username;
+                    document.title = t("title.profileOfUser", { username: params.username });
                     return { username: params.username };
                 },
             },
             {
                 path: "/user",
                 element: <Suspense fallback={<Skeleton />}><UserProfile /></Suspense>,
-                loader: () => document.title = "Profile of User",
+                loader: () => document.title = t("title.profileOfUserDefault"),
             }
         ]
     },
     {
         path: "/control-panel",
         element: <Suspense fallback={<Skeleton />}><ControlPanel /></Suspense>,
-        loader: () => document.title = "Control Panel",
+        loader: () => document.title = t("title.controlPanel"),
     }
 ]);
 

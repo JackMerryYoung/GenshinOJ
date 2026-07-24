@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import Highcharts from 'highcharts';
 import * as HighchartsReactModule from 'highcharts-react-official';
 const HighchartsReact: any =
@@ -123,10 +124,12 @@ const useStyles = makeStyles({
 const CONTROL_PANEL_URL = 'http://localhost:9990';
 
 export function ControlPanel() {
+  const { t } = useTranslation('controlPanel');
   const styles = useStyles();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notLoggedIn, setNotLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [username, setUsername] = useState<string>('');
   const [adminRole, setAdminRole] = useState<string>('');
@@ -140,7 +143,8 @@ export function ControlPanel() {
     const username = localStorage.getItem('loginUsername');
 
     if (!username) {
-      setError('You must be logged in to access the control panel');
+      setError(t('auth.loginRequired'));
+      setNotLoggedIn(true);
       setLoading(false);
       return;
     }
@@ -159,10 +163,10 @@ export function ControlPanel() {
         setAdminRole(data.admin_role);
         setIsAuthenticated(true);
       } else {
-        setError('Access denied: Administrator privileges required');
+        setError(t('auth.accessDenied'));
       }
     } catch (err) {
-      setError('Failed to verify admin access');
+      setError(t('auth.verifyFailed'));
     } finally {
       setLoading(false);
     }
@@ -175,18 +179,18 @@ export function ControlPanel() {
 
   const getRoleName = (role: string): string => {
     const roleNames: { [key: string]: string } = {
-      'problem_admin': 'Problem Administrator',
-      'community_admin': 'Community Administrator',
-      'super_admin': 'Super Administrator',
+      'problem_admin': t('roles.problemAdmin'),
+      'community_admin': t('roles.communityAdmin'),
+      'super_admin': t('roles.superAdmin'),
     };
-    return roleNames[role] || 'Administrator';
+    return roleNames[role] || t('roles.default');
   };
 
   if (loading) {
     return (
       <FluentProvider theme={webLightTheme}>
         <div className={styles.authContainer}>
-          <Spinner label="Loading..." />
+          <Spinner label={t('auth.loading')} />
         </div>
       </FluentProvider>
     );
@@ -197,17 +201,17 @@ export function ControlPanel() {
       <FluentProvider theme={webLightTheme}>
         <div className={styles.authContainer}>
           <Card className={styles.authCard}>
-            <Title2>RsOJ Control Panel</Title2>
+            <Title2>{t('auth.title')}</Title2>
             <Text style={{ marginTop: '16px', color: tokens.colorPaletteRedForeground1 }}>
               {error}
             </Text>
-            {error.includes('logged in') && (
+            {notLoggedIn && (
               <Button
                 appearance="primary"
                 onClick={() => window.location.href = '/login'}
                 style={{ marginTop: '16px' }}
               >
-                Go to Login
+                {t('auth.goToLogin')}
               </Button>
             )}
           </Card>
@@ -221,7 +225,7 @@ export function ControlPanel() {
       <div className={styles.container}>
         <div className={styles.sidebar}>
           <div className={styles.brand}>
-            <Title3>Control Panel</Title3>
+            <Title3>{t('sidebar.title')}</Title3>
             <Text size={200} style={{ marginTop: '8px', color: tokens.colorNeutralForeground3 }}>
               {username}
             </Text>
@@ -236,7 +240,7 @@ export function ControlPanel() {
               className={`${styles.navItem} ${activeTab === 'dashboard' ? styles.navItemActive : ''}`}
               onClick={() => setActiveTab('dashboard')}
             >
-              Dashboard
+              {t('sidebar.dashboard')}
             </Button>
           )}
           {hasPermission(['super_admin']) && (
@@ -246,7 +250,7 @@ export function ControlPanel() {
               className={`${styles.navItem} ${activeTab === 'system' ? styles.navItemActive : ''}`}
               onClick={() => setActiveTab('system')}
             >
-              System Monitor
+              {t('sidebar.systemMonitor')}
             </Button>
           )}
           {hasPermission(['super_admin']) && (
@@ -256,7 +260,7 @@ export function ControlPanel() {
               className={`${styles.navItem} ${activeTab === 'users' ? styles.navItemActive : ''}`}
               onClick={() => setActiveTab('users')}
             >
-              Users
+              {t('sidebar.users')}
             </Button>
           )}
           {hasPermission(['problem_admin', 'super_admin']) && (
@@ -266,7 +270,7 @@ export function ControlPanel() {
               className={`${styles.navItem} ${activeTab === 'problems' ? styles.navItemActive : ''}`}
               onClick={() => setActiveTab('problems')}
             >
-              Problems
+              {t('sidebar.problems')}
             </Button>
           )}
           {hasPermission(['super_admin']) && (
@@ -276,7 +280,7 @@ export function ControlPanel() {
               className={`${styles.navItem} ${activeTab === 'settings' ? styles.navItemActive : ''}`}
               onClick={() => setActiveTab('settings')}
             >
-              Settings
+              {t('sidebar.settings')}
             </Button>
           )}
         </div>
@@ -293,6 +297,7 @@ export function ControlPanel() {
 }
 
 function DashboardTab() {
+  const { t } = useTranslation('controlPanel');
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -318,11 +323,11 @@ function DashboardTab() {
     }
   };
 
-  if (loading) return <Spinner label="Loading statistics..." />;
+  if (loading) return <Spinner label={t('dashboard.loading')} />;
 
   return (
     <>
-      <Title2>Dashboard</Title2>
+      <Title2>{t('dashboard.title')}</Title2>
       {stats && stats.length > 0 && (
         <div style={{ marginTop: '24px' }}>
           {stats.map((metric: any) => {
@@ -347,12 +352,12 @@ function DashboardTab() {
               yAxis: [
                 {
                   title: {
-                    text: 'Daily Count',
+                    text: t('dashboard.dailyCount'),
                   },
                 },
                 {
                   title: {
-                    text: 'Cumulative Total',
+                    text: t('dashboard.cumulativeTotal'),
                   },
                   opposite: true,
                 },
@@ -372,14 +377,14 @@ function DashboardTab() {
               },
               series: [
                 {
-                  name: 'Daily',
+                  name: t('dashboard.daily'),
                   type: 'column',
                   data: dailyData,
                   color: '#0078d4',
                   yAxis: 0,
                 },
                 {
-                  name: 'Cumulative',
+                  name: t('dashboard.cumulative'),
                   type: 'line',
                   data: cumulativeData,
                   color: '#107c10',
@@ -405,7 +410,7 @@ function DashboardTab() {
       )}
       {(!stats || stats.length === 0) && (
         <Card style={{ marginTop: '24px', padding: '24px' }}>
-          <Text>No statistics available yet. Use the system to generate data.</Text>
+          <Text>{t('dashboard.noData')}</Text>
         </Card>
       )}
     </>
@@ -413,6 +418,7 @@ function DashboardTab() {
 }
 
 function SystemMonitorTab() {
+  const { t } = useTranslation('controlPanel');
   const styles = useStyles();
   const [systemStatus, setSystemStatus] = useState<any>(null);
   const [databaseStats, setDatabaseStats] = useState<any>(null);
@@ -451,28 +457,28 @@ function SystemMonitorTab() {
     }
   };
 
-  if (loading) return <Spinner label="Loading system status..." />;
+  if (loading) return <Spinner label={t('systemMonitor.loading')} />;
 
   return (
     <>
-      <Title2>System Monitor</Title2>
+      <Title2>{t('systemMonitor.title')}</Title2>
       <div className={styles.statsGrid} style={{ marginTop: '24px' }}>
         {systemStatus && (
           <>
             <Card className={styles.statCard}>
-              <Text size={200}>Database</Text>
+              <Text size={200}>{t('systemMonitor.database')}</Text>
               <div className={styles.statValue}>
                 <Badge color={systemStatus.database_connected ? 'success' : 'danger'}>
-                  {systemStatus.database_connected ? 'Connected' : 'Disconnected'}
+                  {systemStatus.database_connected ? t('systemMonitor.connected') : t('systemMonitor.disconnected')}
                 </Badge>
               </div>
             </Card>
             <Card className={styles.statCard}>
-              <Text size={200}>Active WebSocket</Text>
+              <Text size={200}>{t('systemMonitor.activeWebSocket')}</Text>
               <div className={styles.statValue}>{systemStatus.active_ws_connections}</div>
             </Card>
             <Card className={styles.statCard}>
-              <Text size={200}>Uptime</Text>
+              <Text size={200}>{t('systemMonitor.uptime')}</Text>
               <div className={styles.statValue}>
                 {Math.floor(systemStatus.uptime_seconds / 3600)}h
               </div>
@@ -480,7 +486,7 @@ function SystemMonitorTab() {
             </Card>
             {systemStatus.memory_usage_mb && (
               <Card className={styles.statCard}>
-                <Text size={200}>Memory Usage</Text>
+                <Text size={200}>{t('systemMonitor.memoryUsage')}</Text>
                 <div className={styles.statValue}>
                   {systemStatus.memory_usage_mb.toFixed(1)} MB
                 </div>
@@ -492,27 +498,27 @@ function SystemMonitorTab() {
 
       {databaseStats && (
         <Card style={{ marginTop: '24px', padding: '24px' }}>
-          <Title3>Database Statistics</Title3>
+          <Title3>{t('systemMonitor.databaseStatistics')}</Title3>
           <div className={styles.statsGrid} style={{ marginTop: '16px' }}>
             <Card className={styles.statCard}>
-              <Text size={200}>Total Users</Text>
+              <Text size={200}>{t('systemMonitor.totalUsers')}</Text>
               <div className={styles.statValue}>{databaseStats.total_users}</div>
             </Card>
             <Card className={styles.statCard}>
-              <Text size={200}>Total Problems</Text>
+              <Text size={200}>{t('systemMonitor.totalProblems')}</Text>
               <div className={styles.statValue}>{databaseStats.total_problems}</div>
             </Card>
             <Card className={styles.statCard}>
-              <Text size={200}>Total Submissions</Text>
+              <Text size={200}>{t('systemMonitor.totalSubmissions')}</Text>
               <div className={styles.statValue}>{databaseStats.total_submissions}</div>
             </Card>
             <Card className={styles.statCard}>
-              <Text size={200}>Total Discussions</Text>
+              <Text size={200}>{t('systemMonitor.totalDiscussions')}</Text>
               <div className={styles.statValue}>{databaseStats.total_discussions}</div>
             </Card>
             {databaseStats.database_size_mb && (
               <Card className={styles.statCard}>
-                <Text size={200}>Database Size</Text>
+                <Text size={200}>{t('systemMonitor.databaseSize')}</Text>
                 <div className={styles.statValue}>
                   {databaseStats.database_size_mb.toFixed(2)} MB
                 </div>
@@ -526,6 +532,7 @@ function SystemMonitorTab() {
 }
 
 function UsersTab() {
+  const { t } = useTranslation('controlPanel');
   const styles = useStyles();
   const [users, setUsers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -560,7 +567,7 @@ function UsersTab() {
   };
 
   const handleDelete = async (userId: number) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+    if (!confirm(t('users.confirmDelete'))) {
       return;
     }
 
@@ -574,20 +581,20 @@ function UsersTab() {
       if (data.ok) {
         loadUsers();
       } else {
-        alert(`Failed to delete user: ${data.message}`);
+        alert(t('users.deleteFailed', { message: data.message }));
       }
     } catch (err) {
-      alert('Failed to delete user');
+      alert(t('users.deleteFailedGeneric'));
     }
   };
 
   return (
     <>
-      <Title2>User Management</Title2>
+      <Title2>{t('users.title')}</Title2>
       <Card style={{ marginTop: '24px', padding: '24px' }}>
         <div className={styles.searchBox}>
           <Input
-            placeholder="Search users..."
+            placeholder={t('users.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             contentBefore={<SearchRegular />}
@@ -595,19 +602,19 @@ function UsersTab() {
         </div>
 
         {loading ? (
-          <Spinner label="Loading users..." />
+          <Spinner label={t('users.loading')} />
         ) : (
           <>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHeaderCell>ID</TableHeaderCell>
-                  <TableHeaderCell>Username</TableHeaderCell>
-                  <TableHeaderCell>Accepted</TableHeaderCell>
-                  <TableHeaderCell>Submissions</TableHeaderCell>
-                  <TableHeaderCell>Discussions</TableHeaderCell>
-                  <TableHeaderCell>Created</TableHeaderCell>
-                  <TableHeaderCell>Actions</TableHeaderCell>
+                  <TableHeaderCell>{t('users.table.id')}</TableHeaderCell>
+                  <TableHeaderCell>{t('users.table.username')}</TableHeaderCell>
+                  <TableHeaderCell>{t('users.table.accepted')}</TableHeaderCell>
+                  <TableHeaderCell>{t('users.table.submissions')}</TableHeaderCell>
+                  <TableHeaderCell>{t('users.table.discussions')}</TableHeaderCell>
+                  <TableHeaderCell>{t('users.table.created')}</TableHeaderCell>
+                  <TableHeaderCell>{t('users.table.actions')}</TableHeaderCell>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -633,13 +640,13 @@ function UsersTab() {
 
             <div className={styles.pagination}>
               <Button disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                Previous
+                {t('users.pagination.previous')}
               </Button>
               <Text>
-                Page {page} of {totalPages} ({total} total)
+                {t('users.pagination.pageInfo', { page, totalPages, total })}
               </Text>
               <Button disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-                Next
+                {t('users.pagination.next')}
               </Button>
             </div>
           </>
@@ -650,6 +657,7 @@ function UsersTab() {
 }
 
 function ProblemsTab() {
+  const { t } = useTranslation('controlPanel');
   const styles = useStyles();
   const [problems, setProblems] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -691,7 +699,7 @@ function ProblemsTab() {
   };
 
   const handleDelete = async (problemNumber: number) => {
-    if (!confirm('Are you sure you want to delete this problem? All submissions and solutions will be deleted.')) {
+    if (!confirm(t('problems.confirmDelete'))) {
       return;
     }
 
@@ -705,23 +713,23 @@ function ProblemsTab() {
       if (data.ok) {
         loadProblems();
       } else {
-        alert(`Failed to delete problem: ${data.message}`);
+        alert(t('problems.deleteFailed', { message: data.message }));
       }
     } catch (err) {
-      alert('Failed to delete problem');
+      alert(t('problems.deleteFailedGeneric'));
     }
   };
 
   const getDifficultyBadge = (difficulty: number) => {
     const map: any = {
-      0: { label: 'Unknown', color: '#999999' },
-      1: { label: 'Beginner', color: '#DA3737' },
-      2: { label: 'Primary', color: '#CC7700' },
-      3: { label: 'Junior', color: '#FDDB10' },
-      4: { label: 'Senior', color: '#3AAF00' },
-      5: { label: 'Advanced', color: '#2744C2' },
-      6: { label: 'Hard', color: '#773388' },
-      7: { label: 'Grand', color: '#1C1C3C' },
+      0: { label: t('problems.difficulty.unknown'), color: '#999999' },
+      1: { label: t('problems.difficulty.beginner'), color: '#DA3737' },
+      2: { label: t('problems.difficulty.primary'), color: '#CC7700' },
+      3: { label: t('problems.difficulty.junior'), color: '#FDDB10' },
+      4: { label: t('problems.difficulty.senior'), color: '#3AAF00' },
+      5: { label: t('problems.difficulty.advanced'), color: '#2744C2' },
+      6: { label: t('problems.difficulty.hard'), color: '#773388' },
+      7: { label: t('problems.difficulty.grand'), color: '#1C1C3C' },
     };
     const config = map[difficulty] || map[0];
     return (
@@ -733,11 +741,11 @@ function ProblemsTab() {
 
   return (
     <>
-      <Title2>Problem Management</Title2>
+      <Title2>{t('problems.title')}</Title2>
       <Card style={{ marginTop: '24px', padding: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
           <Input
-            placeholder="Search problems..."
+            placeholder={t('problems.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             contentBefore={<SearchRegular />}
@@ -748,24 +756,24 @@ function ProblemsTab() {
             icon={<AddRegular />}
             onClick={() => setShowCreateDialog(true)}
           >
-            Create Problem
+            {t('problems.createProblem')}
           </Button>
         </div>
 
         {loading ? (
-          <Spinner label="Loading problems..." />
+          <Spinner label={t('problems.loading')} />
         ) : (
           <>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHeaderCell>Number</TableHeaderCell>
-                  <TableHeaderCell>Name</TableHeaderCell>
-                  <TableHeaderCell>Difficulty</TableHeaderCell>
-                  <TableHeaderCell>Submissions</TableHeaderCell>
-                  <TableHeaderCell>Accepted</TableHeaderCell>
-                  <TableHeaderCell>Accept Rate</TableHeaderCell>
-                  <TableHeaderCell>Actions</TableHeaderCell>
+                  <TableHeaderCell>{t('problems.table.number')}</TableHeaderCell>
+                  <TableHeaderCell>{t('problems.table.name')}</TableHeaderCell>
+                  <TableHeaderCell>{t('problems.table.difficulty')}</TableHeaderCell>
+                  <TableHeaderCell>{t('problems.table.submissions')}</TableHeaderCell>
+                  <TableHeaderCell>{t('problems.table.accepted')}</TableHeaderCell>
+                  <TableHeaderCell>{t('problems.table.acceptRate')}</TableHeaderCell>
+                  <TableHeaderCell>{t('problems.table.actions')}</TableHeaderCell>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -797,13 +805,13 @@ function ProblemsTab() {
 
             <div className={styles.pagination}>
               <Button disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                Previous
+                {t('problems.pagination.previous')}
               </Button>
               <Text>
-                Page {page} of {totalPages} ({total} total)
+                {t('problems.pagination.pageInfo', { page, totalPages, total })}
               </Text>
               <Button disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-                Next
+                {t('problems.pagination.next')}
               </Button>
             </div>
           </>
@@ -828,14 +836,15 @@ function ProblemsTab() {
 }
 
 function SettingsTab() {
+  const { t } = useTranslation('controlPanel');
   const [loading, setLoading] = useState(false);
 
   const handleClearDatabase = async () => {
-    if (!confirm('Are you sure you want to clear the entire database? This action cannot be undone!')) {
+    if (!confirm(t('settings.confirmClear1'))) {
       return;
     }
 
-    if (!confirm('This will delete ALL data including users, problems, submissions, and discussions. Are you absolutely sure?')) {
+    if (!confirm(t('settings.confirmClear2'))) {
       return;
     }
 
@@ -850,10 +859,10 @@ function SettingsTab() {
       if (data.ok) {
         alert(data.message);
       } else {
-        alert(`Failed: ${data.message}`);
+        alert(t('settings.clearFailed', { message: data.message }));
       }
     } catch (err) {
-      alert('Failed to clear database');
+      alert(t('settings.clearFailedGeneric'));
     } finally {
       setLoading(false);
     }
@@ -861,14 +870,14 @@ function SettingsTab() {
 
   return (
     <>
-      <Title2>Settings</Title2>
+      <Title2>{t('settings.title')}</Title2>
       <Card style={{ marginTop: '24px', padding: '24px' }}>
-        <Title3>Danger Zone</Title3>
+        <Title3>{t('settings.dangerZone')}</Title3>
         <Text style={{ marginTop: '12px', marginBottom: '16px' }}>
-          These actions are irreversible and will affect all users.
+          {t('settings.dangerZoneDescription')}
         </Text>
         <Button appearance="primary" onClick={handleClearDatabase} disabled={loading}>
-          Clear Database
+          {t('settings.clearDatabase')}
         </Button>
       </Card>
     </>

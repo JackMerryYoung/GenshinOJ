@@ -1,0 +1,30 @@
+{
+    "error": {
+        "emptyTitleContent": "标题和内容不能为空。",
+        "invalidSession": "你的会话已失效，请重新登录。",
+        "postFailed": "发布题解失败。"
+    },
+    "sortBy": "排序方式",
+    "sort": {
+        "newest": "最新",
+        "mostLiked": "最多点赞"
+    },
+    "writeASolution": "写题解",
+    "field": {
+        "title": "标题",
+        "content": "内容（支持 Markdown、@提及）"
+    },
+    "post": "发布",
+    "loadingSolutions": "正在加载题解……",
+    "noSolutionsYet": "还没有题解，快来写第一篇吧！",
+    "column": {
+        "title": "标题",
+        "author": "作者",
+        "votes": "投票",
+        "posted": "发布时间"
+    },
+    "official": "官方",
+    "page": "第 {{current}} / {{total}} 页",
+    "previous": "上一页",
+    "next": "下一页"
+}

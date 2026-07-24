@@ -1,5 +1,6 @@
 import { useEffect, useState, lazy } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { makeStyles, Input, Field, Button } from "@fluentui/react-components";
 import { PersonRegular, PasswordRegular } from "@fluentui/react-icons";
@@ -95,6 +96,7 @@ function useRegisterSession(
 }
 
 export default function Register() {
+    const { t } = useTranslation("register");
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const [registerUsernameFromInput, setRegisterUsernameFromInput] = useState("");
     const [registerPasswordFromInput, setRegisterPasswordFromInput] = useState("");
@@ -127,37 +129,37 @@ export default function Register() {
         <>
             <div className={useStyles().root}>
                 <form>
-                    <Field label="Register Username" required>
+                    <Field label={t("field.username")} required>
                         <Input contentBefore={<PersonRegular />}
                             onChange={(props) => setRegisterUsernameFromInput(props.target.value)} />
                     </Field>
-                    <Field label="Register Password" required>
+                    <Field label={t("field.password")} required>
                         <Input contentBefore={<PasswordRegular />} type="password"
                             onChange={(props) => setRegisterPasswordFromInput(props.target.value)} />
                     </Field>
-                    <Field label="Confirm Register Password" required>
+                    <Field label={t("field.confirmPassword")} required>
                         <Input contentBefore={<PasswordRegular />} type="password"
                             onChange={(props) => setRegisterPasswordConfirmFromInput(props.target.value)} />
                     </Field>
-                    <Button appearance="primary" onClick={handleRegistrationClick} style={{ marginTop: "1em" }}>Register</Button>
+                    <Button appearance="primary" onClick={handleRegistrationClick} style={{ marginTop: "1em" }}>{t("action.register")}</Button>
                 </form>
                 <PopupDialog
                     open={dialogLoggedInOpenState && !dialogRegisterSuccessOpenState}
                     setPopupDialogOpenState={setDialogLoggedInOpenState}
-                    text="You have already logged in."
+                    text={t("dialog.alreadyLoggedIn")}
                     onClose={() => navigate("/home")} />
                 <PopupDialog
                     open={dialogPasswordInputAndConfirmNotTheSameOpenState}
                     setPopupDialogOpenState={setDialogPasswordInputAndConfirmNotTheSameOpenState}
-                    text="You input the password which is not the same as confirmed." />
+                    text={t("dialog.passwordMismatch")} />
                 <PopupDialog
                     open={dialogRegisterFailureOpenState}
                     setPopupDialogOpenState={setDialogRegisterFailureOpenState}
-                    text="Registration failed. Maybe you registered an existed username or something went wrong." />
+                    text={t("dialog.registerFailure")} />
                 <PopupDialog
                     open={dialogRegisterSuccessOpenState}
                     setPopupDialogOpenState={setDialogRegisterSuccessOpenState}
-                    text="Registration succeeded."
+                    text={t("dialog.registerSuccess")}
                     onClose={() => navigate("/login")} />
             </div>
         </>

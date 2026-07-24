@@ -1,0 +1,28 @@
+{
+    "sortBy": "Sort by",
+    "sort": {
+        "newest": "Newest",
+        "mostLiked": "Most liked"
+    },
+    "newDiscussion": "New discussion",
+    "titleLabel": "Title",
+    "contentLabel": "Content (Markdown, @mention)",
+    "post": "Post",
+    "loadingDiscussions": "Loading discussions...",
+    "noDiscussionsYet": "No discussions yet. Start one!",
+    "column": {
+        "title": "Title",
+        "author": "Author",
+        "votes": "Votes",
+        "posted": "Posted"
+    },
+    "pageOf": "Page {{current}} / {{total}}",
+    "previous": "Previous",
+    "next": "Next",
+    "pleaseLoginFirst": "Please login first.",
+    "error": {
+        "titleContentEmpty": "Title and content can't be empty.",
+        "invalidSession": "Your session is invalid. Please login again.",
+        "postFailed": "Failed to post the discussion."
+    }
+}

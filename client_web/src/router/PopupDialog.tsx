@@ -1,4 +1,5 @@
 import { MouseEventHandler } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
     Button,
@@ -18,6 +19,7 @@ export default function PopupDialog({ text, open, setPopupDialogOpenState, onClo
     setPopupDialogOpenState: React.Dispatch<React.SetStateAction<boolean>>,
     onClose?: MouseEventHandler<HTMLButtonElement> | undefined,
 }) {
+    const { t } = useTranslation("common");
     const handleClose = (event: React.MouseEvent<HTMLButtonElement>) => {
         if (onClose) onClose(event);
         setPopupDialogOpenState(false);
@@ -33,7 +35,7 @@ export default function PopupDialog({ text, open, setPopupDialogOpenState, onClo
                 <DialogContent>{text}</DialogContent>
                 <DialogActions>
                     <DialogTrigger disableButtonEnhancement>
-                        <Button appearance="primary" onClick={handleClose}>Close</Button>
+                        <Button appearance="primary" onClick={handleClose}>{t("action.close")}</Button>
                     </DialogTrigger>
                 </DialogActions>
             </DialogBody>

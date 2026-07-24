@@ -2,6 +2,8 @@ import { useEffect, useState, lazy, useRef } from "react";
 
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 
+import { useTranslation } from "react-i18next";
+
 import { useSelector } from "react-redux";
 
 import { nanoid } from "nanoid";
@@ -19,6 +21,7 @@ function AvatarUploader({ username, sessionToken, onUploaded }: {
     sessionToken: string;
     onUploaded: () => void;
 }) {
+    const { t } = useTranslation("userProfile");
     const [error, setError] = useState<string | undefined>(undefined);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -29,7 +32,7 @@ function AvatarUploader({ username, sessionToken, onUploaded }: {
         if (!file) return;
 
         if (file.size > MAX_AVATAR_SIZE_BYTES) {
-            setError("File exceeds the 1MB limit.");
+            setError(t("avatarUploader.fileTooLarge"));
             return;
         }
 
@@ -49,7 +52,7 @@ function AvatarUploader({ username, sessionToken, onUploaded }: {
                 onUploaded();
             }
         } catch {
-            setError("Failed to upload avatar.");
+            setError(t("avatarUploader.uploadFailed"));
         } finally {
             setUploading(false);
         }
@@ -67,7 +70,7 @@ function AvatarUploader({ username, sessionToken, onUploaded }: {
             disabled={uploading}
             style={{ marginTop: "1em" }}
             onClick={() => fileInputRef.current?.click()}>
-            {uploading ? "Uploading..." : "Upload Avatar"}
+            {uploading ? t("avatarUploader.uploading") : t("avatarUploader.uploadAvatar")}
         </Button>
         {error && <Label style={{ color: "#DA3737" }}>{error}</Label>}
     </div>;
@@ -237,15 +240,16 @@ function FollowButton({ userProfile, onClickFollow, onClickUnfollow }: {
     onClickFollow: () => void;
     onClickUnfollow: () => void;
 }) {
+    const { t } = useTranslation("userProfile");
     if (userProfile.is_following === undefined) return <></>;
 
     if (!userProfile.is_following)
-        return <Button appearance="primary" onClick={onClickFollow}>Follow</Button>;
+        return <Button appearance="primary" onClick={onClickFollow}>{t("follow")}</Button>;
 
     if (userProfile.is_followed_by)
-        return <Button appearance="secondary" onClick={onClickUnfollow}>Mutual Followed</Button>;
+        return <Button appearance="secondary" onClick={onClickUnfollow}>{t("mutualFollowed")}</Button>;
 
-    return <Button appearance="secondary" onClick={onClickUnfollow}>Followed</Button>;
+    return <Button appearance="secondary" onClick={onClickUnfollow}>{t("followed")}</Button>;
 }
 
 export default function UserProfile() {
@@ -265,6 +269,7 @@ export default function UserProfile() {
     const { follow, unfollow } = useFollowAction(sendJsonMessage, lastJsonMessage, fetchUserProfile);
     const [dialogRequireLoginOpenState, setDialogRequireLoginOpenState] = useState(false);
     const navigate = useNavigate();
+    const { t } = useTranslation("userProfile");
 
     useEffect(() => {
         const localLoginStatus = localStorage.getItem("loginStatus");
@@ -291,11 +296,11 @@ export default function UserProfile() {
                                 size={64}
                                 name={userProfile.username}
                                 image={{ src: `/avatar/${userProfile.username}?v=${avatarCacheBuster}` }} />
-                            <Label style={{ margin: "0 1em" }}>Username: {userProfile.username}</Label>
+                            <Label style={{ margin: "0 1em" }}>{t("usernameLabel", { username: userProfile.username })}</Label>
                         </div>
-                        <Label style={{ margin: "0 0.4em" }}>Accepted: {userProfile.accepted}</Label>
-                        <Label style={{ margin: "0 0.4em" }}>Test Accepted: {userProfile.test_accepted}</Label>
-                        <Label style={{ margin: "0 0.4em" }}>General: {userProfile.general}</Label>
+                        <Label style={{ margin: "0 0.4em" }}>{t("acceptedLabel", { count: userProfile.accepted })}</Label>
+                        <Label style={{ margin: "0 0.4em" }}>{t("testAcceptedLabel", { count: userProfile.test_accepted })}</Label>
+                        <Label style={{ margin: "0 0.4em" }}>{t("generalLabel", { count: userProfile.general })}</Label>
                         {
                             !isOwnProfile &&
                             <span style={{ margin: "0 0.4em" }}>
@@ -320,7 +325,7 @@ export default function UserProfile() {
         <PopupDialog
             open={dialogRequireLoginOpenState}
             setPopupDialogOpenState={setDialogRequireLoginOpenState}
-            text="Please login first."
+            text={t("pleaseLoginFirst")}
             onClose={() => navigate("/login")} />
     </>;
 }

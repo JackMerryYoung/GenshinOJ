@@ -1,0 +1,14 @@
+{
+    "list": {
+        "title": "题目列表"
+    },
+    "error": {
+        "fetchFailed": "获取题目列表失败。"
+    },
+    "loading": {
+        "waiting": "加载中..."
+    },
+    "dialog": {
+        "pleaseLoginFirst": "请先登录。"
+    }
+}

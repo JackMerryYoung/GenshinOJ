@@ -1,0 +1,28 @@
+{
+    "sortBy": "排序方式",
+    "sort": {
+        "newest": "最新",
+        "mostLiked": "最多点赞"
+    },
+    "newDiscussion": "发起新讨论",
+    "titleLabel": "标题",
+    "contentLabel": "内容（支持 Markdown、@提及）",
+    "post": "发布",
+    "loadingDiscussions": "正在加载讨论...",
+    "noDiscussionsYet": "还没有讨论，快来发起一个吧！",
+    "column": {
+        "title": "标题",
+        "author": "作者",
+        "votes": "投票",
+        "posted": "发布时间"
+    },
+    "pageOf": "第 {{current}} / {{total}} 页",
+    "previous": "上一页",
+    "next": "下一页",
+    "pleaseLoginFirst": "请先登录。",
+    "error": {
+        "titleContentEmpty": "标题和内容不能为空。",
+        "invalidSession": "您的会话已失效，请重新登录。",
+        "postFailed": "发布讨论失败。"
+    }
+}

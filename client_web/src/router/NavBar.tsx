@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
-import { Divider, Avatar, Tab, CounterBadge } from "@fluentui/react-components";
+import { Divider, Avatar, Tab, CounterBadge, Dropdown, Option } from "@fluentui/react-components";
 import { ChartMultipleFilled, ChatFilled, ClipboardTaskListLtrFilled, CommentMultipleFilled, AlertFilled, PersonFilled, PersonAddFilled, SignOutFilled, ArrowEnterFilled } from "@fluentui/react-icons";
 
 import { useSelector } from "react-redux";
@@ -12,6 +13,11 @@ import { RootState } from "../store";
 import * as globals from "../Globals.ts";
 
 import "../css/style.css";
+
+const LANGUAGE_OPTIONS = [
+    { value: "en", labelKey: "language.en" },
+    { value: "zh-CN", labelKey: "language.zhCN" },
+] as const;
 
 // Track the logged-in user's unread notification count for the navbar badge. Notifications are
 // pull-based (the judge knows the actor's ws_id, not the recipient's), so this polls on a timer and
@@ -65,6 +71,7 @@ export default function NavBar({ sendJsonMessage, lastJsonMessage }: {
     sendJsonMessage: globals.SendJsonMessage;
     lastJsonMessage: unknown;
 }) {
+    const { t, i18n } = useTranslation(["navBar", "common"]);
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
     const navigate = useNavigate();
     const location = useLocation();
@@ -95,16 +102,16 @@ export default function NavBar({ sendJsonMessage, lastJsonMessage }: {
         <div style={{ padding: "0.35em 0" }}>
             <div style={{ display: "inline" }}>
                 <Tab onClick={() => onTabSelect("home")} style={{ float: "left" }} value="home" icon={<Avatar size={24} image={{ src: "https://img.atcoder.jp/icons/373e4eb93e4b8e5f441eeeea55e5ac84.jpg" }} />}>
-                    Genshin OJ
+                    RsOJ
                 </Tab>
                 {
                     loggedIn &&
                     <>
-                        <Tab onClick={() => onTabSelect("problem")} style={{ float: "left" }} value="problem" icon={<ClipboardTaskListLtrFilled />}>Problem</Tab>
-                        <Tab onClick={() => onTabSelect("submission")} style={{ float: "left" }} value="submission" icon={<ChartMultipleFilled />}>Submission</Tab>
-                        <Tab onClick={() => onTabSelect("discussion")} style={{ float: "left" }} value="discussion" icon={<CommentMultipleFilled />}>Discuss</Tab>
+                        <Tab onClick={() => onTabSelect("problem")} style={{ float: "left" }} value="problem" icon={<ClipboardTaskListLtrFilled />}>{t("tab.problem")}</Tab>
+                        <Tab onClick={() => onTabSelect("submission")} style={{ float: "left" }} value="submission" icon={<ChartMultipleFilled />}>{t("tab.submission")}</Tab>
+                        <Tab onClick={() => onTabSelect("discussion")} style={{ float: "left" }} value="discussion" icon={<CommentMultipleFilled />}>{t("tab.discuss")}</Tab>
                         <Tab onClick={() => onTabSelect("notification")} style={{ float: "left" }} value="notification" icon={<AlertFilled />}>
-                            Notification {unreadCount > 0 && <CounterBadge count={unreadCount} size="small" color="danger" />}
+                            {t("tab.notification")} {unreadCount > 0 && <CounterBadge count={unreadCount} size="small" color="danger" />}
                         </Tab>
                     </>
                 }
@@ -113,16 +120,30 @@ export default function NavBar({ sendJsonMessage, lastJsonMessage }: {
                         ?
                         // float:right stacks right-to-left in DOM order, so this renders as: Chat | User | Sign out.
                         <>
-                            <Tab onClick={() => onTabSelect("logout")} style={{ float: "right" }} value="logout" icon={<SignOutFilled />}>Sign out</Tab>
-                            <Tab onClick={() => onTabSelect("user")} style={{ float: "right" }} value="user" icon={<PersonFilled />}>User</Tab>
-                            <Tab onClick={() => onTabSelect("chat")} style={{ float: "right" }} value="chat" icon={<ChatFilled />}>Chat</Tab>
+                            <Tab onClick={() => onTabSelect("logout")} style={{ float: "right" }} value="logout" icon={<SignOutFilled />}>{t("tab.signOut")}</Tab>
+                            <Tab onClick={() => onTabSelect("user")} style={{ float: "right" }} value="user" icon={<PersonFilled />}>{t("tab.user")}</Tab>
+                            <Tab onClick={() => onTabSelect("chat")} style={{ float: "right" }} value="chat" icon={<ChatFilled />}>{t("tab.chat")}</Tab>
                         </>
                         :
                         <>
-                            <Tab onClick={() => onTabSelect("login")} style={{ float: "right" }} value="login" icon={<ArrowEnterFilled />}>Sign in</Tab>
-                            <Tab onClick={() => onTabSelect("register")} style={{ float: "right" }} value="register" icon={<PersonAddFilled />}>Sign up</Tab>
+                            <Tab onClick={() => onTabSelect("login")} style={{ float: "right" }} value="login" icon={<ArrowEnterFilled />}>{t("tab.signIn")}</Tab>
+                            <Tab onClick={() => onTabSelect("register")} style={{ float: "right" }} value="register" icon={<PersonAddFilled />}>{t("tab.signUp")}</Tab>
                         </>
                 }
+                <Dropdown
+                    style={{ float: "right", minWidth: "120px" }}
+                    value={LANGUAGE_OPTIONS.find((option) => option.value === i18n.resolvedLanguage)?.value ?? "en"}
+                    selectedOptions={[i18n.resolvedLanguage ?? "en"]}
+                    onOptionSelect={(_event, data) => {
+                        if (data.optionValue) i18n.changeLanguage(data.optionValue);
+                    }}
+                >
+                    {LANGUAGE_OPTIONS.map((option) => (
+                        <Option key={option.value} value={option.value}>
+                            {t(option.labelKey, { ns: "common" })}
+                        </Option>
+                    ))}
+                </Dropdown>
 
                 <Divider />
             </div>

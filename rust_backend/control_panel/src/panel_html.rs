@@ -247,7 +247,7 @@ pub const PANEL_HTML: &str = r#"<!DOCTYPE html>
   }
 
   // ── session ───────────────────────────────────────────────────────────────
-  const SESSION_KEY    = 'genshinoj_cp_session';
+  const SESSION_KEY    = 'rsoj_cp_session';
   const SESSION_TTL_MS = 30 * 60 * 1000;
   function persistSession(token) {
     try { localStorage.setItem(SESSION_KEY, JSON.stringify({ token, ts: Date.now() })); } catch (_) {}

@@ -1,0 +1,16 @@
+{
+    "avatarUploader": {
+        "fileTooLarge": "File exceeds the 1MB limit.",
+        "uploadFailed": "Failed to upload avatar.",
+        "uploading": "Uploading...",
+        "uploadAvatar": "Upload Avatar"
+    },
+    "follow": "Follow",
+    "mutualFollowed": "Mutual Followed",
+    "followed": "Followed",
+    "usernameLabel": "Username: {{username}}",
+    "acceptedLabel": "Accepted: {{count}}",
+    "testAcceptedLabel": "Test Accepted: {{count}}",
+    "generalLabel": "General: {{count}}",
+    "pleaseLoginFirst": "Please login first."
+}

@@ -1,0 +1,16 @@
+{
+    "field": {
+        "username": "Register Username",
+        "password": "Register Password",
+        "confirmPassword": "Confirm Register Password"
+    },
+    "action": {
+        "register": "Register"
+    },
+    "dialog": {
+        "alreadyLoggedIn": "You have already logged in.",
+        "passwordMismatch": "You input the password which is not the same as confirmed.",
+        "registerFailure": "Registration failed. Maybe you registered an existed username or something went wrong.",
+        "registerSuccess": "Registration succeeded."
+    }
+}
