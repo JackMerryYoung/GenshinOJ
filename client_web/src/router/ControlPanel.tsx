@@ -7,6 +7,7 @@ const HighchartsReact: any =
   (HighchartsReactModule as any).default ||
   HighchartsReactModule;
 import ProblemEditor from './ProblemEditor';
+import LanguageSwitcher from './LanguageSwitcher.tsx';
 import {
   FluentProvider,
   webLightTheme,
@@ -201,6 +202,9 @@ export function ControlPanel() {
       <FluentProvider theme={webLightTheme}>
         <div className={styles.authContainer}>
           <Card className={styles.authCard}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              <LanguageSwitcher />
+            </div>
             <Title2>{t('auth.title')}</Title2>
             <Text style={{ marginTop: '16px', color: tokens.colorPaletteRedForeground1 }}>
               {error}
@@ -232,6 +236,9 @@ export function ControlPanel() {
             <Badge style={{ marginTop: '4px' }} color="success">
               {getRoleName(adminRole)}
             </Badge>
+            <div style={{ marginTop: '12px' }}>
+              <LanguageSwitcher />
+            </div>
           </div>
           {hasPermission(['problem_admin', 'community_admin', 'super_admin']) && (
             <Button

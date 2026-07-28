@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { Divider, Avatar, Tab, CounterBadge, Dropdown, Option } from "@fluentui/react-components";
+import { Divider, Avatar, Tab, CounterBadge } from "@fluentui/react-components";
 import { ChartMultipleFilled, ChatFilled, ClipboardTaskListLtrFilled, CommentMultipleFilled, AlertFilled, PersonFilled, PersonAddFilled, SignOutFilled, ArrowEnterFilled } from "@fluentui/react-icons";
 
 import { useSelector } from "react-redux";
@@ -12,12 +12,9 @@ import { nanoid } from "nanoid";
 import { RootState } from "../store";
 import * as globals from "../Globals.ts";
 
-import "../css/style.css";
+import LanguageSwitcher from "./LanguageSwitcher.tsx";
 
-const LANGUAGE_OPTIONS = [
-    { value: "en", labelKey: "language.en" },
-    { value: "zh-CN", labelKey: "language.zhCN" },
-] as const;
+import "../css/style.css";
 
 // Track the logged-in user's unread notification count for the navbar badge. Notifications are
 // pull-based (the judge knows the actor's ws_id, not the recipient's), so this polls on a timer and
@@ -71,7 +68,7 @@ export default function NavBar({ sendJsonMessage, lastJsonMessage }: {
     sendJsonMessage: globals.SendJsonMessage;
     lastJsonMessage: unknown;
 }) {
-    const { t, i18n } = useTranslation(["navBar", "common"]);
+    const { t } = useTranslation(["navBar", "common"]);
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
     const navigate = useNavigate();
     const location = useLocation();
@@ -130,20 +127,7 @@ export default function NavBar({ sendJsonMessage, lastJsonMessage }: {
                             <Tab onClick={() => onTabSelect("register")} style={{ float: "right" }} value="register" icon={<PersonAddFilled />}>{t("tab.signUp")}</Tab>
                         </>
                 }
-                <Dropdown
-                    style={{ float: "right", minWidth: "120px" }}
-                    value={LANGUAGE_OPTIONS.find((option) => option.value === i18n.resolvedLanguage)?.value ?? "en"}
-                    selectedOptions={[i18n.resolvedLanguage ?? "en"]}
-                    onOptionSelect={(_event, data) => {
-                        if (data.optionValue) i18n.changeLanguage(data.optionValue);
-                    }}
-                >
-                    {LANGUAGE_OPTIONS.map((option) => (
-                        <Option key={option.value} value={option.value}>
-                            {t(option.labelKey, { ns: "common" })}
-                        </Option>
-                    ))}
-                </Dropdown>
+                <LanguageSwitcher style={{ float: "right" }} />
 
                 <Divider />
             </div>
