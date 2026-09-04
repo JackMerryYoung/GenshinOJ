@@ -1,3 +1,3 @@
-# README
+# Temporary submissions
 
-**This is a directory only for temporarily storation. DO NOT put ANYTHING important here.**
+This directory is temporary runtime storage. Do not keep source files or other important data here.

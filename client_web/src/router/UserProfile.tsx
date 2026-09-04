@@ -229,7 +229,6 @@ function useFollowAction(
         });
 
         if (!globals.compareArray(_websocketMessageHistory, websocketMessageHistory)) setWebsocketMessageHistory(_websocketMessageHistory);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [websocketMessageHistory, requestKey]);
 
     return { follow, unfollow };
@@ -272,16 +271,13 @@ export default function UserProfile() {
     const { t } = useTranslation("userProfile");
 
     useEffect(() => {
-        const localLoginStatus = localStorage.getItem("loginStatus");
-        if (localLoginStatus === null || (loginStatus.value === false && localLoginStatus !== null && JSON.parse(localLoginStatus) === false))
-            setDialogRequireLoginOpenState(true);
+        setDialogRequireLoginOpenState(loginStatus.value === false);
 
     }, [loginStatus]);
 
     useEffect(() => {
         if (loginStatus.value === true && targetUsername)
             fetchUserProfile();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loginStatus, targetUsername]);
 
     const isOwnProfile = loginStatus.value === true && targetUsername === loginUsername.value;

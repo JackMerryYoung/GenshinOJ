@@ -1,4 +1,7 @@
-# IDEA?
+# IDEA（历史设计稿）
+
+> 本文记录早期 Python Working Load 架构，仅用于设计历史。当前实现是
+> `rust_backend/main_backend` 动态加载 Rust 模块；开发说明见 `README.md` 和 `CLAUDE.md`。
 
 基础的就是以一种叫做 Working Load 的东西支撑整个程序
 

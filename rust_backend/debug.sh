@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+# Legacy backend-only debug launcher. Prefer `../start.sh` for normal development.
+
 cargo build -p ws_server
 mv ./target/debug/libws_server.so ./modules/ws_server
 cargo build -p simple_authenticator
@@ -10,7 +13,7 @@ cargo build -p judge
 mv ./target/debug/libjudge.so ./modules/judge
 cargo build -p userish
 mv ./target/debug/libuserish.so ./modules/userish
-# control_panel: debug build bypasses the admin token (dev backdoor). Use build&run.sh for release.
+# Debug and release builds use the same control-panel role-token checks.
 cargo build -p control_panel
 mv ./target/debug/libcontrol_panel.so ./modules/control_panel
 # rm -r ./target

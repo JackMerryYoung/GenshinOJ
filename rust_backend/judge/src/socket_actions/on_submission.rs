@@ -38,6 +38,7 @@ pub async fn on_submission(msg: SocketJsonMessageWithWsId) {
             original_request_key: content.request_key,
         });
         drop(guard_pending_submission_requests);
+        expire_pending(&*PENDING_SUBMISSION_REQUESTS, rpc_request_key.clone());
 
         let msg_to_send: SocketJsonMessage = SocketJsonMessage {
             r#type: String::from("on_validate_session"),

@@ -8,9 +8,10 @@ static MAIN_TOKIO_RUNTIME: once_cell::sync::Lazy<tokio::runtime::Runtime> = once
     || { tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap() }
 );
 
-static MAIN_BACKEND_PANIC_FLAG: std::sync::LazyLock<AsyncModifiable<bool>> = std::sync::LazyLock::new(
-    || std::sync::Arc::new(tokio::sync::Mutex::new(false))
-);
+static MAIN_BACKEND_PANIC_FLAG: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+static MAIN_BACKEND_PANIC_NOTIFY: std::sync::LazyLock<tokio::sync::Notify> =
+    std::sync::LazyLock::new(tokio::sync::Notify::new);
 
 // TODO: Use Rc for better performance
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -42,7 +43,7 @@ struct ModuleInstance {
             std::collections::HashMap<String, AsyncModifiable<ModuleStatus>>
         >
     ) -> (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>),
-    on_unload: extern "Rust" fn(),
+    on_unload: extern "Rust" fn(unload_timeout_ms: usize),
 }
 
 #[derive(Debug)]
@@ -106,7 +107,6 @@ fn main() {
         let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
             module_combinations.clone();
         let module_config_json: AsyncModifiable<ModuleConfigJson> = module_config_json.clone();
-        let main_backend_panic_flag: AsyncModifiable<bool> = MAIN_BACKEND_PANIC_FLAG.clone();
         MAIN_TOKIO_RUNTIME.spawn(async move {
             loop {
                 let guard_module_combinations: tokio::sync::MutexGuard<
@@ -165,12 +165,11 @@ fn main() {
                                     )
                                 )
                             );
-                            let mut guard_main_backend_panic_flag: tokio::sync::MutexGuard<
-                                '_,
-                                bool
-                            > = main_backend_panic_flag.lock().await;
-                            *guard_main_backend_panic_flag = true;
-                            drop(guard_main_backend_panic_flag);
+                            MAIN_BACKEND_PANIC_FLAG.store(
+                                true,
+                                std::sync::atomic::Ordering::Release,
+                            );
+                            MAIN_BACKEND_PANIC_NOTIFY.notify_waiters();
                             panic!();
                         }
                     } else {
@@ -203,7 +202,12 @@ fn main() {
                 '_,
                 ModuleConfigJson
             > = module_config_json.lock().await;
-            unload_module_combinations(&mut guard_module_combinations, &guard_module_config_json);
+            tokio::task::block_in_place(|| {
+                unload_module_combinations(
+                    &mut guard_module_combinations,
+                    &guard_module_config_json,
+                );
+            });
             drop(guard_module_config_json);
             drop(guard_module_combinations);
             println!(
@@ -236,19 +240,18 @@ fn main() {
         let module_combinations: AsyncModifiable<Vec<ModuleCombination>> =
             module_combinations.clone();
         let module_config_json: AsyncModifiable<ModuleConfigJson> = module_config_json.clone();
-        let main_backend_panic_flag: AsyncModifiable<bool> = MAIN_BACKEND_PANIC_FLAG.clone();
         MAIN_TOKIO_RUNTIME.block_on(async move {
             loop {
-                let guard_main_backend_panic_flag: tokio::sync::MutexGuard<
-                    '_,
-                    bool
-                > = main_backend_panic_flag.lock().await;
-                if *guard_main_backend_panic_flag {
-                    drop(guard_main_backend_panic_flag);
+                let notified = MAIN_BACKEND_PANIC_NOTIFY.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
+                let panic_detected = MAIN_BACKEND_PANIC_FLAG.load(
+                    std::sync::atomic::Ordering::Acquire,
+                );
+                if panic_detected {
                     break;
                 }
-
-                drop(guard_main_backend_panic_flag);
+                notified.await;
             }
             let mut guard_module_combinations: tokio::sync::MutexGuard<
                 '_,
@@ -258,7 +261,12 @@ fn main() {
                 '_,
                 ModuleConfigJson
             > = module_config_json.lock().await;
-            unload_module_combinations(&mut guard_module_combinations, &guard_module_config_json);
+            tokio::task::block_in_place(|| {
+                unload_module_combinations(
+                    &mut guard_module_combinations,
+                    &guard_module_config_json,
+                );
+            });
             drop(guard_module_config_json);
             drop(guard_module_combinations);
             println!(
@@ -327,13 +335,10 @@ async fn parse_module_config_json() -> ModuleConfigJson {
                     )
                 )
             );
-            let main_backend_panic_flag: AsyncModifiable<bool> = MAIN_BACKEND_PANIC_FLAG.clone();
-            let mut guard_main_backend_panic_flag: tokio::sync::MutexGuard<
-                '_,
-                bool
-            > = main_backend_panic_flag.lock().await;
-            *guard_main_backend_panic_flag = true;
-            drop(guard_main_backend_panic_flag);
+            MAIN_BACKEND_PANIC_FLAG.store(
+                true,
+                std::sync::atomic::Ordering::Release,
+            );
             panic!();
         }
     };
@@ -755,8 +760,21 @@ fn unload_module_combinations(
     module_combinations: &mut Vec<ModuleCombination>,
     module_config_json: &ModuleConfigJson
 ) {
-    for module in module_combinations.drain(..) {
-        module.instance.on_unload(); // Unload each module.
+    // Phase 1: ask every module to finish protocol/database cleanup while all runtimes are still
+    // alive. This matters for modules that communicate with a service which is not represented as
+    // a formal dependency (for example, authenticator sends its unbind message to ws_server).
+    let modules: Vec<ModuleCombination> = std::mem::take(module_combinations);
+    for module in &modules {
+        let unload_timeout: usize = module_config_json.working_load
+            .get(&module.name)
+            .map(|config| config.unload_timeout)
+            .unwrap_or(0);
+        module.instance.on_unload(unload_timeout); // Request graceful cleanup.
+    }
+
+    // Phase 2: dependencies are loaded before dependants, so stop runtimes in reverse order.
+    // Any task that did not finish in phase 1 is force-cancelled after its configured timeout.
+    for module in modules.into_iter().rev() {
         let unload_timeout: usize = module_config_json.working_load
             .get(&module.name)
             .map(|config| config.unload_timeout)
@@ -780,4 +798,3 @@ fn unload_module_combinations(
         );
     }
 }
-

@@ -12,6 +12,8 @@
         "forward10": "Forward 10"
     },
     "indexPage": "Submission Index Page of {{current}} / {{total}}",
+    "emptySelection": "Select a submission to view its details.",
+    "ownSubmission": "My submission",
     "column": {
         "submissionId": "Submission ID",
         "problemNumber": "Problem Number",

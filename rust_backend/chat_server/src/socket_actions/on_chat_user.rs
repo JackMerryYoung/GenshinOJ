@@ -33,6 +33,7 @@ pub async fn on_chat_user(msg: SocketJsonMessageWithWsId) {
             messages: content.messages,
         });
         drop(guard_pending_chat_requests);
+        expire_pending(&*PENDING_CHAT_REQUESTS, request_key.clone());
 
         let msg_to_send: SocketJsonMessage = SocketJsonMessage {
             r#type: String::from("on_validate_session_and_locate"),

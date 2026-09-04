@@ -7,7 +7,7 @@
             "protocol": "std_authenticator@0.1.0",
             "enabled": true,
             "dependencies": [],
-            "unload_timeout": 0
+            "unload_timeout": 5000
         },
         "db_connector": {
             "name": "Database Connector",
@@ -25,7 +25,7 @@
             "dependencies": [
                 "std_authenticator@0.1.0"
             ],
-            "unload_timeout": 0
+            "unload_timeout": 5000
         },
         "compilers_manager": {
             "name": "Compilers Manager",
@@ -44,7 +44,7 @@
                 "std_ws_server@0.1.0",
                 "std_authenticator@0.1.0"
             ],
-            "unload_timeout": 0
+            "unload_timeout": 5000
         },
         "chat_server": {
             "name": "Chat Server",
@@ -54,7 +54,7 @@
             "dependencies": [
                 "std_ws_server@0.1.0"
             ],
-            "unload_timeout": 0
+            "unload_timeout": 5000
         },
         "userish": {
             "name": "Userish",
@@ -65,7 +65,7 @@
                 "std_ws_server@0.1.0",
                 "std_authenticator@0.1.0"
             ],
-            "unload_timeout": 0
+            "unload_timeout": 5000
         },
         "music_player_server": {
             "name": "Music Player Server",
@@ -83,7 +83,7 @@
             "protocol": "std_control_panel@0.1.0",
             "enabled": true,
             "dependencies": [],
-            "unload_timeout": 0
+            "unload_timeout": 5000
         }
     }
 }

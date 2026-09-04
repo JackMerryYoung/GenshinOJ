@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Dialog,
@@ -21,8 +22,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css';
-
-const CONTROL_PANEL_URL = 'http://localhost:9990';
+import { controlPanelFetch } from '../controlPanelApi';
 
 interface TestCase {
   input_file: string;
@@ -37,6 +37,21 @@ interface ProblemEditorProps {
   onClose: () => void;
   problemNumber?: number;
   onSuccess: () => void;
+}
+
+type SaveActionState = {
+  status: 'idle' | 'success' | 'failure';
+  message?: string;
+};
+
+function SaveButton({ disabled, label }: { disabled: boolean; label: string }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button appearance="primary" type="submit" disabled={disabled || pending}>
+      {pending ? '...' : label}
+    </Button>
+  );
 }
 
 export default function ProblemEditor({ isOpen, onClose, problemNumber, onSuccess }: ProblemEditorProps) {
@@ -61,6 +76,51 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
   // Cache the title's problem number so closing animation keeps showing the
   // correct title instead of briefly flipping to "Create New Problem".
   const [displayNumber, setDisplayNumber] = useState<number | undefined>(undefined);
+  const handledSaveStateRef = useRef<SaveActionState | null>(null);
+
+  const [saveState, saveAction] = useActionState<SaveActionState, FormData>(
+    async () => {
+      try {
+        // Statement is stored as a JSON array of paragraphs (split on newlines).
+        const problem_statement = JSON.stringify(statement.split('\n'));
+
+        // testcase_config matches the judge's schema: a `testcases` array whose
+        // entries carry number/score/input/answer/time_limit(sec)/memory_limit(MB).
+        const testcase_config = JSON.stringify({
+          testcases: testCases.map((tc, i) => ({
+            number: i + 1,
+            score: tc.score,
+            input: tc.input_file,
+            answer: tc.output_file,
+            time_limit: tc.time_limit / 1000,
+            memory_limit: tc.memory_limit,
+          })),
+        });
+
+        const url = problemNumber ? `/api/problems/${problemNumber}` : '/api/problems/create';
+        const method = problemNumber ? 'PUT' : 'POST';
+        const payload = problemNumber
+          ? { problem_name: problemName, difficulty: parseInt(difficulty), problem_statement, testcase_config }
+          : {
+            problem_number: parseInt(newProblemNumber),
+            problem_name: problemName,
+            difficulty: parseInt(difficulty),
+            problem_statement,
+            testcase_config,
+          };
+
+        const response = await controlPanelFetch(url, { method, body: JSON.stringify(payload) });
+        const data = await response.json();
+        if (!data.ok) {
+          return { status: 'failure', message: t('message.saveFailedWithReason', { message: data.message }) };
+        }
+        return { status: 'success' };
+      } catch {
+        return { status: 'failure', message: t('message.saveFailedGeneric') };
+      }
+    },
+    { status: 'idle' },
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -73,12 +133,23 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
     }
   }, [isOpen, problemNumber]);
 
+  useEffect(() => {
+    if (handledSaveStateRef.current === saveState) return;
+    handledSaveStateRef.current = saveState;
+    if (saveState.status === 'success') {
+      onSuccess();
+      onClose();
+    } else if (saveState.status === 'failure' && saveState.message) {
+      alert(saveState.message);
+    }
+  }, [saveState, onClose, onSuccess]);
+
   const loadProblem = async () => {
     if (!problemNumber) return;
 
     setLoading(true);
     try {
-      const response = await fetch(`${CONTROL_PANEL_URL}/api/problems/${problemNumber}`);
+      const response = await controlPanelFetch(`/api/problems/${problemNumber}`);
       const data = await response.json();
 
       if (data.ok) {
@@ -140,71 +211,6 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
     setActiveTab('basic');
   };
 
-  const handleSave = async () => {
-    setLoading(true);
-    try {
-      // Statement is stored as a JSON array of paragraphs (split on newlines).
-      const statementArray = statement.split('\n');
-      const problem_statement = JSON.stringify(statementArray);
-
-      // testcase_config matches the judge's schema: a `testcases` array whose
-      // entries carry number/score/input/answer/time_limit(sec)/memory_limit(MB).
-      const testcase_config = JSON.stringify({
-        testcases: testCases.map((tc, i) => ({
-          number: i + 1,
-          score: tc.score,
-          input: tc.input_file,
-          answer: tc.output_file,
-          time_limit: tc.time_limit / 1000,
-          memory_limit: tc.memory_limit,
-        })),
-      });
-
-      let url: string;
-      let method: string;
-      let payload: any;
-
-      if (problemNumber) {
-        url = `${CONTROL_PANEL_URL}/api/problems/${problemNumber}`;
-        method = 'PUT';
-        payload = {
-          problem_name: problemName,
-          difficulty: parseInt(difficulty),
-          problem_statement,
-          testcase_config,
-        };
-      } else {
-        url = `${CONTROL_PANEL_URL}/api/problems/create`;
-        method = 'POST';
-        payload = {
-          problem_number: parseInt(newProblemNumber),
-          problem_name: problemName,
-          difficulty: parseInt(difficulty),
-          problem_statement,
-          testcase_config,
-        };
-      }
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-      if (data.ok) {
-        onSuccess();
-        onClose();
-      } else {
-        alert(t('message.saveFailedWithReason', { message: data.message }));
-      }
-    } catch (err) {
-      alert(t('message.saveFailedGeneric'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'input' | 'output', index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -216,7 +222,7 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
       formData.append('problem_number', problemNumber?.toString() || 'new');
       formData.append('type', type);
 
-      const response = await fetch(`${CONTROL_PANEL_URL}/api/upload-testdata`, {
+      const response = await controlPanelFetch('/api/upload-testdata', {
         method: 'POST',
         body: formData,
       });
@@ -272,7 +278,7 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
 
   return (
     <Dialog open={isOpen} onOpenChange={(_, data) => !data.open && onClose()} modalType="non-modal">
-      {isOpen && (
+      {isOpen ? (
         <div
           onClick={onClose}
           style={{
@@ -282,7 +288,7 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
             zIndex: 1000000,
           }}
         />
-      )}
+      ) : <></>}
       <DialogSurface style={{ maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <DialogTitle>{displayNumber ? t('title.edit', { number: displayNumber }) : t('title.create')}</DialogTitle>
         <DialogBody style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
@@ -520,14 +526,17 @@ export default function ProblemEditor({ isOpen, onClose, problemNumber, onSucces
             )}
           </DialogContent>
         </DialogBody>
-        <DialogActions style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e0e0e0' }}>
-          <Button appearance="secondary" onClick={onClose}>
-            {t('action.cancel', { ns: 'common' })}
-          </Button>
-          <Button appearance="primary" onClick={handleSave} disabled={loading || !problemName}>
-            {t('action.save', { ns: 'common' })}
-          </Button>
-        </DialogActions>
+        <form action={saveAction}>
+          <DialogActions style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e0e0e0' }}>
+            <Button appearance="secondary" type="button" onClick={onClose}>
+              {t('action.cancel', { ns: 'common' })}
+            </Button>
+            <SaveButton
+              disabled={loading || !problemName}
+              label={t('action.save', { ns: 'common' })}
+            />
+          </DialogActions>
+        </form>
       </DialogSurface>
     </Dialog>
   );

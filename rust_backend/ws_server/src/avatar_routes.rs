@@ -53,6 +53,7 @@ async fn validate_session(username: &str, session_token: &str) -> bool {
         let mut guard_pending_validate_session_requests = PENDING_VALIDATE_SESSION_REQUESTS.lock().await;
         guard_pending_validate_session_requests.insert(request_key.clone(), tx);
     }
+    expire_pending(&*PENDING_VALIDATE_SESSION_REQUESTS, request_key.clone());
 
     let msg_to_send: SocketJsonMessage = SocketJsonMessage {
         r#type: String::from("on_validate_session"),

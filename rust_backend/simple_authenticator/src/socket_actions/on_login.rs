@@ -114,32 +114,12 @@ async fn send_json_msg_to_ws_server_on_login_success(
 pub async fn on_login(msg: SocketJsonMessageWithWsId) {
     if let Ok(unwrapped_content) = serde_json::from_value::<ContentOnLogin>(msg.content) {
         let password_hash: String = get_hash(unwrapped_content.password.as_str());
-        println!(
-            "{}",
-            ansi_term::Color::Blue.paint(
-                format!(
-                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` try to login with the hash: `{}`.",
-                    MODULE_IDENTITY,
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!(),
-                    unwrapped_content.username,
-                    password_hash
-                )
-            )
-        );
-
-        let guard_mysql_database_pool: tokio::sync::MutexGuard<
-            '_,
-            mysql_async::Pool
-        > = MYSQL_DATABASE_POOL.lock().await;
-        let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+        let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
         let results: Result<Vec<String>, _> = conn.exec(
             "SELECT password FROM RsOJ.users WHERE username = :username",
             mysql_async::params! { "username" => &unwrapped_content.username }
         ).await;
         drop(conn);
-        drop(guard_mysql_database_pool);
         match results {
             Ok(results_unwrapped) => {
                 if let Some(real_password_hash) = results_unwrapped.first() {
@@ -147,6 +127,9 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                         let new_session_token: String = generate_session_token(
                             rand::rng().random_range(u32::MAX / 4..=u32::MAX)
                         );
+
+                        let _session_state = SESSION_STATE_LOCK.lock().await;
+                        unbind_ws_identity(&msg.ws_id).await;
 
                         println!(
                             "{}",
@@ -161,20 +144,6 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                                 )
                             )
                         );
-                        println!(
-                            "{}",
-                            ansi_term::Color::Blue.paint(
-                                format!(
-                                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The session token: `{}`.",
-                                    MODULE_IDENTITY,
-                                    std::thread::current().id().as_u64(),
-                                    file!(),
-                                    line!(),
-                                    new_session_token
-                                )
-                            )
-                        );
-
                         let mut guard_logged_in_usernames: tokio::sync::MutexGuard<
                             '_,
                             std::collections::HashSet<String>
@@ -182,25 +151,25 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                         guard_logged_in_usernames.insert(unwrapped_content.username.clone());
                         drop(guard_logged_in_usernames);
 
+                        let old_ws_id = WS_IDS_BY_USERNAME
+                            .lock()
+                            .await
+                            .insert(unwrapped_content.username.clone(), msg.ws_id.clone());
+
                         let mut guard_usernames_by_ws_id: tokio::sync::MutexGuard<
                             '_,
                             std::collections::HashMap<String, String>
                         > = USERNAMES_BY_WS_ID.lock().await;
+                        if let Some(old_ws_id) = old_ws_id
+                            && old_ws_id != msg.ws_id
+                        {
+                            guard_usernames_by_ws_id.remove(&old_ws_id);
+                        }
                         guard_usernames_by_ws_id.insert(
                             msg.ws_id.clone(),
                             unwrapped_content.username.clone()
                         );
                         drop(guard_usernames_by_ws_id);
-
-                        let mut guard_ws_ids_by_username: tokio::sync::MutexGuard<
-                            '_,
-                            std::collections::HashMap<String, String>
-                        > = WS_IDS_BY_USERNAME.lock().await;
-                        guard_ws_ids_by_username.insert(
-                            unwrapped_content.username.clone(),
-                            msg.ws_id.clone()
-                        );
-                        drop(guard_ws_ids_by_username);
 
                         let mut guard_session_tokens: tokio::sync::MutexGuard<
                             '_,
@@ -211,6 +180,7 @@ pub async fn on_login(msg: SocketJsonMessageWithWsId) {
                             new_session_token.clone()
                         );
                         drop(guard_session_tokens);
+                        drop(_session_state);
                         send_json_msg_to_ws_server_on_login_success(
                             msg.ws_id,
                             unwrapped_content,

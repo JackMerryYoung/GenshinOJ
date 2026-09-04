@@ -10,19 +10,13 @@ pub struct SocketJsonMessageContentOnSendMsg {
 
 pub async fn on_send_msg(msg: SocketJsonMessage) {
     if let Ok(content) = serde_json::from_value::<SocketJsonMessageContentOnSendMsg>(msg.content) {
-        let guard_ws_server_connections_by_ws_id: tokio::sync::MutexGuard<
-            '_,
-            std::collections::HashMap<
-                String,
-                AsyncModifiable<
-                    futures_util::stream::SplitSink<
-                        axum::extract::ws::WebSocket,
-                        axum::extract::ws::Message
-                    >
-                >
-            >
-        > = WS_SERVER_CONNECTIONS_BY_WS_ID.lock().await;
-        if let Some(ws) = guard_ws_server_connections_by_ws_id.get(content.ws_id.as_str()) {
+        // Clone the per-connection sender and release the registry lock before awaiting the
+        // socket write. A slow client must not block inserts/removals or sends to other clients.
+        let ws = {
+            let guard_ws_server_connections_by_ws_id = WS_SERVER_CONNECTIONS_BY_WS_ID.lock().await;
+            guard_ws_server_connections_by_ws_id.get(content.ws_id.as_str()).cloned()
+        };
+        if let Some(ws) = ws {
             let mut guard_ws: tokio::sync::MutexGuard<
                 '_,
                 futures_util::stream::SplitSink<
@@ -63,9 +57,6 @@ pub async fn on_send_msg(msg: SocketJsonMessage) {
                     )
                 );
             }
-
-            drop(guard_ws);
-            drop(guard_ws_server_connections_by_ws_id);
         } else {
             println!(
                 "{}",

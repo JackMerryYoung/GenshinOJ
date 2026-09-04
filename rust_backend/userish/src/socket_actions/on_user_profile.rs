@@ -35,11 +35,7 @@ pub async fn on_user_profile(msg: SocketJsonMessageWithWsId) {
             msg.content
         )
     {
-        let guard_mysql_database_pool: tokio::sync::MutexGuard<
-            '_,
-            mysql_async::Pool
-        > = MYSQL_DATABASE_POOL.lock().await;
-        let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+        let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
         let results: Result<Vec<(i32, i32, i32)>, _> = conn
             .exec(
                 "SELECT accepted, test_accepted, general FROM RsOJ.users WHERE username = :username",
@@ -69,7 +65,6 @@ pub async fn on_user_profile(msg: SocketJsonMessageWithWsId) {
         };
 
         drop(conn);
-        drop(guard_mysql_database_pool);
 
         match results {
             Ok(results_unwrapped) => {

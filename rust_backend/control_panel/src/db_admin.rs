@@ -11,9 +11,7 @@ use mysql_async::prelude::*;
 //
 // Returns the number of tables truncated.
 pub async fn clear_database() -> Result<usize, String> {
-    let guard_mysql_database_pool: tokio::sync::MutexGuard<'_, mysql_async::Pool> =
-        MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_mysql_database_pool
+    let mut conn: mysql_async::Conn = MYSQL_DATABASE_POOL
         .get_conn().await
         .map_err(|e| e.to_string())?;
 
@@ -50,6 +48,5 @@ pub async fn clear_database() -> Result<usize, String> {
     "SET FOREIGN_KEY_CHECKS = 1".ignore(&mut conn).await.map_err(|e| e.to_string())?;
 
     drop(conn);
-    drop(guard_mysql_database_pool);
     Ok(tables.len())
 }

@@ -24,9 +24,41 @@ pub static CHAT_SERVER_SOCKET: std::sync::OnceLock<AsyncModifiable<tokio::net::T
 
 pub const MYSQL_DATABASE_URL: &str = "mysql://root:123456@127.0.0.1:3306/";
 
-pub static MYSQL_DATABASE_POOL: std::sync::LazyLock<tokio::sync::Mutex<mysql_async::Pool>> = std::sync::LazyLock::new(
-    || { tokio::sync::Mutex::new(mysql_async::Pool::new(MYSQL_DATABASE_URL)) }
-);
+pub static MYSQL_DATABASE_POOL: std::sync::LazyLock<mysql_async::Pool> =
+    std::sync::LazyLock::new(|| mysql_async::Pool::new(MYSQL_DATABASE_URL));
+
+pub static MODULE_RUNTIME_HANDLE: std::sync::OnceLock<tokio::runtime::Handle> =
+    std::sync::OnceLock::new();
+
+pub fn run_shutdown_task<F>(task: F, timeout: std::time::Duration) -> bool
+where
+    F: std::future::Future<Output = ()> + Send + 'static,
+{
+    if let Some(handle) = MODULE_RUNTIME_HANDLE.get() {
+        let (complete_tx, complete_rx) = std::sync::mpsc::channel();
+        drop(handle.spawn(async move {
+            task.await;
+            let _ = complete_tx.send(());
+        }));
+        complete_rx.recv_timeout(timeout).is_ok()
+    } else {
+        eprintln!("[{}] [WARNING] Runtime handle is unavailable during shutdown", MODULE_IDENTITY);
+        false
+    }
+}
+
+pub async fn disconnect_database_pool() {
+    if let Err(error) = MYSQL_DATABASE_POOL.clone().disconnect().await {
+        eprintln!(
+            "[{}] [WARNING] Failed to disconnect the database pool during shutdown: {}",
+            MODULE_IDENTITY, error
+        );
+    }
+}
+
+pub async fn get_db_conn() -> Result<mysql_async::Conn, mysql_async::Error> {
+    MYSQL_DATABASE_POOL.get_conn().await
+}
 
 // In-memory map of pending `chat_user` requests, keyed by the request_key used when asking
 // simple_authenticator to validate the session and locate the recipient. Needed because the
@@ -62,11 +94,7 @@ pub struct ChatMessageRow {
 
 pub async fn store_chat_message(from_username: &str, to_username: &str, messages: &str, created_at: i64) {
     use mysql_async::prelude::*;
-    let guard_mysql_database_pool: tokio::sync::MutexGuard<
-        '_,
-        mysql_async::Pool
-    > = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
     conn.exec_drop(
         "INSERT INTO RsOJ.chat_messages (from_username, to_username, messages, created_at) VALUES (:from_username, :to_username, :messages, :created_at)",
         mysql_async::params! {
@@ -88,11 +116,7 @@ pub async fn fetch_chat_history(
     before_id: Option<i64>
 ) -> Vec<ChatMessageRow> {
     use mysql_async::prelude::*;
-    let guard_mysql_database_pool: tokio::sync::MutexGuard<
-        '_,
-        mysql_async::Pool
-    > = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
     let rows: Vec<(i64, String, String, i64)> = match before_id {
         Some(before_id) => {
             conn.exec(
@@ -125,6 +149,16 @@ pub async fn fetch_chat_history(
 pub static PENDING_CHAT_REQUESTS: std::sync::LazyLock<
     tokio::sync::Mutex<std::collections::HashMap<String, PendingChatRequest>>
 > = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
+pub fn expire_pending<T: Send + 'static>(
+    map: &'static tokio::sync::Mutex<std::collections::HashMap<String, T>>,
+    request_key: String,
+) {
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        map.lock().await.remove(&request_key);
+    });
+}
 
 #[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug)]
 pub struct SocketJsonMessage {

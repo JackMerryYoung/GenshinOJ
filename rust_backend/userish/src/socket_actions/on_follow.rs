@@ -68,6 +68,7 @@ pub async fn on_follow(msg: SocketJsonMessageWithWsId) {
                 request_key: content.request_key,
             });
         }
+        expire_pending(&*PENDING_FOLLOW_REQUESTS, validate_request_key.clone());
 
         let validate_msg: SocketJsonMessage = SocketJsonMessage {
             r#type: String::from("on_validate_session"),
@@ -99,11 +100,7 @@ pub async fn on_follow(msg: SocketJsonMessageWithWsId) {
 }
 
 pub async fn perform_follow(follower_username: &str, followee_username: &str) -> bool {
-    let guard_mysql_database_pool: tokio::sync::MutexGuard<
-        '_,
-        mysql_async::Pool
-    > = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
     let result = conn
         .exec_drop(
             "INSERT IGNORE INTO RsOJ.follows (follower_username, followee_username)
@@ -115,6 +112,5 @@ pub async fn perform_follow(follower_username: &str, followee_username: &str) ->
         )
         .await;
     drop(conn);
-    drop(guard_mysql_database_pool);
     result.is_ok()
 }

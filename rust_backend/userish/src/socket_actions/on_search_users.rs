@@ -31,11 +31,7 @@ pub async fn on_search_users(msg: SocketJsonMessageWithWsId) {
         let pattern: String = format!("%{}%", escaped_query);
         let exclude_username: String = content.exclude_username.unwrap_or_default();
 
-        let guard_mysql_database_pool: tokio::sync::MutexGuard<
-            '_,
-            mysql_async::Pool
-        > = MYSQL_DATABASE_POOL.lock().await;
-        let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+        let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
         let results: Result<Vec<String>, _> = conn
             .exec(
                 "SELECT username FROM RsOJ.users
@@ -50,7 +46,6 @@ pub async fn on_search_users(msg: SocketJsonMessageWithWsId) {
             )
             .await;
         drop(conn);
-        drop(guard_mysql_database_pool);
 
         match results {
             Ok(users) => {

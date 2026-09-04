@@ -7,8 +7,15 @@ struct SocketJsonMessageContentOnProblemSet {
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
+struct ProblemListItem {
+    problem_number: i64,
+    problem_name: String,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
 struct ContentInProblemSetResult {
     problem_set: Vec<String>,
+    problems: Vec<ProblemListItem>,
     request_key: String,
 }
 
@@ -25,24 +32,28 @@ pub async fn on_problem_set(msg: SocketJsonMessageWithWsId) {
         )
     {
         // Read problem set from database instead of JSON file
-        let guard = MYSQL_DATABASE_POOL.lock().await;
-        match guard.get_conn().await {
+        match get_db_conn().await {
             Ok(mut conn) => {
                 let query = format!(
-                    "SELECT problem_number FROM `{DATABASE_NAME}`.`problems` ORDER BY problem_number ASC"
+                    "SELECT problem_number, problem_name FROM `{DATABASE_NAME}`.`problems` ORDER BY problem_number ASC"
                 );
 
-                match conn.query::<i64, _>(query).await {
-                    Ok(problem_numbers) => {
-                        let problem_set: Vec<String> = problem_numbers
+                match conn.query::<(i64, String), _>(query).await {
+                    Ok(problem_rows) => {
+                        let problem_set: Vec<String> = problem_rows
+                            .iter()
+                            .map(|(problem_number, _)| problem_number.to_string())
+                            .collect();
+                        let problems: Vec<ProblemListItem> = problem_rows
                             .into_iter()
-                            .map(|n| n.to_string())
+                            .map(|(problem_number, problem_name)| ProblemListItem { problem_number, problem_name })
                             .collect();
 
                         let problem_set_result = ProblemSetResult {
                             r#type: String::from("problem_set"),
                             content: ContentInProblemSetResult {
                                 problem_set,
+                                problems,
                                 request_key: content.request_key,
                             },
                         };
@@ -97,7 +108,6 @@ pub async fn on_problem_set(msg: SocketJsonMessageWithWsId) {
                 );
             }
         }
-        drop(guard);
     } else {
         println!(
             "{}",

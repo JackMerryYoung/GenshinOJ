@@ -90,26 +90,7 @@ async fn send_json_msg_to_ws_server_on_register_success(
 pub async fn on_register(msg: SocketJsonMessageWithWsId) {
     if let Ok(unwrapped_content) = serde_json::from_value::<ContentOnRegister>(msg.content) {
         let password_hash: String = get_hash(unwrapped_content.password.as_str());
-        println!(
-            "{}",
-            ansi_term::Color::Blue.paint(
-                format!(
-                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` try to register with the hash: `{}`.",
-                    MODULE_IDENTITY,
-                    std::thread::current().id().as_u64(),
-                    file!(),
-                    line!(),
-                    unwrapped_content.username,
-                    password_hash
-                )
-            )
-        );
-
-        let guard_mysql_database_pool: tokio::sync::MutexGuard<
-            '_,
-            mysql_async::Pool
-        > = MYSQL_DATABASE_POOL.lock().await;
-        let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+        let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
         let results: Result<Vec<String>, _> = conn.exec(
             "SELECT password FROM RsOJ.users WHERE username = :username",
             mysql_async::params! { "username" => &unwrapped_content.username }
@@ -199,6 +180,5 @@ pub async fn on_register(msg: SocketJsonMessageWithWsId) {
             }
         }
         drop(conn);
-        drop(guard_mysql_database_pool);
     }
 }

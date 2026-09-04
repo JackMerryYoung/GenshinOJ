@@ -106,14 +106,8 @@ pub const PANEL_HTML: &str = r#"<!DOCTYPE html>
     <div class="card">
       <h1>RsOJ Control Panel</h1>
       <section id="setup" class="hidden">
-        <h2>First-time setup</h2>
-        <p class="hint">Generate admin token (shown only once).</p>
-        <button id="generate" class="primary">Generate admin token</button>
-        <div id="tokenReveal" class="hidden">
-          <p class="hint">Your admin token:</p>
-          <div id="tokenBox" style="word-break: break-all; font-family: monospace; background: var(--colorNeutralBackground3); padding: 10px; border-radius: var(--borderRadiusMedium); margin-bottom: 16px;"></div>
-          <button id="gotIt" class="primary">I saved it</button>
-        </div>
+        <h2>Server configuration required</h2>
+        <p class="hint">Set a CONTROL_PANEL_*_TOKEN environment variable and restart the backend.</p>
       </section>
       <section id="login" class="hidden">
         <h2>Admin login</h2>
@@ -187,10 +181,14 @@ pub const PANEL_HTML: &str = r#"<!DOCTYPE html>
           <input id="newProblemName" type="text" placeholder="e.g., Two Sum" />
           <label for="newProblemDifficulty">Difficulty</label>
           <select id="newProblemDifficulty" style="width: 100%; height: 32px; padding: 0 10px; border-radius: 4px; border: 1px solid #d1d1d1; margin-bottom: 16px; font-size: 14px; font-family: inherit;">
-            <option value="1">1 - Easy</option>
-            <option value="2">2 - Medium</option>
-            <option value="3">3 - Hard</option>
-            <option value="4">4 - Expert</option>
+            <option value="0">0 - Unknown</option>
+            <option value="1">1 - Beginner</option>
+            <option value="2">2 - Primary</option>
+            <option value="3">3 - Junior</option>
+            <option value="4">4 - Senior</option>
+            <option value="5">5 - Advanced</option>
+            <option value="6">6 - Hard</option>
+            <option value="7">7 - Grand</option>
           </select>
           <label for="newProblemStatement">Problem Statement (JSON array format)</label>
           <textarea id="newProblemStatement" placeholder='["Problem description line 1", "Line 2", "Line 3"]' style="min-height: 120px;"></textarea>
@@ -238,10 +236,15 @@ pub const PANEL_HTML: &str = r#"<!DOCTYPE html>
   function btnDone(btn)        { btn.disabled = false; btn.textContent = btn.dataset.orig; }
 
   async function postJson(url, body) {
+    const token = body?.token || sessionToken;
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    const payload = { ...(body || {}) };
+    delete payload.token;
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body || {}),
+      headers,
+      body: JSON.stringify(payload),
     });
     return { res, data: await res.json() };
   }
@@ -250,33 +253,26 @@ pub const PANEL_HTML: &str = r#"<!DOCTYPE html>
   const SESSION_KEY    = 'rsoj_cp_session';
   const SESSION_TTL_MS = 30 * 60 * 1000;
   function persistSession(token) {
-    try { localStorage.setItem(SESSION_KEY, JSON.stringify({ token, ts: Date.now() })); } catch (_) {}
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token, ts: Date.now() })); } catch (_) {}
   }
   function loadSession() {
     try {
-      const s = JSON.parse(localStorage.getItem(SESSION_KEY));
+      const s = JSON.parse(sessionStorage.getItem(SESSION_KEY));
       if (!s?.token || !s?.ts) return null;
-      if (Date.now() - s.ts > SESSION_TTL_MS) { localStorage.removeItem(SESSION_KEY); return null; }
+      if (Date.now() - s.ts > SESSION_TTL_MS) { sessionStorage.removeItem(SESSION_KEY); return null; }
       return s;
     } catch (_) { return null; }
   }
-  function clearSession() { try { localStorage.removeItem(SESSION_KEY); } catch (_) {} }
+  function clearSession() { try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {} }
 
   // ── auth flow ─────────────────────────────────────────────────────────────
   async function init() {
     try {
       const res  = await fetch('/api/status');
       const data = await res.json();
-      // Dev mode: debug build bypasses token entirely — go straight to the app.
-      if (data.dev_mode) {
-        authEl.classList.add('hidden');
-        appEl.classList.remove('hidden');
-        if (!location.hash || location.hash === '#/') location.hash = '#/monitor';
-        route();
-        return;
-      }
       if (!data.configured) {
         document.getElementById('setup').classList.remove('hidden');
+        setAuthStatus('No control-panel role token is configured.', false);
       } else {
         const session = loadSession();
         if (session && await authenticate(session.token, true)) return;
@@ -290,34 +286,6 @@ pub const PANEL_HTML: &str = r#"<!DOCTYPE html>
       document.getElementById('login').classList.remove('hidden');
     }
   }
-
-  // Generate token
-  const generateBtn = document.getElementById('generate');
-  generateBtn.addEventListener('click', async () => {
-    btnBusy(generateBtn, 'Generating…');
-    setAuthStatus('', true);
-    try {
-      const { res, data } = await postJson('/api/setup');
-      if (res.ok && data.token) {
-        document.getElementById('tokenBox').textContent = data.token;
-        document.getElementById('tokenReveal').classList.remove('hidden');
-        generateBtn.classList.add('hidden');
-        setAuthStatus('Token generated — save it now!', true);
-      } else {
-        setAuthStatus(data.message || 'Generation failed.', false);
-        btnDone(generateBtn);
-      }
-    } catch (e) {
-      setAuthStatus('Request failed: ' + e, false);
-      btnDone(generateBtn);
-    }
-  });
-
-  document.getElementById('gotIt').addEventListener('click', () => {
-    document.getElementById('setup').classList.add('hidden');
-    document.getElementById('login').classList.remove('hidden');
-    setAuthStatus('', true);
-  });
 
   // Login — button + Enter key
   const unlockBtn    = document.getElementById('unlock');
@@ -544,8 +512,11 @@ pub const PANEL_HTML: &str = r#"<!DOCTYPE html>
   });
 
   // ── problem management ────────────────────────────────────────────────────────────
-  // Schema: problem_number (PK), problem_name, difficulty (int 1-4), submission_count, accepted_count
-  const DIFF_LABELS = { 1: 'Easy', 2: 'Medium', 3: 'Hard', 4: 'Expert' };
+  // Schema: problem_number (PK), problem_name, difficulty (int 0-7), submission_count, accepted_count
+  const DIFF_LABELS = {
+    0: 'Unknown', 1: 'Beginner', 2: 'Primary', 3: 'Junior',
+    4: 'Senior', 5: 'Advanced', 6: 'Hard', 7: 'Grand'
+  };
   function diffLabel(d) { return DIFF_LABELS[d] || (d ? 'Lv.' + d : '—'); }
 
   let currentProblemPage = 1;

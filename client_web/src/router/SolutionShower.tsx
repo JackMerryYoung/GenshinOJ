@@ -403,9 +403,7 @@ export default function SolutionShower() {
         useVote(sendJsonMessage, lastJsonMessage, "solution_comment_vote_result", "solution_comment_vote", "comment_id");
 
     useEffect(() => {
-        const localLoginStatus = localStorage.getItem("loginStatus");
-        if (localLoginStatus === null || (loginStatus.value === false && localLoginStatus !== null && JSON.parse(localLoginStatus) === false))
-            setDialogRequireLoginOpenState(true);
+        setDialogRequireLoginOpenState(loginStatus.value === false);
     }, [loginStatus]);
 
     useEffect(() => {

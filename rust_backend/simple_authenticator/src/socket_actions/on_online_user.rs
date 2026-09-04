@@ -23,12 +23,14 @@ pub async fn on_online_user(msg: SocketJsonMessageWithWsId) {
             msg.content
         )
     {
+        let _session_state = SESSION_STATE_LOCK.lock().await;
         let guard_logged_in_usernames: tokio::sync::MutexGuard<
             '_,
             std::collections::HashSet<String>
         > = LOGGED_IN_USERNAMES.lock().await;
         let online_users: Vec<String> = guard_logged_in_usernames.iter().cloned().collect();
         drop(guard_logged_in_usernames);
+        drop(_session_state);
 
         let online_user_result = OnlineUserResult {
             r#type: String::from("online_user"),

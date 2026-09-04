@@ -19,6 +19,7 @@ pub extern "Rust" fn on_init(
         .enable_all()
         .build()
         .unwrap();
+    MODULE_RUNTIME_HANDLE.set(userish_runtime.handle().clone()).unwrap();
     GLOBAL_MODULE_STATUSES_BY_PROTOCOL.set(global_module_statuses_by_protocol.clone()).unwrap();
     let userish_status: ModuleStatus = ModuleStatus {
         initialized: false,
@@ -187,13 +188,7 @@ pub extern "Rust" fn on_init(
 }
 
 #[unsafe(no_mangle)]
-pub extern "Rust" fn on_unload() {
-    let userish_runtime_on_unload: tokio::runtime::Runtime = tokio::runtime::Builder
-        ::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
+pub extern "Rust" fn on_unload(unload_timeout_ms: usize) {
     println!(
         "{}",
         ansi_term::Color::Purple.paint(
@@ -207,7 +202,7 @@ pub extern "Rust" fn on_unload() {
         )
     );
 
-    userish_runtime_on_unload.spawn(async move {
+    let cleanup_completed = run_shutdown_task(async move {
         let ws_server_initialized: bool = {
             let guard_global_module_statuses_by_protocol = GLOBAL_MODULE_STATUSES_BY_PROTOCOL.get()
                 .unwrap()
@@ -220,17 +215,19 @@ pub extern "Rust" fn on_unload() {
         if ws_server_initialized {
             userish_socket::disconnect_from_ws_server().await;
         }
-    });
+        disconnect_database_pool().await;
+    }, std::time::Duration::from_millis(unload_timeout_ms as u64));
 
     println!(
         "{}",
         ansi_term::Color::Purple.paint(
             format!(
-                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Unloaded userish.",
+                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Userish shutdown cleanup {}.",
                 MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
-                line!()
+                line!(),
+                if cleanup_completed { "completed" } else { "timed out" }
             )
         )
     );

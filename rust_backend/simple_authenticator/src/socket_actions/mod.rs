@@ -7,3 +7,4 @@ pub mod on_close_connection;
 pub mod on_validate_session_and_locate;
 pub mod on_validate_session;
 pub mod on_username_by_ws_id;
+pub mod on_session_restore;

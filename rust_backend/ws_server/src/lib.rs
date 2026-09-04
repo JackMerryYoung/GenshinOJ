@@ -81,7 +81,7 @@ pub extern "Rust" fn on_init(
                             )
                         )
                     );
-                    on_unload();
+                    on_unload(0);
                     let mut guard_ws_server_status: tokio::sync::MutexGuard<
                         '_,
                         ModuleStatus
@@ -302,7 +302,7 @@ pub extern "Rust" fn on_init(
                         )
                     );
 
-                    on_unload();
+                    on_unload(0);
                     let mut guard_ws_server_status: tokio::sync::MutexGuard<
                         '_,
                         ModuleStatus
@@ -350,7 +350,7 @@ pub extern "Rust" fn on_init(
 }
 
 #[unsafe(no_mangle)]
-pub extern "Rust" fn on_unload() {
+pub extern "Rust" fn on_unload(_unload_timeout_ms: usize) {
     println!(
         "{}",
         ansi_term::Color::Purple.paint(
@@ -375,4 +375,24 @@ pub extern "Rust" fn on_unload() {
             )
         )
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WsServerConfigJson;
+
+    #[test]
+    fn bundled_config_deserializes() {
+        let config: WsServerConfigJson = serde_json::from_str(include_str!(
+            "../ws_server_config_rs.json"
+        ))
+        .expect("ws_server_config_rs.json must match WsServerConfigJson");
+
+        assert!(!config.external_listeners_list.is_empty());
+        assert!(config
+            .external_listeners_list
+            .iter()
+            .all(|listener| !listener.command.is_empty()
+                && semver::VersionReq::parse(&listener.required_protocol_version).is_ok()));
+    }
 }

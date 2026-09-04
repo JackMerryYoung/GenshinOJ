@@ -11,6 +11,6 @@
     "usernameLabel": "用户名：{{username}}",
     "acceptedLabel": "已通过：{{count}}",
     "testAcceptedLabel": "测试通过：{{count}}",
-    "generalLabel": "综合：{{count}}",
+    "generalLabel": "总计：{{count}}",
     "pleaseLoginFirst": "请先登录。"
 }

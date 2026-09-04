@@ -1,3 +1,5 @@
+# Legacy backend-only release launcher. The supported unified launcher is `../start.sh` on Linux.
+
 cargo build -r -p ws_server
 rm ./modules/ws_server/ws_server.dll
 move ./target/release/ws_server.dll ./modules/ws_server/

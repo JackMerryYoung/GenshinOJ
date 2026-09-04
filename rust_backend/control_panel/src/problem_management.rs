@@ -30,8 +30,7 @@ pub struct ProblemListResponse {
 }
 
 pub async fn get_problem_list(query: ProblemListQuery) -> Result<ProblemListResponse, String> {
-    let guard = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn = guard.get_conn().await.map_err(|e| e.to_string())?;
+    let mut conn = MYSQL_DATABASE_POOL.get_conn().await.map_err(|e| e.to_string())?;
 
     let offset = (query.page - 1) * query.page_size;
 
@@ -121,7 +120,6 @@ pub async fn get_problem_list(query: ProblemListQuery) -> Result<ProblemListResp
     }
 
     drop(conn);
-    drop(guard);
 
     Ok(ProblemListResponse {
         problems,
@@ -141,8 +139,7 @@ pub struct CreateProblemRequest {
 }
 
 pub async fn create_problem(request: CreateProblemRequest) -> Result<(), String> {
-    let guard = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn = guard.get_conn().await.map_err(|e| e.to_string())?;
+    let mut conn = MYSQL_DATABASE_POOL.get_conn().await.map_err(|e| e.to_string())?;
 
     // Check if problem number already exists
     let exists: Option<i64> = conn
@@ -165,12 +162,11 @@ pub async fn create_problem(request: CreateProblemRequest) -> Result<(), String>
     }
 
     // Validate testcase_config JSON if provided
-    if let Some(ref tc_config) = request.testcase_config {
-        if !tc_config.trim().is_empty() {
+    if let Some(ref tc_config) = request.testcase_config
+        && !tc_config.trim().is_empty() {
             serde_json::from_str::<serde_json::Value>(tc_config)
                 .map_err(|e| format!("Invalid testcase_config JSON: {}", e))?;
         }
-    }
 
     // Insert the new problem
     conn.exec_drop(
@@ -191,7 +187,6 @@ pub async fn create_problem(request: CreateProblemRequest) -> Result<(), String>
     .map_err(|e| e.to_string())?;
 
     drop(conn);
-    drop(guard);
     Ok(())
 }
 
@@ -206,8 +201,7 @@ pub struct ProblemDetail {
 }
 
 pub async fn get_problem_detail(problem_number: i64) -> Result<ProblemDetail, String> {
-    let guard = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn = guard.get_conn().await.map_err(|e| e.to_string())?;
+    let mut conn = MYSQL_DATABASE_POOL.get_conn().await.map_err(|e| e.to_string())?;
 
     let result: Option<(i64, String, i64, String, Option<String>)> = conn
         .exec_first(
@@ -221,7 +215,6 @@ pub async fn get_problem_detail(problem_number: i64) -> Result<ProblemDetail, St
         .map_err(|e| e.to_string())?;
 
     drop(conn);
-    drop(guard);
 
     match result {
         Some((problem_number, problem_name, difficulty, problem_statement, testcase_config)) => {
@@ -250,8 +243,7 @@ pub async fn update_problem(
     problem_number: i64,
     request: UpdateProblemRequest,
 ) -> Result<(), String> {
-    let guard = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn = guard.get_conn().await.map_err(|e| e.to_string())?;
+    let mut conn = MYSQL_DATABASE_POOL.get_conn().await.map_err(|e| e.to_string())?;
 
     // Check if problem exists
     let exists: Option<i64> = conn
@@ -274,12 +266,11 @@ pub async fn update_problem(
     }
 
     // Validate testcase_config JSON if provided
-    if let Some(ref tc_config) = request.testcase_config {
-        if !tc_config.trim().is_empty() {
+    if let Some(ref tc_config) = request.testcase_config
+        && !tc_config.trim().is_empty() {
             serde_json::from_str::<serde_json::Value>(tc_config)
                 .map_err(|e| format!("Invalid testcase_config JSON: {}", e))?;
         }
-    }
 
     // Update the problem
     conn.exec_drop(
@@ -300,27 +291,24 @@ pub async fn update_problem(
     .map_err(|e| e.to_string())?;
 
     drop(conn);
-    drop(guard);
 
     // The judge reads test config from the file, not the DB column, so mirror it
     // to `<project_root>/problem/<num>/problem_testcase_config.json`. Modules run
     // from `rust_backend/`, so the problem dir is one level up.
-    if let Some(ref tc_config) = request.testcase_config {
-        if !tc_config.trim().is_empty() {
+    if let Some(ref tc_config) = request.testcase_config
+        && !tc_config.trim().is_empty() {
             let dir = format!("../problem/{}", problem_number);
             std::fs::create_dir_all(&dir)
                 .map_err(|e| format!("Failed to create problem dir: {}", e))?;
             std::fs::write(format!("{}/problem_testcase_config.json", dir), tc_config)
                 .map_err(|e| format!("Failed to write testcase config file: {}", e))?;
         }
-    }
 
     Ok(())
 }
 
 pub async fn delete_problem(problem_number: i64) -> Result<(), String> {
-    let guard = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn = guard.get_conn().await.map_err(|e| e.to_string())?;
+    let mut conn = MYSQL_DATABASE_POOL.get_conn().await.map_err(|e| e.to_string())?;
 
     "SET FOREIGN_KEY_CHECKS = 0".ignore(&mut conn).await.map_err(|e| e.to_string())?;
 
@@ -348,6 +336,5 @@ pub async fn delete_problem(problem_number: i64) -> Result<(), String> {
     "SET FOREIGN_KEY_CHECKS = 1".ignore(&mut conn).await.map_err(|e| e.to_string())?;
 
     drop(conn);
-    drop(guard);
     Ok(())
 }

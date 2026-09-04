@@ -20,19 +20,32 @@ struct SubmissionResultResult {
     content: ContentInSubmissionResult,
 }
 
+pub struct PushSubmissionResultRequest {
+    pub ws_id: String,
+    pub submission_id: i64,
+    pub problem_number: i64,
+    pub code: Vec<String>,
+    pub language: String,
+    pub username: String,
+    pub outcome: crate::judging::JudgeOutcome,
+    pub request_key: String,
+}
+
 // Pushed to the original submitter (the only one who can see their own `code`) right after the
 // background judging task finishes, so they don't have to poll `on_submission_result` themselves
 // if they're still on the page.
-pub async fn push_submission_result(
-    ws_id: String,
-    submission_id: i64,
-    problem_number: i64,
-    code: Vec<String>,
-    language: String,
-    username: String,
-    outcome: crate::judging::JudgeOutcome,
-    request_key: String
-) {
+pub async fn push_submission_result(request: PushSubmissionResultRequest) {
+    let PushSubmissionResultRequest {
+        ws_id,
+        submission_id,
+        problem_number,
+        code,
+        language,
+        username,
+        outcome,
+        request_key,
+    } = request;
+
     let submission_result_result = SubmissionResultResult {
         r#type: String::from("submission_result"),
         content: ContentInSubmissionResult {

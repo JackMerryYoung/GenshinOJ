@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState, lazy } from "react";
+import { Suspense, useCallback, useEffect, useState, lazy } from "react";
 import { useLoaderData, useNavigate, useOutletContext } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -11,8 +11,6 @@ const rehypeKatex = (await import("rehype-katex")).default;
 const remarkMath = (await import("remark-math")).default;
 
 import { useSelector } from "react-redux";
-
-import { nanoid } from "nanoid";
 
 const PopupDialog = lazy(() => import("./PopupDialog.tsx"));
 const ProblemSolutions = lazy(() => import("./Solutions.tsx"));
@@ -57,143 +55,47 @@ const options = [
     }
 ];
 
-function useProblemInfo(
-    sendJsonMessage: globals.SendJsonMessage,
-    lastJsonMessage: unknown
-) {
-    const [requestKey, setRequestKey] = useState("");
-    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
+function useProblemInfo(request: globals.WebSocketRequest) {
     const [problemInfo, setProblemInfo] = useState<ProblemInfoFromFetcher | undefined>(undefined);
 
-    const fetchProblemInfo = (problemNumber: number) => {
-        const _requestKey = nanoid();
-        sendJsonMessage({
-            type: "problem_statement",
-            content: {
-                problem_number: problemNumber,
-                request_key: _requestKey
-            }
-        });
-
-        setRequestKey(_requestKey);
-    };
-
-    useEffect(() => {
-        if (lastJsonMessage !== null) setWebsocketMessageHistory((previousMessage) => previousMessage.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
-
-    useEffect(() => {
-        const _websocketMessageHistory = websocketMessageHistory;
-        _websocketMessageHistory.map((_message, _index) => {
-            interface ProblemStatement {
-                type: string;
-                content: {
-                    problem_number: number,
-                    difficulty: number,
-                    problem_name: string,
-                    problem_statement: string[],
-                    request_key: string
-                };
-            }
-
-            function isProblemStatement(x: object) {
-                if ('type' in x && 'content' in x && typeof x.content === 'object') {
-                    return 'problem_number' in (x.content as object) &&
-                        'difficulty' in (x.content as object) &&
-                        'problem_name' in (x.content as object) &&
-                        'problem_statement' in (x.content as object) &&
-                        'request_key' in (x.content as object);
-                }
-
-                return false;
-            }
-
-            if (_message && isProblemStatement(_message)) {
-                const message = _message as ProblemStatement;
-                console.log(message);
-                if (message.content.request_key == requestKey) {
-                    setProblemInfo({
-                        problem_number: message.content.problem_number as number,
-                        difficulty: message.content.difficulty as number,
-                        problem_name: message.content.problem_name as string,
-                        problem_statement: message.content.problem_statement as string[]
-                    });
-
-                    delete _websocketMessageHistory[_index];
-                }
-            }
-        });
-
-        if (!globals.compareArray(_websocketMessageHistory, websocketMessageHistory)) setWebsocketMessageHistory(_websocketMessageHistory);
-    }, [websocketMessageHistory, requestKey]);
+    const fetchProblemInfo = useCallback(async (problemNumber: number, signal?: AbortSignal) => {
+        setProblemInfo(undefined);
+        try {
+            const response = await request<{ type: string; content: ProblemInfoFromFetcher & { request_key: string } }>(
+                "problem_statement",
+                { problem_number: problemNumber },
+                { signal },
+            );
+            setProblemInfo(response.content);
+        } catch (error) {
+            if (error instanceof Error && error.name === "AbortError") return;
+        }
+    }, [request]);
 
     return { problemInfo, fetchProblemInfo };
 }
 
-function useSubmission(
-    sendJsonMessage: globals.SendJsonMessage,
-    lastJsonMessage: unknown
-) {
+function useSubmission(request: globals.WebSocketRequest) {
     const [submissionId, setSubmissionId] = useState<number | undefined>(undefined);
-    const [requestKey, setRequestKey] = useState("");
-    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
     const loginUsername = useSelector((state: RootState) => state.loginUsername);
     const sessionToken = useSelector((state: RootState) => state.sessionToken);
 
-    const submit = (problemNumber: number, submissionCodeLanguage: string, submissionCode: string, isTestSubmissionMode: boolean) => {
-        const _requestKey = nanoid();
-        sendJsonMessage({
-            type: "submission",
-            content: {
+    const submit = useCallback(async (problemNumber: number, submissionCodeLanguage: string, submissionCode: string, isTestSubmissionMode: boolean) => {
+        setSubmissionId(undefined);
+        try {
+            const response = await request<{ type: string; content: { request_key: string; submission_id?: number } }>("submission", {
                 username: loginUsername.value,
                 session_token: sessionToken.value,
                 problem_number: problemNumber,
                 language: submissionCodeLanguage,
                 code: submissionCode.split('\n'),
                 is_test_submission_mode: isTestSubmissionMode,
-                request_key: _requestKey
-            }
-        });
-
-        setRequestKey(_requestKey);
-    };
-
-    useEffect(() => {
-        if (lastJsonMessage !== null) setWebsocketMessageHistory((previousMessage) => previousMessage.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
-
-    useEffect(() => {
-        const _websocketMessageHistory = websocketMessageHistory;
-        _websocketMessageHistory.map((_message, _index) => {
-            interface SubmissionId {
-                type: string;
-                content: {
-                    submission_id: number;
-                    request_key: string;
-                };
-            }
-
-            function isSubmissionId(x: object) {
-                if ('type' in x && 'content' in x && typeof x.content === 'object') {
-                    return 'submission_id' in (x.content as object) &&
-                        'request_key' in (x.content as object);
-                }
-
-                return false;
-            }
-
-            if (_message && isSubmissionId(_message)) {
-                const message = _message as SubmissionId;
-                console.log(message);
-                if (message.content.request_key == requestKey) {
-                    setSubmissionId(message.content.submission_id);
-                    delete _websocketMessageHistory[_index];
-                }
-            }
-        });
-
-        if (!globals.compareArray(_websocketMessageHistory, websocketMessageHistory)) setWebsocketMessageHistory(_websocketMessageHistory);
-    }, [websocketMessageHistory, requestKey]);
+            });
+            if (response.content.submission_id !== undefined) setSubmissionId(response.content.submission_id);
+        } catch {
+            // Keep the success dialog closed when the broker reports a failed submission request.
+        }
+    }, [loginUsername.value, request, sessionToken.value]);
 
     return { submissionId, submit };
 }
@@ -227,12 +129,12 @@ export default function ProblemMain() {
     const [submissionCodeLanguage, setSubmissionCodeLanguage] = useState("cpp");
     const [codeLanguage, setCodeLanguage] = useState("cpp");
     const [isTestSubmissionMode, setIsTestSubmissionMode] = useState(false);
-    const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
+    const { request, sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
     const [dialogSubmitSuccessOpenState, setDialogSubmitSuccessOpenState] = useState(false);
     const [convertedMarkdownRenderString, setConvertedMarkdownRenderString] = useState("");
     const [selectedTab, setSelectedTab] = useState<string>("statement");
-    const { submissionId, submit } = useSubmission(sendJsonMessage, lastJsonMessage);
-    const { problemInfo, fetchProblemInfo } = useProblemInfo(sendJsonMessage, lastJsonMessage);
+    const { submissionId, submit } = useSubmission(request);
+    const { problemInfo, fetchProblemInfo } = useProblemInfo(request);
 
     const navigate = useNavigate();
 
@@ -270,8 +172,10 @@ ${statement}
     }, [problemInfo]);
 
     useEffect(() => {
-        fetchProblemInfo(problemNumber);
-    }, [problemNumber]);
+        const controller = new AbortController();
+        void fetchProblemInfo(problemNumber, controller.signal);
+        return () => controller.abort();
+    }, [fetchProblemInfo, problemNumber]);
 
     useEffect(() => {
         if (submissionId !== undefined) setDialogSubmitSuccessOpenState(true);
@@ -331,6 +235,7 @@ ${statement}
                                 <Suspense fallback={<Spinner size="tiny" delay={500} />}>
                                     <ProblemSolutions
                                         problemNumber={problemNumber}
+                                        request={request}
                                         sendJsonMessage={sendJsonMessage}
                                         lastJsonMessage={lastJsonMessage} />
                                 </Suspense>

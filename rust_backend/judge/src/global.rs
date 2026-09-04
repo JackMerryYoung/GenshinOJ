@@ -34,6 +34,29 @@ pub static GLOBAL_MODULE_STATUSES_BY_PROTOCOL: std::sync::OnceLock<
 
 pub static JUDGE_SOCKET: std::sync::OnceLock<AsyncModifiable<tokio::net::TcpListener>> = std::sync::OnceLock::new();
 
+// A submission owns compiler/runtime processes and several megabytes of source and output data.
+// Reject new work while all slots are occupied instead of allowing unbounded Tokio tasks to
+// exhaust CPU, memory, or process table entries.
+pub static JUDGE_CONCURRENCY: std::sync::LazyLock<std::sync::Arc<tokio::sync::Semaphore>> =
+    std::sync::LazyLock::new(|| {
+        let permits = std::env::var("RSOJ_JUDGE_CONCURRENCY")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(2);
+        std::sync::Arc::new(tokio::sync::Semaphore::new(permits))
+    });
+
+pub fn expire_pending<T: Send + 'static>(
+    map: &'static tokio::sync::Mutex<std::collections::HashMap<String, T>>,
+    request_key: String,
+) {
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        map.lock().await.remove(&request_key);
+    });
+}
+
 // The `problem` directory lives at the project root, one level above `rust_backend` (where every
 // module's process actually runs from), mirroring `main_backend`'s `get_parent_path()` convention.
 pub fn get_problem_dir_path() -> String {
@@ -43,25 +66,44 @@ pub fn get_problem_dir_path() -> String {
     String::from(pwd.to_str().unwrap())
 }
 
-#[derive(serde::Deserialize)]
-pub struct ProblemSetJson {
-    pub problem_set: Vec<String>,
-}
-
-#[derive(serde::Deserialize)]
-pub struct ProblemStatementJson {
-    pub problem_number: i64,
-    pub difficulty: i32,
-    pub problem_name: String,
-    pub problem_statement: Vec<String>,
-}
-
 pub const MYSQL_DATABASE_URL: &str = "mysql://root:123456@127.0.0.1:3306/";
 pub const DATABASE_NAME: &str = "RsOJ";
 
-pub static MYSQL_DATABASE_POOL: std::sync::LazyLock<tokio::sync::Mutex<mysql_async::Pool>> = std::sync::LazyLock::new(
-    || { tokio::sync::Mutex::new(mysql_async::Pool::new(MYSQL_DATABASE_URL)) }
-);
+pub static MYSQL_DATABASE_POOL: std::sync::LazyLock<mysql_async::Pool> =
+    std::sync::LazyLock::new(|| mysql_async::Pool::new(MYSQL_DATABASE_URL));
+
+pub static MODULE_RUNTIME_HANDLE: std::sync::OnceLock<tokio::runtime::Handle> =
+    std::sync::OnceLock::new();
+
+pub fn run_shutdown_task<F>(task: F, timeout: std::time::Duration) -> bool
+where
+    F: std::future::Future<Output = ()> + Send + 'static,
+{
+    if let Some(handle) = MODULE_RUNTIME_HANDLE.get() {
+        let (complete_tx, complete_rx) = std::sync::mpsc::channel();
+        drop(handle.spawn(async move {
+            task.await;
+            let _ = complete_tx.send(());
+        }));
+        complete_rx.recv_timeout(timeout).is_ok()
+    } else {
+        eprintln!("[{}] [WARNING] Runtime handle is unavailable during shutdown", MODULE_IDENTITY);
+        false
+    }
+}
+
+pub async fn disconnect_database_pool() {
+    if let Err(error) = MYSQL_DATABASE_POOL.clone().disconnect().await {
+        eprintln!(
+            "[{}] [WARNING] Failed to disconnect the database pool during shutdown: {}",
+            MODULE_IDENTITY, error
+        );
+    }
+}
+
+pub async fn get_db_conn() -> Result<mysql_async::Conn, mysql_async::Error> {
+    MYSQL_DATABASE_POOL.get_conn().await
+}
 
 // In-memory map of pending `submissions_list` requests, keyed by the request_key used when
 // asking simple_authenticator for the requester's username (resolved from their ws_id). Needed

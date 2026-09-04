@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { Activity, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Highcharts from 'highcharts';
 import * as HighchartsReactModule from 'highcharts-react-official';
@@ -40,6 +40,12 @@ import {
   ChartMultipleRegular,
   SettingsRegular,
 } from '@fluentui/react-icons';
+import {
+  controlPanelFetch,
+  clearControlPanelToken,
+  getControlPanelToken,
+  setControlPanelToken,
+} from '../controlPanelApi';
 
 const useStyles = makeStyles({
   container: {
@@ -122,8 +128,6 @@ const useStyles = makeStyles({
   },
 });
 
-const CONTROL_PANEL_URL = 'http://localhost:9990';
-
 export function ControlPanel() {
   const { t } = useTranslation('controlPanel');
   const styles = useStyles();
@@ -134,13 +138,22 @@ export function ControlPanel() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [username, setUsername] = useState<string>('');
   const [adminRole, setAdminRole] = useState<string>('');
+  const [tokenInput, setTokenInput] = useState('');
 
   useEffect(() => {
-    checkAdminAccess();
+    const storedToken = getControlPanelToken();
+    if (storedToken) checkAdminAccess(storedToken);
+    else {
+      const hasLoginIdentity = Boolean(localStorage.getItem('loginUsername'));
+      setNotLoggedIn(!hasLoginIdentity);
+      setError(hasLoginIdentity ? t('auth.tokenRequired') : t('auth.loginRequired'));
+      setLoading(false);
+    }
   }, []);
 
-  const checkAdminAccess = async () => {
-    // Check if user is logged in via localStorage
+  const checkAdminAccess = async (token: string) => {
+    // The control panel is intentionally outside Root's WebSocket layout, so Redux session
+    // restoration is not mounted on this route. Use the persisted identity for its HTTP check.
     const username = localStorage.getItem('loginUsername');
 
     if (!username) {
@@ -152,25 +165,42 @@ export function ControlPanel() {
 
     try {
       // Verify if the logged-in user is an admin
-      const response = await fetch(`${CONTROL_PANEL_URL}/api/verify-admin`, {
+      const response = await controlPanelFetch('/api/verify-admin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
-      });
+      }, token);
       const data = await response.json();
 
-      if (data.ok && data.is_admin) {
+      if (response.ok && data.ok && data.is_admin) {
         setUsername(data.username);
         setAdminRole(data.admin_role);
         setIsAuthenticated(true);
       } else {
-        setError(t('auth.accessDenied'));
+        clearControlPanelToken();
+        setError(
+          response.status === 503
+            ? t('auth.notConfigured')
+            : t('auth.accessDenied'),
+        );
       }
     } catch (err) {
       setError(t('auth.verifyFailed'));
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAdminLogin = async () => {
+    const token = tokenInput.trim();
+    if (!token) {
+      setError(t('auth.tokenRequired'));
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setControlPanelToken(token);
+    await checkAdminAccess(token);
+    setTokenInput('');
   };
 
   const hasPermission = (requiredPermissions: string[]): boolean => {
@@ -209,6 +239,24 @@ export function ControlPanel() {
             <Text style={{ marginTop: '16px', color: tokens.colorPaletteRedForeground1 }}>
               {error}
             </Text>
+            {!notLoggedIn && (
+              <>
+                <Input
+                  type="password"
+                  value={tokenInput}
+                  onChange={(event) => setTokenInput(event.target.value)}
+                  placeholder={t('auth.tokenPlaceholder')}
+                  style={{ marginTop: '16px' }}
+                />
+                <Button
+                  appearance="primary"
+                  onClick={handleAdminLogin}
+                  style={{ marginTop: '12px' }}
+                >
+                  {t('auth.unlock')}
+                </Button>
+              </>
+            )}
             {notLoggedIn && (
               <Button
                 appearance="primary"
@@ -292,11 +340,31 @@ export function ControlPanel() {
           )}
         </div>
         <div className={styles.content}>
-          {activeTab === 'dashboard' && hasPermission(['problem_admin', 'community_admin', 'super_admin']) && <DashboardTab />}
-          {activeTab === 'system' && hasPermission(['super_admin']) && <SystemMonitorTab />}
-          {activeTab === 'users' && hasPermission(['super_admin']) && <UsersTab />}
-          {activeTab === 'problems' && hasPermission(['problem_admin', 'super_admin']) && <ProblemsTab />}
-          {activeTab === 'settings' && hasPermission(['super_admin']) && <SettingsTab />}
+          {hasPermission(['problem_admin', 'community_admin', 'super_admin']) && (
+            <Activity mode={activeTab === 'dashboard' ? 'visible' : 'hidden'}>
+              <DashboardTab />
+            </Activity>
+          )}
+          {hasPermission(['super_admin']) && (
+            <Activity mode={activeTab === 'system' ? 'visible' : 'hidden'}>
+              <SystemMonitorTab />
+            </Activity>
+          )}
+          {hasPermission(['super_admin']) && (
+            <Activity mode={activeTab === 'users' ? 'visible' : 'hidden'}>
+              <UsersTab />
+            </Activity>
+          )}
+          {hasPermission(['problem_admin', 'super_admin']) && (
+            <Activity mode={activeTab === 'problems' ? 'visible' : 'hidden'}>
+              <ProblemsTab />
+            </Activity>
+          )}
+          {hasPermission(['super_admin']) && (
+            <Activity mode={activeTab === 'settings' ? 'visible' : 'hidden'}>
+              <SettingsTab />
+            </Activity>
+          )}
         </div>
       </div>
     </FluentProvider>
@@ -314,9 +382,8 @@ function DashboardTab() {
 
   const loadStats = async () => {
     try {
-      const response = await fetch(`${CONTROL_PANEL_URL}/api/stats`, {
+      const response = await controlPanelFetch('/api/stats', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
       const data = await response.json();
@@ -440,14 +507,12 @@ function SystemMonitorTab() {
   const loadData = async () => {
     try {
       const [sysRes, dbRes] = await Promise.all([
-        fetch(`${CONTROL_PANEL_URL}/api/system-status`, {
+        controlPanelFetch('/api/system-status', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
         }),
-        fetch(`${CONTROL_PANEL_URL}/api/database-stats`, {
+        controlPanelFetch('/api/database-stats', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
         }),
       ]);
@@ -555,9 +620,8 @@ function UsersTab() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${CONTROL_PANEL_URL}/api/users`, {
+      const response = await controlPanelFetch('/api/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ page, page_size: 10, search: search || undefined }),
       });
       const data = await response.json();
@@ -579,9 +643,8 @@ function UsersTab() {
     }
 
     try {
-      const response = await fetch(`${CONTROL_PANEL_URL}/api/users/${userId}/delete`, {
+      const response = await controlPanelFetch(`/api/users/${userId}/delete`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
       const data = await response.json();
@@ -682,9 +745,8 @@ function ProblemsTab() {
   const loadProblems = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${CONTROL_PANEL_URL}/api/problems`, {
+      const response = await controlPanelFetch('/api/problems', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ page, page_size: 10, search: search || undefined }),
       });
       const data = await response.json();
@@ -711,9 +773,8 @@ function ProblemsTab() {
     }
 
     try {
-      const response = await fetch(`${CONTROL_PANEL_URL}/api/problems/${problemNumber}/delete`, {
+      const response = await controlPanelFetch(`/api/problems/${problemNumber}/delete`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
       const data = await response.json();
@@ -857,9 +918,8 @@ function SettingsTab() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${CONTROL_PANEL_URL}/api/clear-database`, {
+      const response = await controlPanelFetch('/api/clear-database', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
       const data = await response.json();

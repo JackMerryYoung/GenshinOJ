@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+# Legacy backend-only release launcher. Prefer `../start.sh --release` for normal development.
+
 # Build Websocket Server
 if [ ! -e "./modules" ]; then
     mkdir ./modules

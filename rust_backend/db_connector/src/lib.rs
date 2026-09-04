@@ -9,6 +9,9 @@ fn new_async_modifiable<T>(x: T) -> AsyncModifiable<T> {
 pub struct ModuleStatus {
     initialized: bool,
     panicked: bool,
+    // The database connector does not expose an inter-module socket, but this field is required
+    // to keep ModuleStatus layout-compatible with main_backend's dynamic-library ABI.
+    #[allow(dead_code)]
     socket_port: AsyncModifiable<u16>,
     init_notify: std::sync::Arc<tokio::sync::Notify>,
 }
@@ -66,7 +69,7 @@ pub extern "Rust" fn on_init(
 }
 
 #[unsafe(no_mangle)]
-pub extern "Rust" fn on_unload() {
+pub extern "Rust" fn on_unload(_unload_timeout_ms: usize) {
     println!(
         "{}",
         ansi_term::Color::Blue.paint(

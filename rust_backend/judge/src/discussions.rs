@@ -170,6 +170,7 @@ pub async fn request_username_for_lookup(
         rpc_request_key.clone(),
         PendingDiscussionLookupRequest { requester_ws_id, original_request_key, lookup }
     );
+    expire_pending(&*PENDING_DISCUSSION_LOOKUP_REQUESTS, rpc_request_key.clone());
 
     let msg_to_send: SocketJsonMessage = SocketJsonMessage {
         r#type: String::from("on_username_by_ws_id"),
@@ -199,6 +200,7 @@ pub async fn request_session_for_action(
             action,
         }
     );
+    expire_pending(&*PENDING_DISCUSSION_AUTHED_REQUESTS, rpc_request_key.clone());
 
     let msg_to_send: SocketJsonMessage = SocketJsonMessage {
         r#type: String::from("on_validate_session"),
@@ -266,9 +268,9 @@ async fn discussions_list(
     let offset: i64 = (page_index - 1) * DISCUSSIONS_LIST_PAGE_SIZE;
     let sort_column: &str = if sort_by_likes { "d.likes" } else { "d.created_at" };
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
-    let results: Result<Vec<(i64, String, String, i64, i64, i64, i64)>, _> = conn
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
+    type DiscussionListType = Result<Vec<(i64, String, String, i64, i64, i64, i64)>, mysql_async::Error>;
+    let results: DiscussionListType = conn
         .exec(
             format!(
                 "SELECT d.discussion_id, d.username, d.title, d.likes, d.dislikes, d.created_at, COALESCE(v.vote, 0) AS my_vote
@@ -285,7 +287,6 @@ async fn discussions_list(
         )
         .await;
     drop(conn);
-    drop(guard_pool);
 
     let rows = match results {
         Ok(rows) => rows,
@@ -323,9 +324,9 @@ async fn discussion_fetch(
 ) {
     let requester: String = requester_username.unwrap_or_default();
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
-    let row_result: Result<Option<(String, String, String, i64, i64, i64)>, _> = conn
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
+    type DiscussionFetchResult = Result<Option<(String, String, String, i64, i64, i64)>, mysql_async::Error>;
+    let row_result: DiscussionFetchResult = conn
         .exec_first(
             "SELECT username, title, content, likes, dislikes, created_at
             FROM RsOJ.discussions
@@ -343,7 +344,6 @@ async fn discussion_fetch(
         .flatten()
         .unwrap_or(0);
     drop(conn);
-    drop(guard_pool);
 
     match row_result {
         Ok(Some((username, title, content, likes, dislikes, created_at))) => {
@@ -393,9 +393,9 @@ async fn replies_list(
     let offset: i64 = (page_index - 1) * DISCUSSION_REPLIES_LIST_PAGE_SIZE;
     let sort_column: &str = if sort_by_likes { "r.likes" } else { "r.created_at" };
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
-    let results: Result<Vec<(i64, String, String, i64, i64, i64, i64)>, _> = conn
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
+    type RepliesListResultType = Result<Vec<(i64, String, String, i64, i64, i64, i64)>, mysql_async::Error>;
+    let results: RepliesListResultType = conn
         .exec(
             format!(
                 "SELECT r.reply_id, r.username, r.content, r.likes, r.dislikes, r.created_at, COALESCE(v.vote, 0) AS my_vote
@@ -414,7 +414,6 @@ async fn replies_list(
         )
         .await;
     drop(conn);
-    drop(guard_pool);
 
     let rows = match results {
         Ok(rows) => rows,
@@ -498,8 +497,7 @@ async fn post_discussion(
         return;
     }
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
     let insert_result = conn
         .exec_drop(
             "INSERT INTO RsOJ.discussions
@@ -515,7 +513,6 @@ async fn post_discussion(
         .await;
     let discussion_id: i64 = conn.last_insert_id().unwrap_or(0) as i64;
     drop(conn);
-    drop(guard_pool);
 
     if insert_result.is_err() {
         warn(line!(), "Failed to insert the discussion row.");
@@ -553,8 +550,7 @@ async fn post_reply(
         return;
     }
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
     let discussion_owner: Option<String> = conn
         .exec_first(
             "SELECT username FROM RsOJ.discussions WHERE discussion_id = :discussion_id",
@@ -565,7 +561,6 @@ async fn post_reply(
         .flatten();
     let Some(discussion_owner) = discussion_owner else {
         drop(conn);
-        drop(guard_pool);
         send_failure(requester_ws_id, "discussion_reply_post_failure", "discussion_not_found", original_request_key).await;
         return;
     };
@@ -585,7 +580,6 @@ async fn post_reply(
         .await;
     let reply_id: i64 = conn.last_insert_id().unwrap_or(0) as i64;
     drop(conn);
-    drop(guard_pool);
 
     if insert_result.is_err() {
         warn(line!(), "Failed to insert the discussion reply row.");

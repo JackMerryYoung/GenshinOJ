@@ -24,9 +24,41 @@ pub static USERISH_SOCKET: std::sync::OnceLock<AsyncModifiable<tokio::net::TcpLi
 
 pub const MYSQL_DATABASE_URL: &str = "mysql://root:123456@127.0.0.1:3306/";
 
-pub static MYSQL_DATABASE_POOL: std::sync::LazyLock<tokio::sync::Mutex<mysql_async::Pool>> = std::sync::LazyLock::new(
-    || { tokio::sync::Mutex::new(mysql_async::Pool::new(MYSQL_DATABASE_URL)) }
-);
+pub static MYSQL_DATABASE_POOL: std::sync::LazyLock<mysql_async::Pool> =
+    std::sync::LazyLock::new(|| mysql_async::Pool::new(MYSQL_DATABASE_URL));
+
+pub static MODULE_RUNTIME_HANDLE: std::sync::OnceLock<tokio::runtime::Handle> =
+    std::sync::OnceLock::new();
+
+pub fn run_shutdown_task<F>(task: F, timeout: std::time::Duration) -> bool
+where
+    F: std::future::Future<Output = ()> + Send + 'static,
+{
+    if let Some(handle) = MODULE_RUNTIME_HANDLE.get() {
+        let (complete_tx, complete_rx) = std::sync::mpsc::channel();
+        drop(handle.spawn(async move {
+            task.await;
+            let _ = complete_tx.send(());
+        }));
+        complete_rx.recv_timeout(timeout).is_ok()
+    } else {
+        eprintln!("[{}] [WARNING] Runtime handle is unavailable during shutdown", MODULE_IDENTITY);
+        false
+    }
+}
+
+pub async fn disconnect_database_pool() {
+    if let Err(error) = MYSQL_DATABASE_POOL.clone().disconnect().await {
+        eprintln!(
+            "[{}] [WARNING] Failed to disconnect the database pool during shutdown: {}",
+            MODULE_IDENTITY, error
+        );
+    }
+}
+
+pub async fn get_db_conn() -> Result<mysql_async::Conn, mysql_async::Error> {
+    MYSQL_DATABASE_POOL.get_conn().await
+}
 
 #[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug)]
 pub struct SocketJsonMessage {
@@ -77,6 +109,16 @@ pub static PENDING_FOLLOW_REQUESTS: std::sync::LazyLock<
 pub static PENDING_UNFOLLOW_REQUESTS: std::sync::LazyLock<
     tokio::sync::Mutex<std::collections::HashMap<String, PendingUnfollowRequest>>
 > = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
+pub fn expire_pending<T: Send + 'static>(
+    map: &'static tokio::sync::Mutex<std::collections::HashMap<String, T>>,
+    request_key: String,
+) {
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        map.lock().await.remove(&request_key);
+    });
+}
 
 pub async fn get_socket_port_by_protocol(protocol: &str) -> Option<u16> {
     let guard_global_module_statuses_by_protocol: tokio::sync::MutexGuard<

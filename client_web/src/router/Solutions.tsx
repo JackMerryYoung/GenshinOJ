@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useCallback, useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -23,8 +23,6 @@ import {
 import { StarFilled, ThumbLikeRegular, ThumbDislikeRegular } from "@fluentui/react-icons";
 
 import { useSelector } from "react-redux";
-
-import { nanoid } from "nanoid";
 
 import MentionTextarea from "./MentionTextarea.tsx";
 
@@ -51,195 +49,73 @@ export function formatTimestamp(createdAt: number) {
     return new Date(createdAt * 1000).toLocaleString();
 }
 
-interface SolutionsListFromFetch {
-    type: string;
-    content: {
-        solutions_list: SolutionListItem[];
-        request_key: string;
-    };
-}
-
-function isSolutionsListFromFetch(x: object) {
-    if ('type' in x && 'content' in x && typeof x.content === 'object') {
-        return 'solutions_list' in (x.content as object) && 'request_key' in (x.content as object);
-    }
-    return false;
-}
-
-function useSolutionsList(
-    sendJsonMessage: globals.SendJsonMessage,
-    lastJsonMessage: unknown
-) {
-    const [requestKey, setRequestKey] = useState("");
-    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
+function useSolutionsList(request: globals.WebSocketRequest) {
     const [solutionsList, setSolutionsList] = useState<SolutionListItem[] | undefined>(undefined);
 
-    const loadSolutionsList = (problemNumber: number, index: number, sort: string) => {
-        const _requestKey = nanoid();
+    const loadSolutionsList = useCallback(async (problemNumber: number, index: number, sort: string, signal?: AbortSignal) => {
         setSolutionsList(undefined);
-        sendJsonMessage({
-            type: "solutions_list",
-            content: {
-                problem_number: problemNumber,
-                index: index,
-                sort: sort,
-                request_key: _requestKey
-            }
-        });
-        setRequestKey(_requestKey);
-    };
-
-    useEffect(() => {
-        if (lastJsonMessage !== null)
-            setWebsocketMessageHistory((previousMessageHistory) => previousMessageHistory.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
-
-    useEffect(() => {
-        const _websocketMessageHistory = websocketMessageHistory;
-        _websocketMessageHistory.map((_message, _index) => {
-            if (_message && isSolutionsListFromFetch(_message)) {
-                const message = _message as SolutionsListFromFetch;
-                if (message.content.request_key === requestKey) {
-                    setSolutionsList(message.content.solutions_list);
-                    delete _websocketMessageHistory[_index];
-                }
-            }
-        });
-        if (!globals.compareArray(_websocketMessageHistory, websocketMessageHistory)) setWebsocketMessageHistory(_websocketMessageHistory);
-    }, [websocketMessageHistory, requestKey]);
+        try {
+            const response = await request<{ type: string; content: { request_key: string; solutions_list?: SolutionListItem[] } }>(
+                "solutions_list", { problem_number: problemNumber, index, sort }, { signal },
+            );
+            if (response.content.solutions_list) setSolutionsList(response.content.solutions_list);
+        } catch (error) {
+            if (error instanceof Error && error.name === "AbortError") return;
+        }
+    }, [request]);
 
     return { solutionsList, loadSolutionsList };
 }
 
-interface TotalSolutionsListIndexFromFetch {
-    type: string;
-    content: {
-        total_solutions_list_index: number;
-        request_key: string;
-    };
-}
-
-function isTotalSolutionsListIndexFromFetch(x: object) {
-    if ('type' in x && 'content' in x && typeof x.content === 'object') {
-        return 'total_solutions_list_index' in (x.content as object) && 'request_key' in (x.content as object);
-    }
-    return false;
-}
-
-function useTotalSolutionsListIndex(
-    sendJsonMessage: globals.SendJsonMessage,
-    lastJsonMessage: unknown
-) {
-    const [requestKey, setRequestKey] = useState("");
-    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
+function useTotalSolutionsListIndex(request: globals.WebSocketRequest) {
     const [totalSolutionsListIndex, setTotalSolutionsListIndex] = useState(1);
 
-    const loadTotalSolutionsListIndex = (problemNumber: number) => {
-        const _requestKey = nanoid();
-        sendJsonMessage({
-            type: "total_solutions_list_index",
-            content: {
-                problem_number: problemNumber,
-                request_key: _requestKey
+    const loadTotalSolutionsListIndex = useCallback(async (problemNumber: number, signal?: AbortSignal) => {
+        try {
+            const response = await request<{ type: string; content: { request_key: string; total_solutions_list_index?: number } }>(
+                "total_solutions_list_index", { problem_number: problemNumber }, { signal },
+            );
+            if (response.content.total_solutions_list_index !== undefined) {
+                setTotalSolutionsListIndex(response.content.total_solutions_list_index);
             }
-        });
-        setRequestKey(_requestKey);
-    };
-
-    useEffect(() => {
-        if (lastJsonMessage !== null)
-            setWebsocketMessageHistory((previousMessageHistory) => previousMessageHistory.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
-
-    useEffect(() => {
-        const _websocketMessageHistory = websocketMessageHistory;
-        _websocketMessageHistory.map((_message, _index) => {
-            if (_message && isTotalSolutionsListIndexFromFetch(_message)) {
-                const message = _message as TotalSolutionsListIndexFromFetch;
-                if (message.content.request_key === requestKey) {
-                    setTotalSolutionsListIndex(message.content.total_solutions_list_index);
-                    delete _websocketMessageHistory[_index];
-                }
-            }
-        });
-        if (!globals.compareArray(_websocketMessageHistory, websocketMessageHistory)) setWebsocketMessageHistory(_websocketMessageHistory);
-    }, [websocketMessageHistory, requestKey]);
+        } catch (error) {
+            if (error instanceof Error && error.name === "AbortError") return;
+        }
+    }, [request]);
 
     return { totalSolutionsListIndex, loadTotalSolutionsListIndex };
 }
 
-interface PostSolutionResult {
-    type: string;
-    content: {
-        solution_id?: number;
-        reason?: string;
-        request_key: string;
-    };
-}
-
-function isPostSolutionResult(x: object) {
-    if ('type' in x && 'content' in x && typeof x.content === 'object') {
-        return (x as { type: string }).type === "solution_id" || (x as { type: string }).type === "solution_post_failure";
-    }
-    return false;
-}
-
-function usePostSolution(
-    sendJsonMessage: globals.SendJsonMessage,
-    lastJsonMessage: unknown
-) {
-    const [requestKey, setRequestKey] = useState("");
-    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
+function usePostSolution(request: globals.WebSocketRequest) {
     const [postedSolutionId, setPostedSolutionId] = useState<number | undefined>(undefined);
     const [postFailureReason, setPostFailureReason] = useState<string | undefined>(undefined);
     const loginUsername = useSelector((state: RootState) => state.loginUsername);
     const sessionToken = useSelector((state: RootState) => state.sessionToken);
 
-    const postSolution = (problemNumber: number, title: string, content: string) => {
-        const _requestKey = nanoid();
+    const postSolution = useCallback(async (problemNumber: number, title: string, content: string) => {
         setPostedSolutionId(undefined);
         setPostFailureReason(undefined);
-        sendJsonMessage({
-            type: "solution_post",
-            content: {
+        try {
+            const response = await request<{ type: string; content: { request_key: string; solution_id?: number; reason?: string } }>("solution_post", {
                 username: loginUsername.value,
                 session_token: sessionToken.value,
                 problem_number: problemNumber,
-                title: title,
+                title,
                 content: content.split('\n'),
-                request_key: _requestKey
-            }
-        });
-        setRequestKey(_requestKey);
-    };
-
-    useEffect(() => {
-        if (lastJsonMessage !== null)
-            setWebsocketMessageHistory((previousMessageHistory) => previousMessageHistory.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
-
-    useEffect(() => {
-        const _websocketMessageHistory = websocketMessageHistory;
-        _websocketMessageHistory.map((_message, _index) => {
-            if (_message && isPostSolutionResult(_message)) {
-                const message = _message as PostSolutionResult;
-                if (message.content.request_key === requestKey) {
-                    if (message.type === "solution_id" && message.content.solution_id !== undefined)
-                        setPostedSolutionId(message.content.solution_id);
-                    else
-                        setPostFailureReason(message.content.reason ?? "unknown");
-                    delete _websocketMessageHistory[_index];
-                }
-            }
-        });
-        if (!globals.compareArray(_websocketMessageHistory, websocketMessageHistory)) setWebsocketMessageHistory(_websocketMessageHistory);
-    }, [websocketMessageHistory, requestKey]);
+            });
+            if (response.content.solution_id !== undefined) setPostedSolutionId(response.content.solution_id);
+            else setPostFailureReason(response.content.reason ?? "unknown");
+        } catch {
+            setPostFailureReason("request_failed");
+        }
+    }, [loginUsername.value, request, sessionToken.value]);
 
     return { postedSolutionId, postFailureReason, postSolution };
 }
 
-export default function ProblemSolutions({ problemNumber, sendJsonMessage, lastJsonMessage }: {
+export default function ProblemSolutions({ problemNumber, request, sendJsonMessage, lastJsonMessage }: {
     problemNumber: number;
+    request: globals.WebSocketRequest;
     sendJsonMessage: globals.SendJsonMessage;
     lastJsonMessage: unknown;
 }) {
@@ -253,17 +129,21 @@ export default function ProblemSolutions({ problemNumber, sendJsonMessage, lastJ
     const [dialogOpen, setDialogOpen] = useState(false);
     const [dialogText, setDialogText] = useState("");
 
-    const { solutionsList, loadSolutionsList } = useSolutionsList(sendJsonMessage, lastJsonMessage);
-    const { totalSolutionsListIndex, loadTotalSolutionsListIndex } = useTotalSolutionsListIndex(sendJsonMessage, lastJsonMessage);
-    const { postedSolutionId, postFailureReason, postSolution } = usePostSolution(sendJsonMessage, lastJsonMessage);
+    const { solutionsList, loadSolutionsList } = useSolutionsList(request);
+    const { totalSolutionsListIndex, loadTotalSolutionsListIndex } = useTotalSolutionsListIndex(request);
+    const { postedSolutionId, postFailureReason, postSolution } = usePostSolution(request);
 
     useEffect(() => {
-        loadTotalSolutionsListIndex(problemNumber);
-    }, [problemNumber, postedSolutionId]);
+        const controller = new AbortController();
+        void loadTotalSolutionsListIndex(problemNumber, controller.signal);
+        return () => controller.abort();
+    }, [loadTotalSolutionsListIndex, problemNumber, postedSolutionId]);
 
     useEffect(() => {
-        loadSolutionsList(problemNumber, solutionsListIndex, sort);
-    }, [problemNumber, solutionsListIndex, sort, postedSolutionId]);
+        const controller = new AbortController();
+        void loadSolutionsList(problemNumber, solutionsListIndex, sort, controller.signal);
+        return () => controller.abort();
+    }, [loadSolutionsList, problemNumber, solutionsListIndex, sort, postedSolutionId]);
 
     useEffect(() => {
         if (postedSolutionId !== undefined) {

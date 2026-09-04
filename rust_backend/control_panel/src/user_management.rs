@@ -30,8 +30,7 @@ pub struct UserListResponse {
 }
 
 pub async fn get_user_list(query: UserListQuery) -> Result<UserListResponse, String> {
-    let guard = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn = guard.get_conn().await.map_err(|e| e.to_string())?;
+    let mut conn = MYSQL_DATABASE_POOL.get_conn().await.map_err(|e| e.to_string())?;
 
     let offset = (query.page - 1) * query.page_size;
 
@@ -98,7 +97,6 @@ pub async fn get_user_list(query: UserListQuery) -> Result<UserListResponse, Str
     }
 
     drop(conn);
-    drop(guard);
 
     Ok(UserListResponse {
         users: user_infos,
@@ -109,8 +107,7 @@ pub async fn get_user_list(query: UserListQuery) -> Result<UserListResponse, Str
 }
 
 pub async fn delete_user(user_id: i64) -> Result<(), String> {
-    let guard = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn = guard.get_conn().await.map_err(|e| e.to_string())?;
+    let mut conn = MYSQL_DATABASE_POOL.get_conn().await.map_err(|e| e.to_string())?;
 
     // Resolve username first so we can clean related tables (keyed by username).
     let username: Option<String> = conn
@@ -141,6 +138,5 @@ pub async fn delete_user(user_id: i64) -> Result<(), String> {
     "SET FOREIGN_KEY_CHECKS = 1".ignore(&mut conn).await.map_err(|e| e.to_string())?;
 
     drop(conn);
-    drop(guard);
     Ok(())
 }

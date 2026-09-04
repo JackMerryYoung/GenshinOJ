@@ -3,6 +3,9 @@ use crate::socket_actions;
 
 use tokio::io::AsyncReadExt;
 
+const MAX_SOCKET_MESSAGE_BYTES: usize = 4 * 1024 * 1024;
+const SOCKET_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct SocketJsonMessageContentOnBindListener {
     pub protocol: String,
@@ -115,11 +118,17 @@ pub async fn socket_message_processing() {
         tokio::net::TcpListener
     > = JUDGE_SOCKET.get().unwrap().lock().await;
     loop {
-        let (mut client, _) = guard_judge_socket.accept().await.unwrap();
+        let (client, _) = guard_judge_socket.accept().await.unwrap();
         client.set_nodelay(true).ok();
         tokio::spawn(async move {
-            let mut buf: bytes::BytesMut = bytes::BytesMut::with_capacity(1024);
-            client.read_buf(&mut buf).await.unwrap();
+            let mut buf: Vec<u8> = Vec::with_capacity(1024);
+            let read_result = tokio::time::timeout(
+                SOCKET_READ_TIMEOUT,
+                client.take((MAX_SOCKET_MESSAGE_BYTES + 1) as u64).read_to_end(&mut buf)
+            ).await;
+            if !matches!(read_result, Ok(Ok(_))) || buf.len() > MAX_SOCKET_MESSAGE_BYTES {
+                return;
+            }
             let msg: Result<serde_json::Value, serde_json::Error> = serde_json::from_slice(&buf);
             if let Ok(msg) = msg {
                 if msg.get("ws_id").is_some() {

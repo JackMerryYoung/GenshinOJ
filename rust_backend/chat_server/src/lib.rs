@@ -18,6 +18,7 @@ pub extern "Rust" fn on_init(
         .enable_all()
         .build()
         .unwrap();
+    MODULE_RUNTIME_HANDLE.set(chat_server_runtime.handle().clone()).unwrap();
     GLOBAL_MODULE_STATUSES_BY_PROTOCOL.set(global_module_statuses_by_protocol.clone()).unwrap();
     let chat_server_status: ModuleStatus = ModuleStatus {
         initialized: false,
@@ -31,11 +32,7 @@ pub extern "Rust" fn on_init(
         let chat_server_status: AsyncModifiable<ModuleStatus> = chat_server_status.clone();
         chat_server_runtime.spawn(async move {
             use mysql_async::prelude::*;
-            let guard_mysql_database_pool: tokio::sync::MutexGuard<
-                '_,
-                mysql_async::Pool
-            > = MYSQL_DATABASE_POOL.lock().await;
-            let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+            let mut conn: mysql_async::Conn = MYSQL_DATABASE_POOL.get_conn().await.unwrap();
             "CREATE DATABASE IF NOT EXISTS RsOJ".ignore(&mut conn).await.unwrap();
             "USE RsOJ".ignore(&mut conn).await.unwrap();
             "CREATE TABLE IF NOT EXISTS chat_messages (
@@ -47,8 +44,12 @@ pub extern "Rust" fn on_init(
             )"
                 .ignore(&mut conn).await
                 .unwrap();
+            // Conversation pagination filters both participants and then orders by id.
+            let _ = "ALTER TABLE chat_messages ADD INDEX idx_chat_from_to_id (from_username, to_username, id)"
+                .ignore(&mut conn).await;
+            let _ = "ALTER TABLE chat_messages ADD INDEX idx_chat_to_from_id (to_username, from_username, id)"
+                .ignore(&mut conn).await;
             drop(conn);
-            drop(guard_mysql_database_pool);
 
             let mut guard_chat_server_status: tokio::sync::MutexGuard<
                 '_,
@@ -223,13 +224,7 @@ pub extern "Rust" fn on_init(
 }
 
 #[unsafe(no_mangle)]
-pub extern "Rust" fn on_unload() {
-    let chat_server_runtime_on_unload: tokio::runtime::Runtime = tokio::runtime::Builder
-        ::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
+pub extern "Rust" fn on_unload(unload_timeout_ms: usize) {
     println!(
         "{}",
         ansi_term::Color::Purple.paint(
@@ -243,7 +238,7 @@ pub extern "Rust" fn on_unload() {
         )
     );
 
-    chat_server_runtime_on_unload.spawn(async move {
+    let cleanup_completed = run_shutdown_task(async move {
         // Resolve whether ws_server is up and release the lock before calling
         // disconnect_from_ws_server() below, since it locks GLOBAL_MODULE_STATUSES_BY_PROTOCOL
         // itself again internally (via get_socket_port_by_protocol) — holding it here too would
@@ -260,17 +255,19 @@ pub extern "Rust" fn on_unload() {
         if ws_server_initialized {
             chat_server_socket::disconnect_from_ws_server().await;
         }
-    });
+        disconnect_database_pool().await;
+    }, std::time::Duration::from_millis(unload_timeout_ms as u64));
 
     println!(
         "{}",
         ansi_term::Color::Purple.paint(
             format!(
-                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Unloaded the chat server.",
+                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Chat server shutdown cleanup {}.",
                 MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
-                line!()
+                line!(),
+                if cleanup_completed { "completed" } else { "timed out" }
             )
         )
     );

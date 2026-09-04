@@ -69,6 +69,7 @@ function useSubmissionResult(
 
     const loadSubmissionResult = (submissionId: number) => {
         const _requestKey = nanoid();
+        setSubmissionResult(undefined);
         sendJsonMessage({
             type: "submission_result",
             content: {
@@ -173,7 +174,6 @@ function useSubmissionResult(
 export default function SubmissionShower() {
     const { submissionId } = (useLoaderData() as SubmissionInfoFromLoader);
     const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
-    const [dialogRequireLoginOpenState, setDialogRequireLoginOpenState] = useState(false);
     const [dialogSubmissionNotFoundOpenState, setDialogSubmissionNotFoundOpenState] = useState(false);
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
     const { submissionResult, loadSubmissionResult } = useSubmissionResult(sendJsonMessage, lastJsonMessage, submissionId);
@@ -191,23 +191,13 @@ export default function SubmissionShower() {
     };
 
     useEffect(() => {
-        const localLoginStatus = localStorage.getItem("loginStatus");
-        if (localLoginStatus === null || (loginStatus.value === false && localLoginStatus !== null && JSON.parse(localLoginStatus) === false))
-            setDialogRequireLoginOpenState(true);
-    }, [loginStatus]);
-
-    useEffect(() => {
         if (loginStatus.value === true)
             loadSubmissionResult(submissionId);
-    }, [loginStatus]);
+    }, [loginStatus.value, submissionId]);
 
     useEffect(() => {
         if (submissionResult !== undefined && submissionResult.result === "SNF") setDialogSubmissionNotFoundOpenState(true);
     }, [submissionResult]);
-
-    const handleNavigateLogin = () => {
-        navigate("/login");
-    };
 
     const handleNavigateBackward = () => {
         navigate(-1);
@@ -216,7 +206,7 @@ export default function SubmissionShower() {
     return <>
         {
             loginStatus.value && (
-                <div style={{ padding: "0.25em 0", maxWidth: "90%" }}>
+                <div style={{ padding: "0.25em 0", width: "100%", boxSizing: "border-box" }}>
                     <div style={{ display: "flex", marginBottom: "0.75em" }}>
                         <Label style={{ margin: "0.20em 0.15em 0.20em 0.85em" }}>{t("submissionId")}: {submissionResult?.submission_id}</Label>
                         {
@@ -353,10 +343,5 @@ export default function SubmissionShower() {
             setPopupDialogOpenState={setDialogSubmissionNotFoundOpenState}
             text={t("submissionNotFound", { submissionId })}
             onClose={handleNavigateBackward} />
-        <PopupDialog
-            open={dialogRequireLoginOpenState}
-            setPopupDialogOpenState={setDialogRequireLoginOpenState}
-            text={t("pleaseLoginFirst")}
-            onClose={handleNavigateLogin} />
     </>
 }

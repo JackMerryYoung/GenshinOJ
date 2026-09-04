@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -6,8 +6,6 @@ import { Divider, Avatar, Tab, CounterBadge } from "@fluentui/react-components";
 import { ChartMultipleFilled, ChatFilled, ClipboardTaskListLtrFilled, CommentMultipleFilled, AlertFilled, PersonFilled, PersonAddFilled, SignOutFilled, ArrowEnterFilled } from "@fluentui/react-icons";
 
 import { useSelector } from "react-redux";
-
-import { nanoid } from "nanoid";
 
 import { RootState } from "../store";
 import * as globals from "../Globals.ts";
@@ -18,55 +16,35 @@ import "../css/style.css";
 
 // Track the logged-in user's unread notification count for the navbar badge. Notifications are
 // pull-based (the judge knows the actor's ws_id, not the recipient's), so this polls on a timer and
-// on navigation, and also refreshes immediately whenever a `notification_mark_read_result` flows by
-// (e.g. the Info Center just marked something read on this same shared socket).
-function useUnreadCount(sendJsonMessage: globals.SendJsonMessage, lastJsonMessage: unknown, loggedIn: boolean) {
+// on navigation. The request broker keeps each count response paired with the refresh that started it.
+function useUnreadCount(request: globals.WebSocketRequest, loggedIn: boolean) {
     const [unreadCount, setUnreadCount] = useState(0);
-    const [requestKey, setRequestKey] = useState("");
-    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
+    const refreshAbortRef = useRef<AbortController | null>(null);
 
-    const refresh = () => {
-        const _requestKey = nanoid();
-        sendJsonMessage({ type: "notifications_unread_count", content: { request_key: _requestKey } });
-        setRequestKey(_requestKey);
-    };
-
-    useEffect(() => {
-        if (lastJsonMessage !== null) setWebsocketMessageHistory((p) => p.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
-
-    useEffect(() => {
-        const h = websocketMessageHistory;
-        let sawMarkRead = false;
-        h.map((_message, i) => {
-            if (_message && typeof _message === 'object' && 'type' in _message) {
-                const type = (_message as { type: string }).type;
-                if (type === "notifications_unread_count") {
-                    const message = _message as { content: { unread_count: number; request_key: string } };
-                    if (message.content.request_key === requestKey) { setUnreadCount(message.content.unread_count); delete h[i]; }
-                } else if (type === "notification_mark_read_result") {
-                    sawMarkRead = true;
-                    delete h[i];
-                }
-            }
-        });
-        if (!globals.compareArray(h, websocketMessageHistory)) setWebsocketMessageHistory(h);
-        if (sawMarkRead && loggedIn) refresh();
-    }, [websocketMessageHistory, requestKey]);
+    const refresh = useCallback(() => {
+        refreshAbortRef.current?.abort();
+        const controller = new AbortController();
+        refreshAbortRef.current = controller;
+        request<{
+            type: "notifications_unread_count";
+            content: { unread_count: number; request_key: string };
+        }>("notifications_unread_count", {}, { responseTypes: ["notifications_unread_count"], signal: controller.signal })
+            .then((response) => setUnreadCount(response.content.unread_count))
+            .catch(() => undefined);
+    }, [request]);
 
     useEffect(() => {
         if (!loggedIn) { setUnreadCount(0); return; }
         refresh();
         const id = setInterval(refresh, 20000);
         return () => clearInterval(id);
-    }, [loggedIn]);
+    }, [loggedIn, refresh]);
 
     return { unreadCount, refresh };
 }
 
-export default function NavBar({ sendJsonMessage, lastJsonMessage }: {
-    sendJsonMessage: globals.SendJsonMessage;
-    lastJsonMessage: unknown;
+export default function NavBar({ request }: {
+    request: globals.WebSocketRequest;
 }) {
     const { t } = useTranslation(["navBar", "common"]);
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
@@ -74,7 +52,7 @@ export default function NavBar({ sendJsonMessage, lastJsonMessage }: {
     const location = useLocation();
     const loggedIn = loginStatus.value === true;
 
-    const { unreadCount, refresh } = useUnreadCount(sendJsonMessage, lastJsonMessage, loggedIn);
+    const { unreadCount, refresh } = useUnreadCount(request, loggedIn);
 
     // Re-check the unread count whenever the route changes (cheap, and keeps the badge fresh right
     // after the user reads notifications without waiting for the next poll tick).

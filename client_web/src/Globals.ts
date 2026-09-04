@@ -1,12 +1,11 @@
 import { nanoid } from "nanoid";
-import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "./store.ts";
-import { loginReducer, logoutReducer } from "../redux/loginStatusSlice.ts";
-import { modifySessionTokenReducer } from "../redux/sessionTokenSlice.ts";
-import { modifyLoginUsernameReducer } from "../redux/loginUsernameSlice.ts";
+import { useDispatch } from "react-redux";
+import { logoutReducer } from "../redux/loginStatusSlice.ts";
 import { clearLoginUsernameReducer } from "../redux/loginUsernameSlice.ts";
 import { clearSessionTokenReducer } from "../redux/sessionTokenSlice.ts";
+import type { WebSocketRequest } from "./websocket/requestBroker.ts";
+
+export type { WebSocketRequest } from "./websocket/requestBroker.ts";
 
 export function getProperty(obj: unknown, key: string) {
     if (typeof obj === "object" && obj !== null) {
@@ -56,103 +55,20 @@ export declare type WebSocketHook<T = unknown, P = WebSocketEventMap['message'] 
     lastJsonMessage: T;
     readyState: ReadyState;
     getWebSocket: () => (WebSocketLike | null);
+    request: WebSocketRequest;
 };
-
-export function useLoginSession(
-    sendJsonMessage: SendJsonMessage,
-    lastJsonMessage: unknown
-) {
-    const [requestKey, setRequestKey] = useState("");
-    const [loginUsername, setLoginUsername] = useState("");
-    const [loginSessionState, setLoginSessionState] = useState<boolean | undefined>(undefined);
-    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
-    const dispatch = useDispatch();
-
-    const loginSession = (_loginUsername: string, _loginPassword: string) => {
-        setLoginSessionState(undefined);
-        const _requestKey = nanoid();
-        setLoginUsername(_loginUsername);
-        sendJsonMessage({
-            type: "login",
-            content: {
-                username: _loginUsername,
-                password: _loginPassword,
-                request_key: _requestKey
-            }
-        });
-
-        setRequestKey(_requestKey);
-    };
-
-    useEffect(() => {
-        if (lastJsonMessage !== null)
-            setWebsocketMessageHistory((previousMessageHistory) => previousMessageHistory.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
-
-    useEffect(() => {
-        const _websocketMessageHistory = websocketMessageHistory;
-        _websocketMessageHistory.map((_message, index) => {
-            interface LoginSessionResult {
-                type: string;
-                content: {
-                    request_key: string
-                };
-            }
-
-            interface LoginSessionResultSuccess extends LoginSessionResult {
-                type: string;
-                content: {
-                    request_key: string,
-                    session_token: string
-                };
-            }
-
-            function isLoginSession(x: object) {
-                if ('type' in x && 'content' in x && typeof x.content === 'object') {
-                    return 'request_key' in (x.content as object);
-                }
-
-                return false;
-            }
-
-            if (_message && isLoginSession(_message)) {
-                if ((_message as LoginSessionResult).content.request_key === requestKey) {
-                    if ((_message as LoginSessionResult).type === "quit") {
-                        setLoginSessionState(false);
-                        dispatch(logoutReducer());
-                        localStorage.setItem("loginStatus", JSON.stringify(false));
-                    }
-                    if ((_message as LoginSessionResult).type === "session_token") {
-                        setLoginSessionState(true);
-                        dispatch(loginReducer());
-                        dispatch(modifySessionTokenReducer((_message as LoginSessionResultSuccess).content.session_token));
-                        dispatch(modifyLoginUsernameReducer(loginUsername));
-                        localStorage.setItem("loginStatus", JSON.stringify(true));
-                    }
-
-                    delete _websocketMessageHistory[index];
-                }
-            }
-        });
-
-        if (!compareArray(_websocketMessageHistory, websocketMessageHistory)) setWebsocketMessageHistory(_websocketMessageHistory);
-    }, [websocketMessageHistory, loginUsername, requestKey]);
-
-    return { loginSession, loginSessionState };
-}
-
 export function useLogoutSession() {
-    const loginStatus = useSelector((state: RootState) => state.loginStatus);
     const dispatch = useDispatch();
     const handleQuit = () => {
-        if (loginStatus.value === true) {
-            dispatch(logoutReducer());
-            dispatch(clearLoginUsernameReducer());
-            dispatch(clearSessionTokenReducer());
-            localStorage.removeItem("loginUsername");
-            localStorage.removeItem("loginPassword");
-            localStorage.setItem("loginStatus", JSON.stringify(false));
-        }
+        // Explicit logout always clears the persisted recovery token, even if the transport
+        // already dropped and Redux no longer reports an active connection.
+        dispatch(logoutReducer());
+        dispatch(clearLoginUsernameReducer());
+        dispatch(clearSessionTokenReducer());
+        localStorage.removeItem("loginUsername");
+        localStorage.removeItem("loginSessionToken");
+        localStorage.removeItem("loginPassword");
+        localStorage.removeItem("loginStatus");
 
     };
 

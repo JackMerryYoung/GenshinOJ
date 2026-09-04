@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useOptimistic, useRef, useState, startTransition, lazy, Suspense } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { TFunction } from "i18next";
@@ -12,8 +12,6 @@ import {
 import { PersonFilled, CommentMultipleFilled, MentionFilled } from "@fluentui/react-icons";
 
 import { useSelector } from "react-redux";
-
-import { nanoid } from "nanoid";
 
 const PopupDialog = lazy(() => import("./PopupDialog.tsx"));
 
@@ -49,119 +47,90 @@ function describe(item: NotificationItem, t: TFunction) {
     return t("notification.repliedToYou");
 }
 
-function isNotificationsListFromFetch(x: object) {
-    if ('type' in x && 'content' in x && typeof x.content === 'object') {
-        return 'notifications_list' in (x.content as object) && 'request_key' in (x.content as object);
-    }
-    return false;
-}
-
-function useNotificationsList(sendJsonMessage: globals.SendJsonMessage, lastJsonMessage: unknown) {
-    const [requestKey, setRequestKey] = useState("");
-    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
+function useNotificationsList(request: globals.WebSocketRequest) {
     const [notificationsList, setNotificationsList] = useState<NotificationItem[] | undefined>(undefined);
+    const requestAbortRef = useRef<AbortController | null>(null);
 
     const loadNotificationsList = (index: number) => {
-        const _requestKey = nanoid();
+        requestAbortRef.current?.abort();
+        const controller = new AbortController();
+        requestAbortRef.current = controller;
         setNotificationsList(undefined);
-        sendJsonMessage({ type: "notifications_list", content: { index, request_key: _requestKey } });
-        setRequestKey(_requestKey);
+        request<{
+            type: "notifications_list";
+            content: { notifications_list: NotificationItem[]; request_key: string };
+        }>("notifications_list", { index }, { responseTypes: ["notifications_list"], signal: controller.signal })
+            .then((response) => setNotificationsList(response.content.notifications_list))
+            .catch((error) => {
+                if (!controller.signal.aborted) console.error("Failed to load notifications", error);
+            });
     };
-
-    useEffect(() => {
-        if (lastJsonMessage !== null) setWebsocketMessageHistory((p) => p.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
-
-    useEffect(() => {
-        const h = websocketMessageHistory;
-        h.map((_message, i) => {
-            if (_message && isNotificationsListFromFetch(_message)) {
-                const message = _message as { content: { notifications_list: NotificationItem[]; request_key: string } };
-                if (message.content.request_key === requestKey) {
-                    setNotificationsList(message.content.notifications_list);
-                    delete h[i];
-                }
-            }
-        });
-        if (!globals.compareArray(h, websocketMessageHistory)) setWebsocketMessageHistory(h);
-    }, [websocketMessageHistory, requestKey]);
 
     return { notificationsList, setNotificationsList, loadNotificationsList };
 }
 
-function isTotalIndexFromFetch(x: object) {
-    if ('type' in x && 'content' in x && typeof x.content === 'object') {
-        return 'total_notifications_list_index' in (x.content as object) && 'request_key' in (x.content as object);
-    }
-    return false;
-}
-
-function useTotalIndex(sendJsonMessage: globals.SendJsonMessage, lastJsonMessage: unknown) {
-    const [requestKey, setRequestKey] = useState("");
-    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
+function useTotalIndex(request: globals.WebSocketRequest) {
     const [totalIndex, setTotalIndex] = useState(1);
+    const requestAbortRef = useRef<AbortController | null>(null);
 
     const loadTotalIndex = () => {
-        const _requestKey = nanoid();
-        sendJsonMessage({ type: "total_notifications_list_index", content: { request_key: _requestKey } });
-        setRequestKey(_requestKey);
+        requestAbortRef.current?.abort();
+        const controller = new AbortController();
+        requestAbortRef.current = controller;
+        request<{
+            type: "total_notifications_list_index";
+            content: { total_notifications_list_index: number; request_key: string };
+        }>("total_notifications_list_index", {}, { responseTypes: ["total_notifications_list_index"], signal: controller.signal })
+            .then((response) => setTotalIndex(response.content.total_notifications_list_index))
+            .catch((error) => {
+                if (!controller.signal.aborted) console.error("Failed to load notification page count", error);
+            });
     };
-
-    useEffect(() => {
-        if (lastJsonMessage !== null) setWebsocketMessageHistory((p) => p.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
-
-    useEffect(() => {
-        const h = websocketMessageHistory;
-        h.map((_message, i) => {
-            if (_message && isTotalIndexFromFetch(_message)) {
-                const message = _message as { content: { total_notifications_list_index: number; request_key: string } };
-                if (message.content.request_key === requestKey) { setTotalIndex(message.content.total_notifications_list_index); delete h[i]; }
-            }
-        });
-        if (!globals.compareArray(h, websocketMessageHistory)) setWebsocketMessageHistory(h);
-    }, [websocketMessageHistory, requestKey]);
 
     return { totalIndex, loadTotalIndex };
 }
 
-function useMarkRead(sendJsonMessage: globals.SendJsonMessage) {
+function useMarkRead(request: globals.WebSocketRequest) {
     const loginUsername = useSelector((state: RootState) => state.loginUsername);
     const sessionToken = useSelector((state: RootState) => state.sessionToken);
 
     // notificationId 0 marks every unread notification read.
-    const markRead = (notificationId: number) => {
-        sendJsonMessage({
-            type: "notification_mark_read",
-            content: {
+    const markRead = (notificationId: number) => request<{
+        type: "notification_mark_read_result";
+        content: { request_key: string; result: string };
+    }>("notification_mark_read", {
                 username: loginUsername.value,
                 session_token: sessionToken.value,
                 notification_id: notificationId,
-                request_key: nanoid(),
-            },
-        });
-    };
+            }, { responseTypes: ["notification_mark_read_result"] });
 
     return { markRead };
 }
 
 export default function InfoCenter() {
     const { t } = useTranslation("infoCenter");
-    const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
+    const { request } = useOutletContext<globals.WebSocketHook>();
     const navigate = useNavigate();
     const loginStatus = useSelector((state: RootState) => state.loginStatus);
 
     const [dialogRequireLoginOpenState, setDialogRequireLoginOpenState] = useState(false);
     const [index, setIndex] = useState(1);
 
-    const { notificationsList, setNotificationsList, loadNotificationsList } = useNotificationsList(sendJsonMessage, lastJsonMessage);
-    const { totalIndex, loadTotalIndex } = useTotalIndex(sendJsonMessage, lastJsonMessage);
-    const { markRead } = useMarkRead(sendJsonMessage);
+    const { notificationsList, setNotificationsList, loadNotificationsList } = useNotificationsList(request);
+    const { totalIndex, loadTotalIndex } = useTotalIndex(request);
+    const { markRead } = useMarkRead(request);
+    const [optimisticNotifications, applyOptimistic] = useOptimistic(
+        notificationsList,
+        (current: NotificationItem[] | undefined, update: { notificationId: number }) => {
+            if (!current) return current;
+            return current.map((item) => update.notificationId === 0 || item.notification_id === update.notificationId
+                ? { ...item, is_read: true }
+                : item);
+        },
+    );
 
     useEffect(() => {
-        const localLoginStatus = localStorage.getItem("loginStatus");
-        if (localLoginStatus === null || (loginStatus.value === false && localLoginStatus !== null && JSON.parse(localLoginStatus) === false))
-            setDialogRequireLoginOpenState(true);
+        setDialogRequireLoginOpenState(loginStatus.value === false);
     }, [loginStatus]);
 
     useEffect(() => {
@@ -173,15 +142,31 @@ export default function InfoCenter() {
 
     const openNotification = (item: NotificationItem) => {
         if (!item.is_read) {
-            markRead(item.notification_id);
-            setNotificationsList((prev) => prev?.map((n) => n.notification_id === item.notification_id ? { ...n, is_read: true } : n));
+            startTransition(async () => {
+                applyOptimistic({ notificationId: item.notification_id });
+                try {
+                    const response = await markRead(item.notification_id);
+                    if (response.content.result !== "ok") throw new Error(response.content.result);
+                    setNotificationsList((prev) => prev?.map((n) => n.notification_id === item.notification_id ? { ...n, is_read: true } : n));
+                } catch {
+                    loadNotificationsList(index);
+                }
+            });
         }
         navigate(item.target_url);
     };
 
     const markAllRead = () => {
-        markRead(0);
-        setNotificationsList((prev) => prev?.map((n) => ({ ...n, is_read: true })));
+        startTransition(async () => {
+            applyOptimistic({ notificationId: 0 });
+            try {
+                const response = await markRead(0);
+                if (response.content.result !== "ok") throw new Error(response.content.result);
+                setNotificationsList((prev) => prev?.map((n) => ({ ...n, is_read: true })));
+            } catch {
+                loadNotificationsList(index);
+            }
+        });
     };
 
     return <>
@@ -197,17 +182,17 @@ export default function InfoCenter() {
 
                 <div className="scroll-box" style={{ flex: 1, minHeight: 0, marginTop: "0.5em" }}>
                 {
-                    notificationsList === undefined
+                    optimisticNotifications === undefined
                         ?
                         <Spinner size="small" label={t("loading.notifications")} delay={300} />
                         :
-                        notificationsList.length === 0
+                        optimisticNotifications.length === 0
                             ?
                             <Label>{t("empty.noNotifications")}</Label>
                             :
                             <>
                                 {
-                                    notificationsList.map((item) => (
+                                    optimisticNotifications.map((item) => (
                                         <div
                                             key={item.notification_id}
                                             onClick={() => openNotification(item)}

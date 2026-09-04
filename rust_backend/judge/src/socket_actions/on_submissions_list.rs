@@ -33,6 +33,7 @@ pub async fn on_submissions_list(msg: SocketJsonMessageWithWsId) {
             }
         );
         drop(guard_pending_submissions_list_requests);
+        expire_pending(&*PENDING_SUBMISSIONS_LIST_REQUESTS, lookup_request_key.clone());
 
         // judge has no notion of usernames itself — only simple_authenticator tracks which
         // username owns a given ws_id — so ask it directly (point-to-point module-to-module

@@ -21,6 +21,7 @@ pub extern "Rust" fn on_init(
         .enable_all()
         .build()
         .unwrap();
+    MODULE_RUNTIME_HANDLE.set(simple_authenticator_runtime.handle().clone()).unwrap();
     GLOBAL_MODULE_STATUSES_BY_PROTOCOL.set(global_module_statuses_by_protocol.clone()).unwrap();
     let simple_authenticator_status: ModuleStatus = ModuleStatus {
         initialized: false,
@@ -35,11 +36,7 @@ pub extern "Rust" fn on_init(
         let simple_authenticator_status: AsyncModifiable<ModuleStatus> =
             simple_authenticator_status.clone();
         simple_authenticator_runtime.spawn(async move {
-            let guard_mysql_database_pool: tokio::sync::MutexGuard<
-                '_,
-                mysql_async::Pool
-            > = MYSQL_DATABASE_POOL.lock().await;
-            let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+            let mut conn: mysql_async::Conn = MYSQL_DATABASE_POOL.get_conn().await.unwrap();
             let tmp: Vec<String> = conn.query("SHOW DATABASES LIKE \'RsOJ\'").await.unwrap();
             if !tmp.iter().any(|x| x == "RsOJ") {
                 "CREATE DATABASE RsOJ".ignore(&mut conn).await.unwrap();
@@ -74,6 +71,17 @@ pub extern "Rust" fn on_init(
                         .unwrap();
                 }
             }
+            let admin_role_column: Vec<String> = conn
+                .query(
+                    "SELECT column_name FROM information_schema.columns WHERE table_schema = 'RsOJ' AND table_name = 'users' AND column_name = 'admin_role'"
+                )
+                .await
+                .unwrap();
+            if admin_role_column.is_empty() {
+                "ALTER TABLE users ADD COLUMN admin_role VARCHAR(32) NULL"
+                    .ignore(&mut conn).await
+                    .unwrap();
+            }
             // created_at is BIGINT (epoch millis), added later than the columns above. Existing
             // rows backfill to 0, so pre-existing users fall before any 30-day window and count
             // only toward the cumulative baseline, never a daily spike.
@@ -97,8 +105,12 @@ pub extern "Rust" fn on_init(
             )"
                 .ignore(&mut conn).await
                 .unwrap();
+            // Login, registration and username lookups all use username as their key.
+            let _ = "ALTER TABLE users ADD UNIQUE INDEX uq_users_username (username)"
+                .ignore(&mut conn).await;
+            let _ = "ALTER TABLE follows ADD INDEX idx_follows_followee (followee_username)"
+                .ignore(&mut conn).await;
             drop(conn);
-            drop(guard_mysql_database_pool);
             let mut guard_simple_authenticator_status: tokio::sync::MutexGuard<
                 '_,
                 ModuleStatus
@@ -278,13 +290,7 @@ pub extern "Rust" fn on_init(
 }
 
 #[unsafe(no_mangle)]
-pub extern "Rust" fn on_unload() {
-    let simple_authenticator_runtime_on_unload: tokio::runtime::Runtime = tokio::runtime::Builder
-        ::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
+pub extern "Rust" fn on_unload(unload_timeout_ms: usize) {
     println!(
         "{}",
         ansi_term::Color::Purple.paint(
@@ -298,7 +304,7 @@ pub extern "Rust" fn on_unload() {
         )
     );
 
-    simple_authenticator_runtime_on_unload.spawn(async move {
+    let cleanup_completed = run_shutdown_task(async move {
         // Resolve whether ws_server is up and release both locks before calling
         // disconnect_from_ws_server() below, since it locks GLOBAL_MODULE_STATUSES_BY_PROTOCOL
         // itself again internally (via get_socket_port_by_protocol) — holding it here too would
@@ -315,19 +321,19 @@ pub extern "Rust" fn on_unload() {
         if ws_server_initialized {
             simple_authenticator_socket::disconnect_from_ws_server().await;
         }
-
-        // TODO: To tell main backend to drop this module.
-    });
+        disconnect_database_pool().await;
+    }, std::time::Duration::from_millis(unload_timeout_ms as u64));
 
     println!(
         "{}",
         ansi_term::Color::Purple.paint(
             format!(
-                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Unloaded the simple authenticator.",
+                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Simple authenticator shutdown cleanup {}.",
                 MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
-                line!()
+                line!(),
+                if cleanup_completed { "completed" } else { "timed out" }
             )
         )
     );

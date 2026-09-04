@@ -3,9 +3,13 @@
     "title": "RsOJ Control Panel",
     "loading": "Loading...",
     "loginRequired": "You must be logged in to access the control panel",
-    "accessDenied": "Access denied: Administrator privileges required",
+    "accessDenied": "Access denied: invalid token or administrator privileges required",
     "verifyFailed": "Failed to verify admin access",
-    "goToLogin": "Go to Login"
+    "goToLogin": "Go to Login",
+    "tokenRequired": "Enter the control-panel admin token",
+    "tokenPlaceholder": "Control-panel admin token",
+    "unlock": "Unlock",
+    "notConfigured": "Control panel is not configured on the server"
   },
   "roles": {
     "problemAdmin": "Problem Administrator",

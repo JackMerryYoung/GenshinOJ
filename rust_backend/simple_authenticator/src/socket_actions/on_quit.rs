@@ -6,94 +6,41 @@ struct ContentOnQuit {
     session_token: String,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
-struct SocketJsonMessageContentOnQuit {
-    ws_id: String,
-    json_msg: ContentOnQuit,
-}
-
 pub async fn on_quit(msg: SocketJsonMessageWithWsId) {
-    if let Ok(content) = serde_json::from_value::<SocketJsonMessageContentOnQuit>(msg.content) {
-        let mut guard_usernames_by_ws_id: tokio::sync::MutexGuard<
-            '_,
-            std::collections::HashMap<String, String>
-        > = USERNAMES_BY_WS_ID.lock().await;
-        if let Some(username_by_ws_id) = guard_usernames_by_ws_id.get(&content.ws_id) {
-            let unwrapped_content: ContentOnQuit = content.json_msg;
-            let mut guard_logged_in_usernames: tokio::sync::MutexGuard<
-                '_,
-                std::collections::HashSet<String>
-            > = LOGGED_IN_USERNAMES.lock().await;
-            if guard_logged_in_usernames.contains(username_by_ws_id) {
-                let mut guard_session_tokens_by_username: tokio::sync::MutexGuard<
-                    '_,
-                    std::collections::HashMap<String, String>
-                > = SESSION_TOKENS_BY_USERNAME.lock().await;
-                if
-                    let Some(session_token) =
-                        guard_session_tokens_by_username.get(username_by_ws_id)
-                {
-                    if
-                        &unwrapped_content.username == username_by_ws_id &&
-                        &unwrapped_content.session_token == session_token
-                    {
-                        println!(
-                            "{}",
-                            ansi_term::Color::Blue.paint(
-                                format!(
-                                    "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` quitted with session token: `{}`.",
-                                    MODULE_IDENTITY,
-                                    std::thread::current().id().as_u64(),
-                                    file!(),
-                                    line!(),
-                                    username_by_ws_id,
-                                    session_token
-                                )
-                            )
-                        );
-                        guard_session_tokens_by_username.remove(username_by_ws_id);
-                        guard_logged_in_usernames.remove(username_by_ws_id);
-                        let mut guard_ws_ids_by_username: tokio::sync::MutexGuard<
-                            '_,
-                            std::collections::HashMap<String, String>
-                        > = WS_IDS_BY_USERNAME.lock().await;
-                        guard_ws_ids_by_username.remove(username_by_ws_id);
-                        drop(guard_ws_ids_by_username);
-                        guard_usernames_by_ws_id.remove(&content.ws_id);
-                    } else {
-                        println!(
-                            "{}",
-                            ansi_term::Color::Yellow.paint(
-                                format!(
-                                    "[{}] [WARNING] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to quit (The user tried to quit with a fake session token).",
-                                    MODULE_IDENTITY,
-                                    std::thread::current().id().as_u64(),
-                                    file!(),
-                                    line!(),
-                                    username_by_ws_id
-                                )
-                            )
-                        );
-                    }
-                } else {
-                    println!(
-                        "{}",
-                        ansi_term::Color::Blue.paint(
-                            format!(
-                                "[{}] [INFO] [THREAD {}] [FILE `{}` LINE {}] The user `{}` failed to quit (The user tried to quit without session token).",
-                                MODULE_IDENTITY,
-                                std::thread::current().id().as_u64(),
-                                file!(),
-                                line!(),
-                                username_by_ws_id
-                            )
-                        )
-                    );
-                }
-                drop(guard_session_tokens_by_username);
-            }
-            drop(guard_logged_in_usernames);
-        }
-        drop(guard_usernames_by_ws_id);
+    let Ok(content) = serde_json::from_value::<ContentOnQuit>(msg.content) else {
+        return;
+    };
+
+    let _session_state = SESSION_STATE_LOCK.lock().await;
+    let username_for_ws = {
+        let usernames_by_ws_id = USERNAMES_BY_WS_ID.lock().await;
+        usernames_by_ws_id.get(&msg.ws_id).cloned()
+    };
+    if username_for_ws.as_deref() != Some(content.username.as_str()) {
+        return;
+    }
+
+    let token_matches = {
+        let session_tokens = SESSION_TOKENS_BY_USERNAME.lock().await;
+        session_tokens.get(&content.username) == Some(&content.session_token)
+    };
+    if !token_matches {
+        return;
+    }
+
+    SESSION_TOKENS_BY_USERNAME
+        .lock()
+        .await
+        .remove(&content.username);
+    LOGGED_IN_USERNAMES.lock().await.remove(&content.username);
+    USERNAMES_BY_WS_ID.lock().await.remove(&msg.ws_id);
+
+    let mut ws_ids_by_username = WS_IDS_BY_USERNAME.lock().await;
+    if ws_ids_by_username
+        .get(&content.username)
+        .map(String::as_str)
+        == Some(msg.ws_id.as_str())
+    {
+        ws_ids_by_username.remove(&content.username);
     }
 }

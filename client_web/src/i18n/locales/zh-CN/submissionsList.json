@@ -12,6 +12,8 @@
         "forward10": "前进 10 页"
     },
     "indexPage": "提交列表第 {{current}} / {{total}} 页",
+    "emptySelection": "请选择一条提交记录查看详情。",
+    "ownSubmission": "我的提交",
     "column": {
         "submissionId": "提交 ID",
         "problemNumber": "题目编号",

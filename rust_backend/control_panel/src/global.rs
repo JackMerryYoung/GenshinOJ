@@ -19,9 +19,37 @@ pub struct ModuleStatus {
 
 pub const MYSQL_DATABASE_URL: &str = "mysql://root:123456@127.0.0.1:3306/";
 
-pub static MYSQL_DATABASE_POOL: std::sync::LazyLock<tokio::sync::Mutex<mysql_async::Pool>> = std::sync::LazyLock::new(
-    || { tokio::sync::Mutex::new(mysql_async::Pool::new(MYSQL_DATABASE_URL)) }
-);
+pub static MYSQL_DATABASE_POOL: std::sync::LazyLock<mysql_async::Pool> =
+    std::sync::LazyLock::new(|| mysql_async::Pool::new(MYSQL_DATABASE_URL));
+
+pub static MODULE_RUNTIME_HANDLE: std::sync::OnceLock<tokio::runtime::Handle> =
+    std::sync::OnceLock::new();
+
+pub fn run_shutdown_task<F>(task: F, timeout: std::time::Duration) -> bool
+where
+    F: std::future::Future<Output = ()> + Send + 'static,
+{
+    if let Some(handle) = MODULE_RUNTIME_HANDLE.get() {
+        let (complete_tx, complete_rx) = std::sync::mpsc::channel();
+        drop(handle.spawn(async move {
+            task.await;
+            let _ = complete_tx.send(());
+        }));
+        complete_rx.recv_timeout(timeout).is_ok()
+    } else {
+        eprintln!("[{}] [WARNING] Runtime handle is unavailable during shutdown", MODULE_IDENTITY);
+        false
+    }
+}
+
+pub async fn disconnect_database_pool() {
+    if let Err(error) = MYSQL_DATABASE_POOL.clone().disconnect().await {
+        eprintln!(
+            "[{}] [WARNING] Failed to disconnect the database pool during shutdown: {}",
+            MODULE_IDENTITY, error
+        );
+    }
+}
 
 pub const DATABASE_NAME: &str = "RsOJ";
 
@@ -39,3 +67,43 @@ pub const VISITS_TABLE_NAME: &str = "control_panel_visits";
 // upward until it finds a free one.
 pub const CONTROL_PANEL_HTTP_HOST: &str = "127.0.0.1";
 pub const CONTROL_PANEL_HTTP_PORT: u16 = 9990;
+
+// Set role-scoped credentials in the backend process environment. Keeping them outside the
+// database means clearing OJ data cannot invalidate or expose control-panel credentials.
+pub static CONTROL_PANEL_ADMIN_TOKEN: std::sync::LazyLock<Option<String>> =
+    std::sync::LazyLock::new(|| {
+        std::env::var("CONTROL_PANEL_ADMIN_TOKEN")
+            .ok()
+            .filter(|token| !token.trim().is_empty())
+    });
+
+pub static CONTROL_PANEL_PROBLEM_ADMIN_TOKEN: std::sync::LazyLock<Option<String>> =
+    std::sync::LazyLock::new(|| {
+        std::env::var("CONTROL_PANEL_PROBLEM_ADMIN_TOKEN")
+            .ok()
+            .filter(|token| !token.trim().is_empty())
+    });
+
+pub static CONTROL_PANEL_COMMUNITY_ADMIN_TOKEN: std::sync::LazyLock<Option<String>> =
+    std::sync::LazyLock::new(|| {
+        std::env::var("CONTROL_PANEL_COMMUNITY_ADMIN_TOKEN")
+            .ok()
+            .filter(|token| !token.trim().is_empty())
+    });
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AdminRole {
+    Super,
+    Problem,
+    Community,
+}
+
+impl AdminRole {
+    pub fn as_database_value(self) -> &'static str {
+        match self {
+            Self::Super => "super_admin",
+            Self::Problem => "problem_admin",
+            Self::Community => "community_admin",
+        }
+    }
+}

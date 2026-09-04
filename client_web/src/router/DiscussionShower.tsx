@@ -329,9 +329,7 @@ export default function DiscussionShower() {
         useVote(sendJsonMessage, lastJsonMessage, "discussion_reply_vote_result", "discussion_reply_vote", "reply_id");
 
     useEffect(() => {
-        const localLoginStatus = localStorage.getItem("loginStatus");
-        if (localLoginStatus === null || (loginStatus.value === false && localLoginStatus !== null && JSON.parse(localLoginStatus) === false))
-            setDialogRequireLoginOpenState(true);
+        setDialogRequireLoginOpenState(loginStatus.value === false);
     }, [loginStatus]);
 
     useEffect(() => {

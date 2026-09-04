@@ -1,5 +1,10 @@
 use crate::global::*;
 
+use tokio::io::AsyncReadExt;
+
+const MAX_JUDGE_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
+const COMPILE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
 #[derive(serde::Deserialize)]
 struct TestcaseConfig {
     score: i32,
@@ -49,7 +54,10 @@ async fn run_with_limits(
     time_limit: f64,
     memory_limit_mb: i64
 ) -> Result<std::process::Output, String> {
-    let memory_limit_kb = memory_limit_mb * 1024;
+    let memory_limit_kb = memory_limit_mb
+        .checked_mul(1024)
+        .filter(|value| *value > 0)
+        .ok_or_else(|| String::from("invalid memory limit"))?;
     let full_command = format!(
         "ulimit -v {}; exec {} {}",
         memory_limit_kb,
@@ -64,26 +72,107 @@ async fn run_with_limits(
         .current_dir(cwd)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        // stderr is not part of the judging result. Discarding it prevents a submission that
+        // writes continuously to stderr from consuming an unbounded buffer.
+        .stderr(std::process::Stdio::null())
+        .kill_on_drop(true)
         .spawn()
         .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
-    {
+    let Some(stdout) = child.stdout.take() else {
+        let _ = child.start_kill();
+        return Err(String::from("failed to open child stdout"));
+    };
+    let mut stdout_task = tokio::spawn(async move {
+        let mut stdout = stdout.take((MAX_JUDGE_OUTPUT_BYTES + 1) as u64);
+        let mut bytes = Vec::new();
+        let result = stdout.read_to_end(&mut bytes).await;
+        (result, bytes)
+    });
+
+    // Keep stdin writing concurrent with stdout draining. Otherwise a submission that writes a
+    // full pipe and then reads stdin can deadlock the judge before the time limit starts.
+    let Some(mut stdin) = child.stdin.take() else {
+        stdout_task.abort();
+        let _ = child.start_kill();
+        let _ = child.wait().await;
+        return Err(String::from("failed to open child stdin"));
+    };
+    let stdin_content = stdin_content.to_owned();
+    let stdin_task = tokio::spawn(async move {
         use tokio::io::AsyncWriteExt;
-        let mut stdin = child.stdin.take().unwrap();
         let _ = stdin.write_all(stdin_content.as_bytes()).await;
         drop(stdin);
+    });
+
+    let timeout_duration = std::time::Duration::from_secs_f64(time_limit.max(0.001));
+    let wait_result = tokio::time::timeout(timeout_duration, child.wait()).await;
+    let status = match wait_result {
+        Ok(Ok(status)) => status,
+        Ok(Err(error)) => {
+            let _ = child.start_kill();
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(1), child.wait()).await;
+            stdin_task.abort();
+            stdout_task.abort();
+            return Err(format!("Failed to wait for process: {}", error));
+        }
+        Err(_) => {
+            // `kill_on_drop` is a final backstop, but explicitly request termination before
+            // dropping the child so a timed-out submission does not remain in the process table.
+            let _ = child.start_kill();
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(1), child.wait()).await;
+            stdin_task.abort();
+            stdout_task.abort();
+            return Err(String::from("TLE"));
+        }
+    };
+
+    stdin_task.abort();
+
+    let (read_result, stdout) = match tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        &mut stdout_task
+    ).await {
+        Ok(Ok(result)) => result,
+        Ok(Err(error)) => return Err(format!("Failed to read process output: {}", error)),
+        Err(_) => {
+            stdout_task.abort();
+            return Err(String::from("RE"));
+        }
+    };
+    if let Err(error) = read_result {
+        return Err(format!("Failed to read process output: {}", error));
+    }
+    if stdout.len() > MAX_JUDGE_OUTPUT_BYTES {
+        return Err(String::from("OLE"));
     }
 
-    match
-        tokio::time::timeout(
-            std::time::Duration::from_secs_f64(time_limit),
-            child.wait_with_output()
-        ).await
-    {
-        Ok(Ok(output)) => Ok(output),
-        Ok(Err(e)) => Err(format!("Failed to wait for process: {}", e)),
-        Err(_) => Err(String::from("TLE")),
+    Ok(std::process::Output { status, stdout, stderr: Vec::new() })
+}
+
+async fn compile_source(
+    command: &str,
+    args: &[&str],
+    cwd: &std::path::Path
+) -> bool {
+    let mut child = match tokio::process::Command::new(command)
+        .args(args)
+        .current_dir(cwd)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .kill_on_drop(true)
+        .spawn() {
+        Ok(child) => child,
+        Err(_) => return false,
+    };
+    match tokio::time::timeout(COMPILE_TIMEOUT, child.wait()).await {
+        Ok(Ok(status)) => status.success(),
+        Ok(Err(_)) | Err(_) => {
+            let _ = child.start_kill();
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(1), child.wait()).await;
+            false
+        }
     }
 }
 
@@ -125,40 +214,19 @@ pub async fn judge_submission(
         "c" => {
             let source_path = tmp_dir.join("main.c");
             let _ = std::fs::write(&source_path, &source_code);
-            let compile_output = tokio::process::Command
-                ::new("gcc")
-                .arg("main.c")
-                .arg("-O2")
-                .arg("-o")
-                .arg("main")
-                .current_dir(&tmp_dir)
-                .output().await;
-            let ok = matches!(compile_output, Ok(ref o) if o.status.success());
+            let ok = compile_source("gcc", &["main.c", "-O2", "-o", "main"], &tmp_dir).await;
             ("main.c", String::from("./main"), vec![], if ok { Ok(()) } else { Err(()) })
         }
         "cpp" => {
             let source_path = tmp_dir.join("main.cpp");
             let _ = std::fs::write(&source_path, &source_code);
-            let compile_output = tokio::process::Command
-                ::new("g++")
-                .arg("main.cpp")
-                .arg("-O2")
-                .arg("-o")
-                .arg("main")
-                .current_dir(&tmp_dir)
-                .output().await;
-            let ok = matches!(compile_output, Ok(ref o) if o.status.success());
+            let ok = compile_source("g++", &["main.cpp", "-O2", "-o", "main"], &tmp_dir).await;
             ("main.cpp", String::from("./main"), vec![], if ok { Ok(()) } else { Err(()) })
         }
         "java" => {
             let source_path = tmp_dir.join("Main.java");
             let _ = std::fs::write(&source_path, &source_code);
-            let compile_output = tokio::process::Command
-                ::new("javac")
-                .arg("Main.java")
-                .current_dir(&tmp_dir)
-                .output().await;
-            let ok = matches!(compile_output, Ok(ref o) if o.status.success());
+            let ok = compile_source("javac", &["Main.java"], &tmp_dir).await;
             ("Main.java", String::from("java"), vec![String::from("Main")], if ok {
                 Ok(())
             } else {
@@ -219,10 +287,10 @@ pub async fn judge_submission(
                 }
             }
             Err(reason) => {
-                if reason == "TLE" {
-                    String::from("TLE")
-                } else {
-                    String::from("RE")
+                match reason.as_str() {
+                    "TLE" => String::from("TLE"),
+                    "OLE" => String::from("OLE"),
+                    _ => String::from("RE"),
                 }
             }
         };

@@ -33,21 +33,20 @@ thead.my-table-sticky {
   display: block;
   position: sticky;
   z-index: 1;
-  min-width: calc(100vw - 1.2em);
-  /* Reserve the same thin gutter the body keeps, so the header columns stay aligned with the
-     (gutter-inset) body rows. The header never scrolls, so its thumb is always transparent. */
-  overflow-y: scroll;
+  width: 100%;
+  min-width: 0;
+  /* Keep the header aligned with the body when the body actually overflows, without showing a
+     scrollbar for short lists. */
+  overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
 tbody.my-table-scrollbar {
   display: block;
-  /* `scroll` (not `auto`) keeps the gutter permanently reserved, so the scrollbar appearing/
-     disappearing never shifts the table. */
-  overflow-y: scroll;
+  overflow-y: auto;
   max-height: calc(100vh - 20.7em);
-  width: calc(100vw - 1.2em);
+  width: 100%;
   /* Hidden thumb (transparent) by default; revealed on hover via the standard scrollbar-color
      property. NB: the ::-webkit-scrollbar :hover approach does NOT work — Chromium won't repaint
      the scrollbar pseudo-element when the container's :hover state changes. */
@@ -73,6 +72,14 @@ tr.my-table-row-header {
   width: 100%;
   align-items: center;
   text-align: left;
+}
+
+tr.my-table-row-header > th,
+tr.my-table-row-body > td {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 td.my-table-cell {

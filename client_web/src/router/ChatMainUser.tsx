@@ -19,9 +19,11 @@ import "../css/chatBubble.css"
 
 interface ChatMessage {
     id?: number;
+    clientId?: string;
     message: string;
     fromMe: boolean;
     createdAt?: number;
+    status?: "sending" | "sent";
 }
 
 interface ChatMessageFromFetch {
@@ -104,6 +106,10 @@ function useChatMessage(
     const loginUsername = useSelector((state: RootState) => state.loginUsername);
     const sessionToken = useSelector((state: RootState) => state.sessionToken);
     const loadingHistoryRef = useRef(false);
+    const pendingOutgoingRef = useRef<Array<{
+        message: string;
+        clientId: string;
+    }>>([]);
 
     const fetchHistory = useCallback((beforeId?: number) => {
         if (loadingHistoryRef.current) return;
@@ -118,7 +124,6 @@ function useChatMessage(
                 request_key: nanoid(),
             }
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [toUsername, loginUsername.value, sessionToken.value, sendJsonMessage]);
 
     // Reset and load the most recent 10 messages whenever the conversation partner changes.
@@ -126,6 +131,7 @@ function useChatMessage(
         setChatMessageList([]);
         setHasMoreHistory(true);
         loadingHistoryRef.current = false;
+        pendingOutgoingRef.current.splice(0);
         fetchHistory(undefined);
     }, [toUsername, fetchHistory]);
 
@@ -168,6 +174,12 @@ function useChatMessage(
                     const message = _message as ChatMessageFromEchoFailure;
                     if (message.type === "chat_echo" && message.content.status === 0) {
                         changed = true;
+                        const pending = pendingOutgoingRef.current.shift();
+                        if (pending) {
+                            setChatMessageList((previous) => previous.filter(
+                                (item) => item.clientId !== pending.clientId,
+                            ));
+                        }
                         delete _websocketMessageHistory[index];
                     }
                 }
@@ -176,7 +188,33 @@ function useChatMessage(
                     const message = _message as ChatMessageFromEchoSuccess;
                     if (message.type === "chat_echo" && message.content.status === 1) {
                         changed = true;
-                        newChatMessageList.push(({ message: (message.content.messages as string), fromMe: true, createdAt: message.content.created_at } as ChatMessage));
+                        const pending = pendingOutgoingRef.current.findIndex(
+                            (item) => item.message === message.content.messages,
+                        );
+                        const pendingMessage = pending >= 0 ? pendingOutgoingRef.current.splice(pending, 1)[0] : undefined;
+                        const confirmedMessage = {
+                            clientId: pendingMessage?.clientId,
+                            message: message.content.messages,
+                            fromMe: true,
+                            createdAt: message.content.created_at,
+                            status: "sent",
+                        } as ChatMessage;
+                        setChatMessageList((previous) => {
+                            const pendingIndex = pendingMessage
+                                ? previous.findIndex((item) => item.clientId === pendingMessage.clientId)
+                                : -1;
+                            if (pendingIndex >= 0) {
+                                return previous.map((item, itemIndex) => itemIndex === pendingIndex
+                                    ? confirmedMessage
+                                    : item);
+                            }
+                            const alreadyAdded = previous.some((item) =>
+                                item.fromMe &&
+                                item.message === confirmedMessage.message &&
+                                item.createdAt === confirmedMessage.createdAt,
+                            );
+                            return alreadyAdded ? previous : previous.concat(confirmedMessage);
+                        });
                         delete _websocketMessageHistory[index];
                     }
                 }
@@ -185,10 +223,25 @@ function useChatMessage(
 
         if (historyPage !== null) {
             const isInitialPage = chatMessageList.length === 0;
-            setChatMessageList((previous) => (historyPage as ChatMessage[]).concat(previous));
+            setChatMessageList((previous) => {
+                const page = (historyPage as ChatMessage[]).filter((candidate) => !previous.some((item) =>
+                    (candidate.id !== undefined && item.id === candidate.id) ||
+                    (candidate.fromMe === item.fromMe &&
+                        candidate.message === item.message &&
+                        candidate.createdAt === item.createdAt)
+                ));
+                return page.length > 0 ? page.concat(previous) : previous;
+            });
             if (isInitialPage) setInitialHistoryLoadToken((x) => x + 1);
         } else if (changed) {
-            setChatMessageList((previous) => previous.concat(newChatMessageList));
+            setChatMessageList((previous) => {
+                const additions = newChatMessageList.filter((candidate) => !previous.some((item) =>
+                    item.fromMe === candidate.fromMe &&
+                    item.message === candidate.message &&
+                    item.createdAt === candidate.createdAt,
+                ));
+                return additions.length > 0 ? previous.concat(additions) : previous;
+            });
             // A live message (sent or received), not a history page — signal so the view can
             // jump to the bottom to follow it.
             setNewMessageToken((x) => x + 1);
@@ -204,15 +257,27 @@ function useChatMessage(
     };
 
     const sendChatMessage = (chatMessageToSend: string) => {
-        const _requestKey = nanoid();
+        const optimisticMessage: ChatMessage = {
+            clientId: nanoid(),
+            message: chatMessageToSend,
+            fromMe: true,
+            createdAt: Date.now(),
+            status: "sending",
+        };
+
+        setChatMessageList((previous) => previous.concat(optimisticMessage));
+        pendingOutgoingRef.current.push({
+            message: chatMessageToSend,
+            clientId: optimisticMessage.clientId as string,
+        });
         sendJsonMessage({
             type: "chat_user",
             content: {
                 from: loginUsername.value,
                 to: toUsername,
-                messages: chatMessageToSend as string,
+                messages: chatMessageToSend,
                 session_token: sessionToken.value,
-                request_key: _requestKey,
+                request_key: nanoid(),
             }
         });
     };
@@ -277,8 +342,11 @@ export default function ChatMainUser() {
         }
     };
 
-    const handleClickSendChatMessage = () => {
-        sendChatMessage(replaceEmojiShortcuts(chatMessageToSend));
+    const handleSubmitSendChatMessage = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const message = replaceEmojiShortcuts(chatMessageToSend);
+        if (message.trim() === "") return;
+        sendChatMessage(message);
         setChatMessageToSend("");
     };
 
@@ -304,7 +372,7 @@ export default function ChatMainUser() {
                                 ?
                                 <></>
                                 :
-                                chatMessageList.map((message, index) => <div key={message.id ?? "live-" + index} style={{ alignItems: message.fromMe ? "flex-end" : "flex-start", display: "flex", flexDirection: "column", width: "fill", minHeight: "50px" }}>
+                                chatMessageList.map((message, index) => <div key={message.id ?? message.clientId ?? "live-" + index} style={{ alignItems: message.fromMe ? "flex-end" : "flex-start", display: "flex", flexDirection: "column", width: "fill", minHeight: "50px", opacity: message.status === "sending" ? 0.65 : 1 }}>
                                     <span style={{ fontSize: "0.75em", color: "#888", margin: "0 0.3em 0.15em" }}>{formatChatTimestamp(message.createdAt)}</span>
                                     <ChatBubble text={message.message} fromMe={message.fromMe} />
                                 </div>)
@@ -313,13 +381,13 @@ export default function ChatMainUser() {
                 </div>
             </div>
             <div style={{ display: "flex", flexDirection: "row", width: "fill", alignItems: "end" }}>
-                <form>
+                <form onSubmit={handleSubmitSendChatMessage}>
                     <Field label={t("inputToChat")} style={{ maxWidth: "300px", flex: 3, marginBottom: "3px" }}>
                         <Input type="text" id="chat-input" value={chatMessageToSend} onChange={(props) => setChatMessageToSend(props.target.value)} />
                     </Field>
                     <Popover>
                         <PopoverTrigger disableButtonEnhancement>
-                            <Button icon={<EmojiRegular />} style={{ flex: 1, marginRight: "5px" }} />
+                            <Button type="button" icon={<EmojiRegular />} style={{ flex: 1, marginRight: "5px" }} />
                         </PopoverTrigger>
                         <PopoverSurface>
                             <div style={{ display: "flex", flexWrap: "wrap", maxWidth: "240px" }}>
@@ -329,6 +397,7 @@ export default function ChatMainUser() {
                                             key={shortcut}
                                             appearance="subtle"
                                             title={shortcut}
+                                            type="button"
                                             onClick={() => handlePickEmoji(emoji)}
                                             style={{ fontSize: "1.2em", minWidth: "2em" }}>
                                             {emoji}
@@ -338,7 +407,7 @@ export default function ChatMainUser() {
                             </div>
                         </PopoverSurface>
                     </Popover>
-                    <Button onClick={handleClickSendChatMessage} style={{ flex: 1 }} appearance="primary">{t("action.send", { ns: "common" })}</Button>
+                    <Button type="submit" style={{ flex: 1 }} appearance="primary">{t("action.send", { ns: "common" })}</Button>
                 </form>
             </div>
         </div>

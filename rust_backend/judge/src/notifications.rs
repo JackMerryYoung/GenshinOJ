@@ -157,8 +157,7 @@ pub async fn create_post_notifications(
     let excerpt: String = build_excerpt(content_lines);
     let mentions: Vec<String> = extract_mentions(content_lines);
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = match guard_pool.get_conn().await {
+    let mut conn: mysql_async::Conn = match get_db_conn().await {
         Ok(conn) => conn,
         Err(e) => {
             warn(line!(), &format!("Failed to get a connection for notifications: {e}"));
@@ -169,11 +168,10 @@ pub async fn create_post_notifications(
     // recipient -> kind, with 'mention' overriding 'reply' for the same person.
     let mut recipients: std::collections::BTreeMap<String, &str> = std::collections::BTreeMap::new();
 
-    if let Some(owner) = parent_owner {
-        if owner != actor {
+    if let Some(owner) = parent_owner
+        && owner != actor {
             recipients.insert(owner.to_string(), "reply");
         }
-    }
 
     for name in &mentions {
         if name == actor {
@@ -217,7 +215,6 @@ pub async fn create_post_notifications(
     }
 
     drop(conn);
-    drop(guard_pool);
 }
 
 // ---------------------------------------------------------------------------
@@ -248,6 +245,7 @@ pub async fn request_username_for_lookup(
         rpc_request_key.clone(),
         PendingNotificationLookupRequest { requester_ws_id, original_request_key, lookup }
     );
+    expire_pending(&*PENDING_NOTIFICATION_LOOKUP_REQUESTS, rpc_request_key.clone());
 
     let msg_to_send: SocketJsonMessage = SocketJsonMessage {
         r#type: String::from("on_username_by_ws_id"),
@@ -277,6 +275,7 @@ pub async fn request_session_for_action(
             action,
         }
     );
+    expire_pending(&*PENDING_NOTIFICATION_AUTHED_REQUESTS, rpc_request_key.clone());
 
     let msg_to_send: SocketJsonMessage = SocketJsonMessage {
         r#type: String::from("on_validate_session"),
@@ -368,9 +367,9 @@ async fn notifications_list(
     let page_index: i64 = std::cmp::max(1, page_index);
     let offset: i64 = (page_index - 1) * NOTIFICATIONS_LIST_PAGE_SIZE;
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
-    let results: Result<Vec<(i64, String, String, String, String, String, bool, i64)>, _> = conn
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
+    type NotificationListResultType = Result<Vec<(i64, String, String, String, String, String, bool, i64)>, mysql_async::Error>;
+    let results: NotificationListResultType = conn
         .exec(
             "SELECT notification_id, actor, kind, source_type, target_url, excerpt, is_read, created_at
             FROM RsOJ.notifications
@@ -385,7 +384,6 @@ async fn notifications_list(
         )
         .await;
     drop(conn);
-    drop(guard_pool);
 
     let rows = match results {
         Ok(rows) => rows,
@@ -421,8 +419,7 @@ async fn total_notifications_list_index(
     original_request_key: String,
     requester: String
 ) {
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
     let count: i64 = conn
         .exec_first::<i64, _, _>(
             "SELECT COUNT(*) FROM RsOJ.notifications WHERE recipient = :recipient",
@@ -433,7 +430,6 @@ async fn total_notifications_list_index(
         .flatten()
         .unwrap_or(0);
     drop(conn);
-    drop(guard_pool);
 
     let total_index: i64 = std::cmp::max(1, (count + NOTIFICATIONS_LIST_PAGE_SIZE - 1) / NOTIFICATIONS_LIST_PAGE_SIZE);
     let result = TotalIndexResult {
@@ -451,8 +447,7 @@ async fn unread_count(
     original_request_key: String,
     requester: String
 ) {
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
     let count: i64 = conn
         .exec_first::<i64, _, _>(
             "SELECT COUNT(*) FROM RsOJ.notifications WHERE recipient = :recipient AND is_read = FALSE",
@@ -463,7 +458,6 @@ async fn unread_count(
         .flatten()
         .unwrap_or(0);
     drop(conn);
-    drop(guard_pool);
 
     let result = UnreadCountResult {
         r#type: String::from("notifications_unread_count"),
@@ -501,8 +495,7 @@ async fn mark_read(
     requester: String,
     notification_id: i64
 ) {
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
     // The `recipient = requester` predicate is what stops a user from touching anyone else's inbox.
     let update_result = if notification_id == 0 {
         conn
@@ -520,7 +513,6 @@ async fn mark_read(
             .await
     };
     drop(conn);
-    drop(guard_pool);
 
     let result_str: &str = if update_result.is_err() {
         warn(line!(), "Failed to mark notification(s) read.");
@@ -552,8 +544,7 @@ pub async fn user_search(requester_ws_id: String, original_request_key: String, 
             .replace('_', "\\_");
         let pattern: String = format!("{escaped}%");
 
-        let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-        let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
+        let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
         let rows: Vec<String> = conn
             .exec(
                 "SELECT username FROM RsOJ.users WHERE username LIKE :pattern ESCAPE '\\\\'
@@ -563,7 +554,6 @@ pub async fn user_search(requester_ws_id: String, original_request_key: String, 
             .await
             .unwrap_or_default();
         drop(conn);
-        drop(guard_pool);
         rows
     };
 

@@ -3,9 +3,13 @@
     "title": "RsOJ 控制面板",
     "loading": "加载中...",
     "loginRequired": "您必须登录才能访问控制面板",
-    "accessDenied": "访问被拒绝：需要管理员权限",
+    "accessDenied": "访问被拒绝：令牌无效或需要管理员权限",
     "verifyFailed": "验证管理员权限失败",
-    "goToLogin": "前往登录"
+    "goToLogin": "前往登录",
+    "tokenRequired": "请输入控制面板管理员令牌",
+    "tokenPlaceholder": "控制面板管理员令牌",
+    "unlock": "解锁",
+    "notConfigured": "服务器尚未配置控制面板"
   },
   "roles": {
     "problemAdmin": "题目管理员",

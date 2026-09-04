@@ -32,6 +32,7 @@ pub async fn on_chat_history(msg: SocketJsonMessageWithWsId) {
             before_id: content.before_id,
         });
         drop(guard_pending_chat_history_requests);
+        expire_pending(&*PENDING_CHAT_HISTORY_REQUESTS, request_key.clone());
 
         let msg_to_send: SocketJsonMessage = SocketJsonMessage {
             r#type: String::from("on_validate_session_and_locate"),

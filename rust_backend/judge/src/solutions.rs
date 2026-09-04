@@ -191,6 +191,7 @@ pub async fn request_username_for_lookup(
         rpc_request_key.clone(),
         PendingSolutionLookupRequest { requester_ws_id, original_request_key, lookup }
     );
+    expire_pending(&*PENDING_SOLUTION_LOOKUP_REQUESTS, rpc_request_key.clone());
 
     let msg_to_send: SocketJsonMessage = SocketJsonMessage {
         r#type: String::from("on_username_by_ws_id"),
@@ -224,6 +225,7 @@ pub async fn request_session_for_action(
             action,
         }
     );
+    expire_pending(&*PENDING_SOLUTION_AUTHED_REQUESTS, rpc_request_key.clone());
 
     let msg_to_send: SocketJsonMessage = SocketJsonMessage {
         r#type: String::from("on_validate_session"),
@@ -296,9 +298,9 @@ async fn solutions_list(
     // orders the rest. The sort column is a fixed value chosen here, never client text.
     let sort_column: &str = if sort_by_likes { "s.likes" } else { "s.created_at" };
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
-    let results: Result<Vec<(i64, i64, String, String, bool, i64, i64, i64, i64)>, _> = conn
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
+    type SolutionsListResultType = Result<Vec<(i64, i64, String, String, bool, i64, i64, i64, i64)>, mysql_async::Error>;
+    let results: SolutionsListResultType = conn
         .exec(
             format!(
                 "SELECT s.solution_id, s.problem_number, s.username, s.title, s.is_official, s.likes, s.dislikes, s.created_at, COALESCE(v.vote, 0) AS my_vote
@@ -317,7 +319,6 @@ async fn solutions_list(
         )
         .await;
     drop(conn);
-    drop(guard_pool);
 
     let rows = match results {
         Ok(rows) => rows,
@@ -374,9 +375,9 @@ async fn solution_fetch(
 ) {
     let requester: String = requester_username.unwrap_or_default();
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
-    let row_result: Result<Option<(i64, String, String, String, bool, i64, i64, i64)>, _> = conn
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
+    type SolutionFetchResultType = Result<Option<(i64, String, String, String, bool, i64, i64, i64)>, mysql_async::Error>;
+    let row_result: SolutionFetchResultType = conn
         .exec_first(
             "SELECT problem_number, username, title, content, is_official, likes, dislikes, created_at
             FROM RsOJ.solutions
@@ -394,7 +395,6 @@ async fn solution_fetch(
         .flatten()
         .unwrap_or(0);
     drop(conn);
-    drop(guard_pool);
 
     match row_result {
         Ok(Some((problem_number, username, title, content, is_official, likes, dislikes, created_at))) => {
@@ -452,9 +452,9 @@ async fn comments_list(
     let offset: i64 = (page_index - 1) * SOLUTION_COMMENTS_LIST_PAGE_SIZE;
     let sort_column: &str = if sort_by_likes { "c.likes" } else { "c.created_at" };
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
-    let results: Result<Vec<(i64, String, String, i64, i64, i64, i64)>, _> = conn
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
+    type CommentsListResultType = Result<Vec<(i64, String, String, i64, i64, i64, i64)>, mysql_async::Error>;
+    let results: CommentsListResultType = conn
         .exec(
             format!(
                 "SELECT c.comment_id, c.username, c.content, c.likes, c.dislikes, c.created_at, COALESCE(v.vote, 0) AS my_vote
@@ -473,7 +473,6 @@ async fn comments_list(
         )
         .await;
     drop(conn);
-    drop(guard_pool);
 
     let rows = match results {
         Ok(rows) => rows,
@@ -576,8 +575,7 @@ async fn post_solution(
         return;
     }
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
     let insert_result = conn
         .exec_drop(
             "INSERT INTO RsOJ.solutions
@@ -595,7 +593,6 @@ async fn post_solution(
         .await;
     let solution_id: i64 = conn.last_insert_id().unwrap_or(0) as i64;
     drop(conn);
-    drop(guard_pool);
 
     if insert_result.is_err() {
         warn(line!(), "Failed to insert the solution row.");
@@ -633,8 +630,7 @@ async fn post_comment(
         return;
     }
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
     // Guard against commenting on a non-existent solution; also grab the author so we can notify them.
     let solution_owner: Option<String> = conn
         .exec_first(
@@ -646,7 +642,6 @@ async fn post_comment(
         .flatten();
     let Some(solution_owner) = solution_owner else {
         drop(conn);
-        drop(guard_pool);
         send_failure(requester_ws_id, "solution_comment_post_failure", "solution_not_found", original_request_key).await;
         return;
     };
@@ -666,7 +661,6 @@ async fn post_comment(
         .await;
     let comment_id: i64 = conn.last_insert_id().unwrap_or(0) as i64;
     drop(conn);
-    drop(guard_pool);
 
     if insert_result.is_err() {
         warn(line!(), "Failed to insert the solution comment row.");
@@ -711,8 +705,7 @@ pub async fn apply_vote(
         _ => 0,
     };
 
-    let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
+    let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
 
     // The target must exist before we touch any totals.
     let exists: Option<i64> = conn
@@ -746,7 +739,6 @@ pub async fn apply_vote(
             .ok()
             .flatten();
         drop(conn);
-        drop(guard_pool);
         return totals.map(|(likes, dislikes)| (likes, dislikes, new_vote));
     }
 
@@ -798,7 +790,6 @@ pub async fn apply_vote(
         .ok()
         .flatten();
     drop(conn);
-    drop(guard_pool);
 
     totals.map(|(likes, dislikes)| (likes, dislikes, new_vote))
 }

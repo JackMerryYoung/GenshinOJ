@@ -1,3 +1,3 @@
-# README
+# Generated output
 
-**This is a directory only for temporarily storation. DO NOT put ANYTHING important here.**
+This directory is temporary judge output storage. Do not keep important data here.

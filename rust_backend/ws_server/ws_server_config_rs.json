@@ -1,47 +1,177 @@
 {
     "restricted_mode": true,
     "external_listeners_list": [
-        { "command": "on_chat_history", "required_protocol_version": "*" },
-        { "command": "on_chat_user", "required_protocol_version": "*" },
-        { "command": "on_close_connection", "required_protocol_version": "*" },
-        { "command": "on_login_check", "required_protocol_version": "*" },
-        { "command": "on_login", "required_protocol_version": "*" },
-        { "command": "on_online_user", "required_protocol_version": "*" },
-        { "command": "on_quit", "required_protocol_version": "*" },
-        { "command": "on_register", "required_protocol_version": "*" },
-        { "command": "on_user_profile", "required_protocol_version": "*" },
-        { "command": "on_follow", "required_protocol_version": "*" },
-        { "command": "on_unfollow", "required_protocol_version": "*" },
-        { "command": "on_friends_list", "required_protocol_version": "*" },
-        { "command": "on_search_users", "required_protocol_version": "*" },
-        { "command": "on_problem_set", "required_protocol_version": "*" },
-        { "command": "on_problem_statement", "required_protocol_version": "*" },
-        { "command": "on_total_submissions_list_index", "required_protocol_version": "*" },
-        { "command": "on_submissions_list", "required_protocol_version": "*" },
-        { "command": "on_submission", "required_protocol_version": "*" },
-        { "command": "on_submission_result", "required_protocol_version": "*" },
-        { "command": "on_solutions_list", "required_protocol_version": "*" },
-        { "command": "on_total_solutions_list_index", "required_protocol_version": "*" },
-        { "command": "on_solution", "required_protocol_version": "*" },
-        { "command": "on_solution_post", "required_protocol_version": "*" },
-        { "command": "on_solution_vote", "required_protocol_version": "*" },
-        { "command": "on_solution_comments_list", "required_protocol_version": "*" },
-        { "command": "on_total_solution_comments_list_index", "required_protocol_version": "*" },
-        { "command": "on_solution_comment_post", "required_protocol_version": "*" },
-        { "command": "on_solution_comment_vote", "required_protocol_version": "*" },
-        { "command": "on_discussions_list", "required_protocol_version": "*" },
-        { "command": "on_total_discussions_list_index", "required_protocol_version": "*" },
-        { "command": "on_discussion", "required_protocol_version": "*" },
-        { "command": "on_discussion_post", "required_protocol_version": "*" },
-        { "command": "on_discussion_vote", "required_protocol_version": "*" },
-        { "command": "on_discussion_replies_list", "required_protocol_version": "*" },
-        { "command": "on_total_discussion_replies_list_index", "required_protocol_version": "*" },
-        { "command": "on_discussion_reply_post", "required_protocol_version": "*" },
-        { "command": "on_discussion_reply_vote", "required_protocol_version": "*" },
-        { "command": "on_notifications_list", "required_protocol_version": "*" },
-        { "command": "on_total_notifications_list_index", "required_protocol_version": "*" },
-        { "command": "on_notifications_unread_count", "required_protocol_version": "*" },
-        { "command": "on_notification_mark_read", "required_protocol_version": "*" },
-        { "command": "on_user_search", "required_protocol_version": "*" }
+        {
+            "command": "on_chat_history",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_chat_user",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_close_connection",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_login_check",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_login",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_online_user",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_quit",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_register",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_session_restore",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_user_profile",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_follow",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_unfollow",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_friends_list",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_search_users",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_problem_set",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_problem_statement",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_total_submissions_list_index",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_submissions_list",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_submission",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_submission_result",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_solutions_list",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_total_solutions_list_index",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_solution",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_solution_post",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_solution_vote",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_solution_comments_list",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_total_solution_comments_list_index",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_solution_comment_post",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_solution_comment_vote",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_discussions_list",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_total_discussions_list_index",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_discussion",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_discussion_post",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_discussion_vote",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_discussion_replies_list",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_total_discussion_replies_list_index",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_discussion_reply_post",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_discussion_reply_vote",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_notifications_list",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_total_notifications_list_index",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_notifications_unread_count",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_notification_mark_read",
+            "required_protocol_version": "*"
+        },
+        {
+            "command": "on_user_search",
+            "required_protocol_version": "*"
+        }
     ]
 }

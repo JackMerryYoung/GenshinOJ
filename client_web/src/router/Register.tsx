@@ -1,21 +1,16 @@
-import { useEffect, useState, lazy } from "react";
+import { lazy, useActionState, useEffect, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-
-import { makeStyles, Input, Field, Button } from "@fluentui/react-components";
-import { PersonRegular, PasswordRegular } from "@fluentui/react-icons";
-
-import { useDispatch, useSelector } from "react-redux";
-
-import { nanoid } from "nanoid";
-
-const PopupDialog = lazy(() => import("./PopupDialog.tsx"));
+import { Button, Field, Input, makeStyles } from "@fluentui/react-components";
+import { PasswordRegular, PersonRegular } from "@fluentui/react-icons";
+import { useSelector } from "react-redux";
 
 import * as globals from "../Globals.ts";
 import { RootState } from "../store.ts";
-import { logoutReducer } from "../../redux/loginStatusSlice.ts";
-
 import "../css/style.css";
+
+const PopupDialog = lazy(() => import("./PopupDialog.tsx"));
 
 const useStyles = makeStyles({
     root: {
@@ -28,140 +23,126 @@ const useStyles = makeStyles({
     },
 });
 
-function useRegisterSession(
-    sendJsonMessage: globals.SendJsonMessage,
-    lastJsonMessage: unknown
-) {
-    const [requestKey, setRequestKey] = useState("");
-    const [registerSessionState, setRegisterSessionState] = useState<boolean | undefined>(undefined);
-    const [websocketMessageHistory, setWebsocketMessageHistory] = useState([]);
-    const dispatch = useDispatch();
+type RegisterActionState = {
+    status: "idle" | "success" | "failure" | "validation";
+    message?: string;
+};
 
-    const registerSession = (registerUsername: string, registerPassword: string) => {
-        const _requestKey = nanoid();
-        setRegisterSessionState(undefined);
-        sendJsonMessage({
-            type: "register",
-            content: {
-                username: registerUsername,
-                password: registerPassword,
-                request_key: _requestKey
-            }
-        });
+function RegisterSubmitButton() {
+    const { t } = useTranslation("register");
+    const { pending } = useFormStatus();
 
-        setRequestKey(_requestKey);
-    };
-
-    useEffect(() => {
-        if (lastJsonMessage !== null)
-            setWebsocketMessageHistory((previousMessageHistory) => previousMessageHistory.concat(lastJsonMessage as []));
-    }, [lastJsonMessage]);
-
-    useEffect(() => {
-        const _websocketMessageHistory = websocketMessageHistory;
-        websocketMessageHistory.map((_message, index) => {
-            interface RegisterSessionResult {
-                type: string;
-                content: {
-                    reason: string,
-                    request_key: string
-                };
-            }
-
-            function isRegisterSession(x: object) {
-                if ('type' in x && 'content' in x && typeof x.content === 'object') {
-                    return 'request_key' in (x.content as object) && 'reason' in (x.content as object) && x.type === 'quit';
-                }
-
-                return false;
-            }
-            if (_message && isRegisterSession(_message)) {
-                const message = _message as RegisterSessionResult;
-                if (message.content.reason == "registration_success" && message.content.request_key === requestKey) {
-                    dispatch(logoutReducer());
-                    setRegisterSessionState(true);
-                    delete _websocketMessageHistory[index];
-                }
-
-                if (message.type == "quit" && message.content.reason == "registration_failure" && message.content.request_key === requestKey) {
-                    dispatch(logoutReducer());
-                    setRegisterSessionState(false);
-                    delete _websocketMessageHistory[index];
-                }
-            }
-        });
-    }, [websocketMessageHistory, requestKey]);
-
-    return { registerSession, registerSessionState };
+    return (
+        <Button appearance="primary" type="submit" disabled={pending} style={{ marginTop: "1em" }}>
+            {pending ? t("action.pending") : t("action.register")}
+        </Button>
+    );
 }
 
 export default function Register() {
     const { t } = useTranslation("register");
-    const { sendJsonMessage, lastJsonMessage } = useOutletContext<globals.WebSocketHook>();
-    const [registerUsernameFromInput, setRegisterUsernameFromInput] = useState("");
-    const [registerPasswordFromInput, setRegisterPasswordFromInput] = useState("");
-    const [registerPasswordConfirmFromInput, setRegisterPasswordConfirmFromInput] = useState("");
+    const { request } = useOutletContext<globals.WebSocketHook>();
+    const loginStatus = useSelector((state: RootState) => state.loginStatus);
+    const navigate = useNavigate();
     const [dialogLoggedInOpenState, setDialogLoggedInOpenState] = useState(false);
-    const [dialogPasswordInputAndConfirmNotTheSameOpenState, setDialogPasswordInputAndConfirmNotTheSameOpenState] = useState(false);
     const [dialogRegisterFailureOpenState, setDialogRegisterFailureOpenState] = useState(false);
     const [dialogRegisterSuccessOpenState, setDialogRegisterSuccessOpenState] = useState(false);
-    const loginStatus = useSelector((state: RootState) => state.loginStatus);
-    const { registerSession, registerSessionState } = useRegisterSession(sendJsonMessage, lastJsonMessage);
-    const navigate = useNavigate();
 
-    const handleRegistrationClick = () => {
-        if (registerPasswordFromInput != registerPasswordConfirmFromInput)
-            setDialogPasswordInputAndConfirmNotTheSameOpenState(true);
-        else
-            registerSession(registerUsernameFromInput, registerPasswordFromInput);
-    };
+    const [actionState, registerAction, pending] = useActionState<RegisterActionState, FormData>(
+        async (_previousState, formData) => {
+            const username = String(formData.get("username") ?? "").trim();
+            const password = String(formData.get("password") ?? "");
+            const passwordConfirmation = String(formData.get("passwordConfirmation") ?? "");
 
-    useEffect(() => { if (loginStatus.value === true) setDialogLoggedInOpenState(true); }, [loginStatus]);
+            if (!username || !password || !passwordConfirmation) {
+                return { status: "validation", message: t("validation.required") };
+            }
+            if (password !== passwordConfirmation) {
+                return { status: "validation", message: t("dialog.passwordMismatch") };
+            }
+
+            try {
+                const response = await request<{
+                    type: "quit";
+                    content: { request_key: string; reason?: string };
+                }>("register", { username, password }, { responseTypes: ["quit"] });
+
+                if (response.content.reason !== "registration_success") {
+                    return { status: "failure", message: t("dialog.registerFailure") };
+                }
+
+                return { status: "success" };
+            } catch (error) {
+                return {
+                    status: "failure",
+                    message: t("dialog.requestFailed", {
+                        message: error instanceof Error ? error.message : t("dialog.unknownError"),
+                    }),
+                };
+            }
+        },
+        { status: "idle" },
+    );
 
     useEffect(() => {
-        if (registerSessionState !== undefined) {
-            if (registerSessionState === true) setDialogRegisterSuccessOpenState(true);
-            if (registerSessionState === false) setDialogRegisterFailureOpenState(true);
+        setDialogLoggedInOpenState(loginStatus.value === true && !pending && actionState.status === "idle");
+    }, [actionState.status, loginStatus.value, pending]);
+
+    useEffect(() => {
+        if (actionState.status === "success") setDialogRegisterSuccessOpenState(true);
+        if (actionState.status === "failure" || actionState.status === "validation") {
+            setDialogRegisterFailureOpenState(true);
         }
-    }, [registerSessionState]);
+    }, [actionState]);
 
     return (
-        <>
-            <div className={useStyles().root}>
-                <form>
-                    <Field label={t("field.username")} required>
-                        <Input contentBefore={<PersonRegular />}
-                            onChange={(props) => setRegisterUsernameFromInput(props.target.value)} />
-                    </Field>
-                    <Field label={t("field.password")} required>
-                        <Input contentBefore={<PasswordRegular />} type="password"
-                            onChange={(props) => setRegisterPasswordFromInput(props.target.value)} />
-                    </Field>
-                    <Field label={t("field.confirmPassword")} required>
-                        <Input contentBefore={<PasswordRegular />} type="password"
-                            onChange={(props) => setRegisterPasswordConfirmFromInput(props.target.value)} />
-                    </Field>
-                    <Button appearance="primary" onClick={handleRegistrationClick} style={{ marginTop: "1em" }}>{t("action.register")}</Button>
-                </form>
-                <PopupDialog
-                    open={dialogLoggedInOpenState && !dialogRegisterSuccessOpenState}
-                    setPopupDialogOpenState={setDialogLoggedInOpenState}
-                    text={t("dialog.alreadyLoggedIn")}
-                    onClose={() => navigate("/home")} />
-                <PopupDialog
-                    open={dialogPasswordInputAndConfirmNotTheSameOpenState}
-                    setPopupDialogOpenState={setDialogPasswordInputAndConfirmNotTheSameOpenState}
-                    text={t("dialog.passwordMismatch")} />
-                <PopupDialog
-                    open={dialogRegisterFailureOpenState}
-                    setPopupDialogOpenState={setDialogRegisterFailureOpenState}
-                    text={t("dialog.registerFailure")} />
-                <PopupDialog
-                    open={dialogRegisterSuccessOpenState}
-                    setPopupDialogOpenState={setDialogRegisterSuccessOpenState}
-                    text={t("dialog.registerSuccess")}
-                    onClose={() => navigate("/login")} />
-            </div>
-        </>
+        <div className={useStyles().root}>
+            <form action={registerAction}>
+                <Field label={t("field.username")} required>
+                    <Input
+                        contentBefore={<PersonRegular />}
+                        name="username"
+                        autoComplete="username"
+                        required
+                    />
+                </Field>
+                <Field label={t("field.password")} required>
+                    <Input
+                        contentBefore={<PasswordRegular />}
+                        type="password"
+                        name="password"
+                        autoComplete="new-password"
+                        required
+                    />
+                </Field>
+                <Field label={t("field.confirmPassword")} required>
+                    <Input
+                        contentBefore={<PasswordRegular />}
+                        type="password"
+                        name="passwordConfirmation"
+                        autoComplete="new-password"
+                        required
+                    />
+                </Field>
+                <RegisterSubmitButton />
+            </form>
+            <PopupDialog
+                open={dialogLoggedInOpenState && actionState.status !== "success"}
+                setPopupDialogOpenState={setDialogLoggedInOpenState}
+                text={t("dialog.alreadyLoggedIn")}
+                onClose={() => navigate("/home")}
+            />
+            <PopupDialog
+                open={dialogRegisterFailureOpenState}
+                setPopupDialogOpenState={setDialogRegisterFailureOpenState}
+                text={actionState.message ?? t("dialog.registerFailure")}
+            />
+            <PopupDialog
+                open={dialogRegisterSuccessOpenState}
+                setPopupDialogOpenState={setDialogRegisterSuccessOpenState}
+                text={t("dialog.registerSuccess")}
+                onClose={() => navigate("/login")}
+            />
+        </div>
     );
 }

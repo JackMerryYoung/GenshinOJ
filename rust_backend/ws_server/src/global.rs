@@ -248,28 +248,57 @@ async fn try_get_socket_port_by_protocol(protocol: &str) -> Option<u16> {
     if port == 0 { None } else { Some(port) }
 }
 
-// Fire-and-forget: tell the control panel (if loaded) that a site visit happened. The control
-// panel is an HTTP service rather than a socket-protocol peer, so we hand-write a minimal HTTP
-// POST over a raw TCP connection. Any failure is swallowed — visit analytics must never affect
-// serving websocket clients.
-pub async fn report_visit_to_control_panel() {
-    let Some(port) = try_get_socket_port_by_protocol("std_control_panel").await else {
-        return;
+/// Best-effort variant for cleanup notifications. Module shutdown should not turn a normal
+/// websocket disconnect into a panic just because the authenticator listener is already gone.
+pub async fn try_send_socket_json_message(msg_to_send: &serde_json::Value, to_protocol: &str) -> bool {
+    let Some(port) = try_get_socket_port_by_protocol(to_protocol).await else {
+        return false;
     };
-    let Ok(mut stream) = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")).await else {
-        return;
+    let Ok(mut socket) = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")).await else {
+        return false;
+    };
+    socket.set_nodelay(true).ok();
+    let Ok(json_msg_str) = serde_json::to_string(msg_to_send) else {
+        return false;
+    };
+    socket.write_all(json_msg_str.as_bytes()).await.is_ok()
+}
+
+// The control panel is an HTTP service rather than a socket-protocol peer, so ws_server hands
+// it minimal HTTP POST requests over a loopback TCP connection. Any failure is swallowed: the
+// optional monitoring module must never affect serving websocket clients.
+async fn post_control_panel(path: &str, body: &[u8]) -> bool {
+    let Some(port) = try_get_socket_port_by_protocol("std_control_panel").await else {
+        return false;
+    };
+    let stream = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")),
+    ).await;
+    let Ok(Ok(mut stream)) = stream else {
+        return false;
     };
     stream.set_nodelay(true).ok();
-    let request: &str =
-        "POST /api/record-visit HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    let content_type = if body.is_empty() {
+        ""
+    } else {
+        "Content-Type: application/json\r\n"
+    };
+    let request = format!(
+        "POST {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: {}\r\n{content_type}Connection: close\r\n\r\n",
+        body.len()
+    );
     if stream.write_all(request.as_bytes()).await.is_err() {
-        return;
+        return false;
+    }
+    if !body.is_empty() && stream.write_all(body).await.is_err() {
+        return false;
     }
     // Drain the response to EOF before dropping the socket. Closing immediately after the write,
     // while the server's unread response is still inbound, makes the OS send an RST instead of a
     // graceful FIN — which cancels the control panel's in-flight handler before it commits the
     // visit. Bounded by a short timeout so a wedged peer can't hang this task.
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
         let mut buf = [0u8; 256];
         loop {
             match stream.read(&mut buf).await {
@@ -277,7 +306,47 @@ pub async fn report_visit_to_control_panel() {
                 Ok(_) => {}
             }
         }
-    }).await;
+    }).await.is_ok()
+}
+
+// Fire-and-forget: tell the control panel (if loaded) that a site visit happened.
+pub async fn report_visit_to_control_panel() {
+    let _ = post_control_panel("/api/record-visit", &[]).await;
+}
+
+async fn post_ws_connection_delta_to_control_panel(delta: i8) {
+    let body = format!("{{\"delta\":{delta}}}");
+    // Module loading is concurrent with the websocket listener becoming available. Retry briefly
+    // so a client that connects during startup is still reflected in the control-panel metric.
+    for attempt in 0..5 {
+        if post_control_panel("/api/record-ws-connection", body.as_bytes()).await {
+            return;
+        }
+        if attempt < 4 {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
+}
+
+// Connection changes are queued through one worker so an increment cannot overtake a later
+// decrement when a client connects and disconnects quickly. The worker is created lazily on the
+// ws_server runtime's first connection event.
+static CONTROL_PANEL_WS_CONNECTION_REPORTER: std::sync::LazyLock<
+    tokio::sync::mpsc::UnboundedSender<i8>
+> = std::sync::LazyLock::new(|| {
+    let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel::<i8>();
+    tokio::spawn(async move {
+        while let Some(delta) = receiver.recv().await {
+            post_ws_connection_delta_to_control_panel(delta).await;
+        }
+    });
+    sender
+});
+
+pub fn report_ws_connection_delta_to_control_panel(delta: i8) {
+    if matches!(delta, 1 | -1) {
+        let _ = CONTROL_PANEL_WS_CONNECTION_REPORTER.send(delta);
+    }
 }
 
 pub fn get_pwd() -> String {
@@ -304,3 +373,13 @@ pub const MAX_AVATAR_SIZE_BYTES: usize = 1024 * 1024; // 1 MiB
 pub static PENDING_VALIDATE_SESSION_REQUESTS: std::sync::LazyLock<
     tokio::sync::Mutex<std::collections::HashMap<String, tokio::sync::oneshot::Sender<bool>>>
 > = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(std::collections::HashMap::new()));
+
+pub fn expire_pending<T: Send + 'static>(
+    map: &'static tokio::sync::Mutex<std::collections::HashMap<String, T>>,
+    request_key: String,
+) {
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        map.lock().await.remove(&request_key);
+    });
+}

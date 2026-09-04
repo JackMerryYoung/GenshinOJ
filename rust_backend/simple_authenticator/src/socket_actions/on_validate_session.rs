@@ -15,11 +15,13 @@ struct ContentOnValidateSessionResult {
 
 pub async fn on_validate_session(msg: SocketJsonMessage) {
     if let Ok(content) = serde_json::from_value::<ContentOnValidateSession>(msg.content) {
+        let _session_state = SESSION_STATE_LOCK.lock().await;
         let guard_session_tokens_by_username = SESSION_TOKENS_BY_USERNAME.lock().await;
         let session_valid: bool =
             guard_session_tokens_by_username.get(&content.username) ==
             Some(&content.session_token);
         drop(guard_session_tokens_by_username);
+        drop(_session_state);
 
         let msg_to_send: SocketJsonMessage = SocketJsonMessage {
             r#type: String::from("on_validate_session_result"),

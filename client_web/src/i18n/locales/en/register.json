@@ -5,12 +5,18 @@
         "confirmPassword": "Confirm Register Password"
     },
     "action": {
-        "register": "Register"
+        "register": "Register",
+        "pending": "Creating account..."
+    },
+    "validation": {
+        "required": "All registration fields are required."
     },
     "dialog": {
         "alreadyLoggedIn": "You have already logged in.",
         "passwordMismatch": "You input the password which is not the same as confirmed.",
         "registerFailure": "Registration failed. Maybe you registered an existed username or something went wrong.",
-        "registerSuccess": "Registration succeeded."
+        "registerSuccess": "Registration succeeded.",
+        "requestFailed": "Registration request failed: {{message}}",
+        "unknownError": "Unknown error"
     }
 }

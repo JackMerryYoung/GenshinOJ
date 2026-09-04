@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,8 +17,8 @@
     "@monaco-editor/react": "^4.7.0",
     "@reduxjs/toolkit": "^2.12.0",
     "@swc/core": "^1.15.41",
-    "@types/react": ">=19.0.0",
-    "@types/react-dom": ">=19.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
     "copy-to-clipboard": "^4.0.2",
     "esbuild": "^0.28.1",
     "highcharts": "^13.0.0",
@@ -26,7 +28,7 @@
     "katex": "^0.17.0",
     "nanoid": "^5.1.14",
     "react": "^19.2.7",
-    "react-dom": ">=19.0.0",
+    "react-dom": "^19.2.7",
     "react-i18next": "^17.0.11",
     "react-markdown": "^10.1.0",
     "react-redux": "^9.3.0",
@@ -41,6 +43,7 @@
     "vite-plugin-top-level-await": "^1.6.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/react-syntax-highlighter": ">=15.5.13",
     "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.61.1",
@@ -50,5 +53,9 @@
     "eslint-plugin-react-refresh": "^0.5.3",
     "typescript": "^6.0.3",
     "vite": "npm:rolldown-vite@latest"
+  },
+  "allowScripts": {
+    "@swc/core@1.15.41": true,
+    "esbuild@0.28.1": true
   }
 }

@@ -38,8 +38,26 @@ pub async fn ws_handler(
     ws_upgrade.on_upgrade(ws_callback)
 }
 
-async fn remove_ws_connection(ws_id: &str) {
-    {
+async fn notify_authenticator_connection_closed(ws_id: &str, invalidate_session: bool) {
+    let message = SocketJsonMessageWithWsId {
+        r#type: String::from("on_close_connection"),
+        content: serde_json::json!({
+            "invalidate_session": invalidate_session,
+            "request_key": uuid::Uuid::new_v4().to_string(),
+        }),
+        request_key: uuid::Uuid::new_v4().to_string(),
+        from_protocol: String::from("std_ws_server"),
+        ws_id: ws_id.to_string(),
+    };
+    let message = serde_json::to_value(message).unwrap();
+    let _ = try_send_socket_json_message(&message, "std_authenticator").await;
+}
+
+/// Remove a websocket from the transport registry and notify modules that keep per-connection
+/// state. All termination paths go through this function so an AFK timeout, a client close, and
+/// an EOF cannot leave an authenticated session marked online forever.
+async fn remove_ws_connection(ws_id: &str, invalidate_session: bool) {
+    let removed = {
         let mut guard_ws_server_connections_by_ws_id: tokio::sync::MutexGuard<
             '_,
             std::collections::HashMap<
@@ -52,16 +70,21 @@ async fn remove_ws_connection(ws_id: &str) {
                 >
             >
         > = WS_SERVER_CONNECTIONS_BY_WS_ID.lock().await;
-        guard_ws_server_connections_by_ws_id.remove(ws_id); // Clear sender.
-    }
+        guard_ws_server_connections_by_ws_id.remove(ws_id).is_some() // Clear sender.
+    };
 
-    {
+    if removed {
         let mut guard_ws_server_connections_cnt: tokio::sync::MutexGuard<
             '_,
             usize
         > = WS_SERVER_CONNECTIONS_CNT.lock().await;
-        *guard_ws_server_connections_cnt -= 1;
+        *guard_ws_server_connections_cnt = guard_ws_server_connections_cnt.saturating_sub(1);
+        report_ws_connection_delta_to_control_panel(-1);
     }
+
+    // Auth cleanup is best-effort. The authenticator is normally always loaded, but a shutdown
+    // race must not prevent the websocket task from releasing its own transport state.
+    notify_authenticator_connection_closed(ws_id, invalidate_session).await;
 }
 
 #[allow(unused_parens)]
@@ -87,6 +110,7 @@ pub async fn ws_callback(ws: axum::extract::ws::WebSocket) {
         > = WS_SERVER_CONNECTIONS_CNT.lock().await;
         *guard_ws_server_connections_cnt += 1;
     }
+    report_ws_connection_delta_to_control_panel(1);
 
     // Best-effort: report this connection as a site visit to the control panel, if it's loaded.
     // Spawned so reporting never delays handling the websocket.
@@ -156,7 +180,7 @@ pub async fn ws_callback(ws: axum::extract::ws::WebSocket) {
                     )
                 );
                 drop(ws_receiver); // Clear receiver.
-                remove_ws_connection(&ws_id_string).await;
+                remove_ws_connection(&ws_id_string, true).await;
                 return;
             }
         };
@@ -236,11 +260,13 @@ pub async fn ws_callback(ws: axum::extract::ws::WebSocket) {
                         )
                     );
                     drop(ws_receiver); // Clear receiver.
-                    remove_ws_connection(&ws_id_string).await;
+                    remove_ws_connection(&ws_id_string, false).await;
                     return;
                 }
                 _ => {}
             }
+        } else {
+            break; // Transport error; perform the same cleanup as a normal EOF below.
         }
     }
 
@@ -256,5 +282,5 @@ pub async fn ws_callback(ws: axum::extract::ws::WebSocket) {
             )
         )
     );
-    remove_ws_connection(&ws_id_string).await;
+    remove_ws_connection(&ws_id_string, false).await;
 }

@@ -24,6 +24,7 @@ pub extern "Rust" fn on_init(
         .enable_all()
         .build()
         .unwrap();
+    MODULE_RUNTIME_HANDLE.set(judge_runtime.handle().clone()).unwrap();
     GLOBAL_MODULE_STATUSES_BY_PROTOCOL.set(global_module_statuses_by_protocol.clone()).unwrap();
     let judge_status: ModuleStatus = ModuleStatus {
         initialized: false,
@@ -36,11 +37,7 @@ pub extern "Rust" fn on_init(
     {
         let judge_status: AsyncModifiable<ModuleStatus> = judge_status.clone();
         judge_runtime.spawn(async move {
-            let guard_mysql_database_pool: tokio::sync::MutexGuard<
-                '_,
-                mysql_async::Pool
-            > = MYSQL_DATABASE_POOL.lock().await;
-            let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+            let mut conn: mysql_async::Conn = MYSQL_DATABASE_POOL.get_conn().await.unwrap();
             "CREATE DATABASE IF NOT EXISTS RsOJ".ignore(&mut conn).await.unwrap();
             "USE RsOJ".ignore(&mut conn).await.unwrap();
             "CREATE TABLE IF NOT EXISTS submissions (
@@ -163,8 +160,21 @@ pub extern "Rust" fn on_init(
             )"
                 .ignore(&mut conn).await
                 .unwrap();
+            // Cover the list/count paths and common problem/user filters. These are best-effort
+            // migrations so an existing index does not prevent startup.
+            for statement in [
+                "ALTER TABLE submissions ADD INDEX idx_submissions_problem (problem_number, submission_id)",
+                "ALTER TABLE submissions ADD INDEX idx_submissions_user (username, submission_id)",
+                "ALTER TABLE solutions ADD INDEX idx_solutions_problem_created (problem_number, is_official, created_at, solution_id)",
+                "ALTER TABLE solution_comments ADD INDEX idx_solution_comments_solution_created (solution_id, created_at, comment_id)",
+                "ALTER TABLE discussions ADD INDEX idx_discussions_created (created_at, discussion_id)",
+                "ALTER TABLE discussion_replies ADD INDEX idx_discussion_replies_discussion_created (discussion_id, created_at, reply_id)",
+                "ALTER TABLE notifications ADD INDEX idx_notifications_recipient_id (recipient, notification_id)",
+                "ALTER TABLE notifications ADD INDEX idx_notifications_recipient_read (recipient, is_read, notification_id)",
+            ] {
+                let _ = statement.ignore(&mut conn).await;
+            }
             drop(conn);
-            drop(guard_mysql_database_pool);
 
             let mut guard_judge_status: tokio::sync::MutexGuard<
                 '_,
@@ -337,13 +347,7 @@ pub extern "Rust" fn on_init(
 }
 
 #[unsafe(no_mangle)]
-pub extern "Rust" fn on_unload() {
-    let judge_runtime_on_unload: tokio::runtime::Runtime = tokio::runtime::Builder
-        ::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
+pub extern "Rust" fn on_unload(unload_timeout_ms: usize) {
     println!(
         "{}",
         ansi_term::Color::Purple.paint(
@@ -357,7 +361,7 @@ pub extern "Rust" fn on_unload() {
         )
     );
 
-    judge_runtime_on_unload.spawn(async move {
+    let cleanup_completed = run_shutdown_task(async move {
         // Resolve whether ws_server is up and release the lock before calling
         // disconnect_from_ws_server() below, since it locks GLOBAL_MODULE_STATUSES_BY_PROTOCOL
         // itself again internally (via get_socket_port_by_protocol) — holding it here too would
@@ -374,17 +378,19 @@ pub extern "Rust" fn on_unload() {
         if ws_server_initialized {
             judge_socket::disconnect_from_ws_server().await;
         }
-    });
+        disconnect_database_pool().await;
+    }, std::time::Duration::from_millis(unload_timeout_ms as u64));
 
     println!(
         "{}",
         ansi_term::Color::Purple.paint(
             format!(
-                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Unloaded the judge.",
+                "[{}] [DOWN] [THREAD {}] [FILE `{}` LINE {}] Judge shutdown cleanup {}.",
                 MODULE_IDENTITY,
                 std::thread::current().id().as_u64(),
                 file!(),
-                line!()
+                line!(),
+                if cleanup_completed { "completed" } else { "timed out" }
             )
         )
     );

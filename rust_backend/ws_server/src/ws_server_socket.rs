@@ -3,17 +3,26 @@ use crate::socket_actions;
 
 use tokio::io::AsyncReadExt;
 
+const MAX_SOCKET_MESSAGE_BYTES: usize = 4 * 1024 * 1024;
+const SOCKET_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
 pub async fn socket_message_processing() {
     let guard_ws_server_socket: tokio::sync::MutexGuard<
         '_,
         tokio::net::TcpListener
     > = WS_SERVER_SOCKET.get().unwrap().lock().await;
     loop {
-        let (mut client, _) = guard_ws_server_socket.accept().await.unwrap();
+        let (client, _) = guard_ws_server_socket.accept().await.unwrap();
         client.set_nodelay(true).ok();
         tokio::spawn(async move {
-            let mut buf: bytes::BytesMut = bytes::BytesMut::with_capacity(65536);
-            client.read_buf(&mut buf).await.unwrap();
+            let mut buf: Vec<u8> = Vec::with_capacity(65536);
+            let read_result = tokio::time::timeout(
+                SOCKET_READ_TIMEOUT,
+                client.take((MAX_SOCKET_MESSAGE_BYTES + 1) as u64).read_to_end(&mut buf)
+            ).await;
+            if !matches!(read_result, Ok(Ok(_))) || buf.len() > MAX_SOCKET_MESSAGE_BYTES {
+                return;
+            }
             let msg: Result<
                 SocketJsonMessage,
                 serde_json::Error

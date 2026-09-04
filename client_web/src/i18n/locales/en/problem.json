@@ -1,6 +1,17 @@
 {
     "list": {
-        "title": "Problem List"
+        "title": "Problem List",
+        "number": "Number",
+        "name": "Problem Name"
+    },
+    "search": {
+        "placeholder": "Search by number or name",
+        "empty": "No matching problems."
+    },
+    "pagination": {
+        "page": "Page {{current}} / {{total}}",
+        "previous": "Previous",
+        "next": "Next"
     },
     "error": {
         "fetchFailed": "Failed to fetch the problem list."

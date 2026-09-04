@@ -5,12 +5,18 @@
         "confirmPassword": "确认注册密码"
     },
     "action": {
-        "register": "注册"
+        "register": "注册",
+        "pending": "正在创建账户..."
+    },
+    "validation": {
+        "required": "所有注册字段均为必填项。"
     },
     "dialog": {
         "alreadyLoggedIn": "您已经登录。",
         "passwordMismatch": "您输入的密码与确认密码不一致。",
         "registerFailure": "注册失败。可能是您注册的用户名已存在，或发生了其他错误。",
-        "registerSuccess": "注册成功。"
+        "registerSuccess": "注册成功。",
+        "requestFailed": "注册请求失败：{{message}}",
+        "unknownError": "未知错误"
     }
 }

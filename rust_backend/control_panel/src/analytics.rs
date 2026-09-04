@@ -3,9 +3,7 @@ use mysql_async::prelude::*;
 
 // Create the visits table (if missing). Called once at startup, after the database exists.
 pub async fn ensure_schema() -> Result<(), String> {
-    let guard_mysql_database_pool: tokio::sync::MutexGuard<'_, mysql_async::Pool> =
-        MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_mysql_database_pool
+    let mut conn: mysql_async::Conn = MYSQL_DATABASE_POOL
         .get_conn().await
         .map_err(|e| e.to_string())?;
 
@@ -19,15 +17,12 @@ pub async fn ensure_schema() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     drop(conn);
-    drop(guard_mysql_database_pool);
     Ok(())
 }
 
 // Record a single visit at the current time.
 pub async fn record_visit() -> Result<(), String> {
-    let guard_mysql_database_pool: tokio::sync::MutexGuard<'_, mysql_async::Pool> =
-        MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_mysql_database_pool
+    let mut conn: mysql_async::Conn = MYSQL_DATABASE_POOL
         .get_conn().await
         .map_err(|e| e.to_string())?;
 
@@ -42,7 +37,6 @@ pub async fn record_visit() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     drop(conn);
-    drop(guard_mysql_database_pool);
     Ok(())
 }
 
@@ -72,9 +66,7 @@ async fn get_metric_series(
     timestamp_column: &str,
     days: i64
 ) -> Result<Vec<MetricPoint>, String> {
-    let guard_mysql_database_pool: tokio::sync::MutexGuard<'_, mysql_async::Pool> =
-        MYSQL_DATABASE_POOL.lock().await;
-    let mut conn: mysql_async::Conn = guard_mysql_database_pool
+    let mut conn: mysql_async::Conn = MYSQL_DATABASE_POOL
         .get_conn().await
         .map_err(|e| e.to_string())?;
 
@@ -109,7 +101,6 @@ async fn get_metric_series(
         .map_err(|e| e.to_string())?;
 
     drop(conn);
-    drop(guard_mysql_database_pool);
 
     let mut counts: std::collections::HashMap<String, i64> = rows.into_iter().collect();
     let mut points: Vec<MetricPoint> = Vec::with_capacity(days as usize);

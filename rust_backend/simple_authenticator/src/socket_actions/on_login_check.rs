@@ -18,9 +18,11 @@ pub async fn on_login_check(msg: SocketJsonMessageWithWsId) {
             msg.content
         )
     {
+        let _session_state = SESSION_STATE_LOCK.lock().await;
         let guard_logged_in_usernames = LOGGED_IN_USERNAMES.lock().await;
         let check_result = (*guard_logged_in_usernames).contains(&content.username);
         drop(guard_logged_in_usernames);
+        drop(_session_state);
 
         let msg_to_send: SocketJsonMessage = SocketJsonMessage {
             r#type: String::from("on_send_msg"),

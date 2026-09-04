@@ -21,6 +21,7 @@ pub async fn on_validate_session_and_locate(msg: SocketJsonMessage) {
             msg.content
         )
     {
+        let _session_state = SESSION_STATE_LOCK.lock().await;
         let guard_session_tokens_by_username: tokio::sync::MutexGuard<
             '_,
             std::collections::HashMap<String, String>
@@ -36,6 +37,7 @@ pub async fn on_validate_session_and_locate(msg: SocketJsonMessage) {
         > = WS_IDS_BY_USERNAME.lock().await;
         let to_ws_id: Option<String> = guard_ws_ids_by_username.get(&content.to_username).cloned();
         drop(guard_ws_ids_by_username);
+        drop(_session_state);
 
         let msg_to_send: SocketJsonMessage = SocketJsonMessage {
             r#type: String::from("on_validate_session_and_locate_result"),

@@ -1,150 +1,137 @@
-# Control Panel
+# RsOJ 控制面板
 
-RsOJ 控制面板是一个基于 React 的管理界面，用于管理整个在线评测系统。
+控制面板由两部分组成：
 
-## 访问方式
+- React 页面：`http://127.0.0.1:5173/control-panel`
+- 独立 Axum API：默认监听 `http://127.0.0.1:9990`
 
-控制面板运行在独立的 HTTP 服务器上：
+API 只绑定回环地址。远程管理应使用 SSH 隧道或可信反向代理，不要直接暴露端口。
 
-- **后端地址**: `http://localhost:9990` (仅绑定到 127.0.0.1，不对外网开放)
-- **前端路由**: `http://localhost:5173/control-panel` (开发模式)
+## 启动与配置
 
-## 功能特性
+控制面板令牌只从进程环境读取，不写入数据库，也不会由网页生成。按需配置：
 
-### 1. 仪表板 (Dashboard)
-- 查看最近30天的访问统计
-- 每日和累计指标展示
-
-### 2. 系统监控 (System Monitor)
-- 数据库连接状态
-- 活跃的 WebSocket 连接数
-- 系统运行时间
-- 内存使用情况
-- 数据库统计信息（用户、题目、提交、讨论总数）
-
-### 3. 用户管理 (Users)
-- 查看所有用户列表
-- 搜索用户
-- 查看用户统计（AC数、提交数、讨论数）
-- 删除用户（级联删除相关数据）
-
-### 4. 题目管理 (Problems)
-- 查看所有题目列表
-- 搜索题目
-- 创建新题目
-- 查看题目统计（提交数、通过数、通过率）
-- 删除题目（级联删除相关提交和题解）
-
-### 5. 系统设置 (Settings)
-- 清空数据库（危险操作，保留表结构）
-
-## 首次设置
-
-### 生产环境
-
-1. 首次访问控制面板时，点击 "Generate Admin Token" 生成管理员令牌
-2. **重要**: 立即保存生成的令牌，它只会显示一次
-3. 令牌使用 MD5 哈希存储在数据库中，原文无法恢复
-4. 每次访问控制面板都需要输入令牌进行身份验证
-
-### 开发环境
-
-在 Debug 构建模式下（`cargo build`），身份验证被自动绕过，无需令牌即可访问所有功能。
-
-## 安全注意事项
-
-1. **仅本地访问**: 后端绑定到 `127.0.0.1`，不接受外网连接
-2. **远程访问**: 如需远程管理，请使用 SSH 隧道：
-   ```bash
-   ssh -L 9990:localhost:9990 user@server
-   ```
-3. **令牌保管**: 管理员令牌具有完全控制权限，请妥善保管
-4. **数据备份**: 执行清空数据库等危险操作前，请先备份数据
-
-## API 端点
-
-所有 API 端点都需要在请求体中包含 `token` 字段（开发模式除外）：
-
-- `GET /api/status` - 检查配置状态
-- `POST /api/setup` - 生成管理员令牌（仅首次）
-- `POST /api/login` - 验证令牌
-- `POST /api/stats` - 获取统计数据
-- `POST /api/system-status` - 获取系统状态
-- `POST /api/database-stats` - 获取数据库统计
-- `POST /api/users` - 获取用户列表
-- `POST /api/users/{id}/delete` - 删除用户
-- `POST /api/problems` - 获取题目列表
-- `POST /api/problems/create` - 创建题目
-- `POST /api/problems/{id}/delete` - 删除题目
-- `POST /api/clear-database` - 清空数据库
-
-## 开发说明
-
-### 前端开发
-
-控制面板前端位于 `client_web/src/router/ControlPanel.tsx`，使用以下技术栈：
-
-- React 19 + TypeScript
-- Fluent UI 组件库
-- React Router 路由
-- 直接 fetch API 调用（不使用 WebSocket）
-
-### 后端开发
-
-控制面板后端位于 `rust_backend/control_panel/`，模块结构：
-
-- `http_server.rs` - Axum HTTP 服务器和路由
-- `auth.rs` - 令牌生成和验证
-- `analytics.rs` - 访问统计分析
-- `system_monitor.rs` - 系统监控
-- `user_management.rs` - 用户管理
-- `problem_management.rs` - 题目管理
-- `db_admin.rs` - 数据库管理操作
-
-### 题目创建
-
-创建题目时需要提供：
-
-- **Problem Number** (必填): 唯一的题目编号
-- **Problem Name** (必填): 题目名称
-- **Difficulty** (必填): 难度级别
-  - 1: Easy
-  - 2: Medium
-  - 3: Hard
-  - 4: Expert
-- **Problem Statement** (必填): 题目描述（支持 Markdown）
-- **Testcase Config** (可选): 测试用例配置（JSON 格式）
-
-## 故障排查
-
-### 无法连接到控制面板
-
-检查后端模块是否正常启动：
 ```bash
-cd rust_backend
-./build&run.sh
+# super_admin，拥有全部控制面板权限
+export CONTROL_PANEL_ADMIN_TOKEN='replace-with-a-long-random-token'
+
+# problem_admin，只允许统计和题目管理
+export CONTROL_PANEL_PROBLEM_ADMIN_TOKEN='replace-with-another-random-token'
+
+# community_admin，目前只允许统计；社区审核 API 尚未实现
+export CONTROL_PANEL_COMMUNITY_ADMIN_TOKEN='replace-with-another-random-token'
+
+./start.sh
 ```
 
-查看日志中是否有 `[CONTROL_PANEL] [INFO] Control panel listening on http://127.0.0.1:9990` 消息。
+至少需要一个非空令牌，否则受保护 API 返回 `503 Service Unavailable`。debug 和 release 构建
+执行相同鉴权，不存在开发后门。
 
-### 端口被占用
+如果 React 前端不应连接默认 API 地址，在启动 Vite 前设置：
 
-控制面板会自动尝试更高的端口号，查看启动日志确认实际使用的端口。
-
-### 忘记管理员令牌
-
-生产环境中，如果丢失令牌，需要手动删除数据库中的记录：
-```sql
-DELETE FROM RsOJ.control_panel_admin;
+```bash
+export VITE_CONTROL_PANEL_URL='http://127.0.0.1:9990'
 ```
 
-然后重新访问控制面板生成新令牌。
+跨源开发地址除默认的 `localhost:5173` 和 `127.0.0.1:5173` 外，可再允许一个来源：
 
-## 数据库表
+```bash
+export CONTROL_PANEL_CORS_ORIGIN='https://admin.example.com'
+```
 
-控制面板使用两个独立的表（带 `control_panel_` 前缀）：
+## 登录模型
 
-- `control_panel_admin` - 存储管理员令牌哈希
-- `control_panel_visits` - 记录网站访问日志
+进入 React 控制面板需要同时满足：
 
-这些表在执行"清空数据库"操作时会被保留。
+1. 浏览器中存在主站登录后保存的 `loginUsername`。
+2. 用户表的 `admin_role` 为 `super_admin`、`problem_admin` 或 `community_admin`。
+3. 输入与该数据库角色对应的控制面板令牌。
+
+React 客户端只在当前标签页的 `sessionStorage` 中保存控制面板令牌。所有受保护请求通过
+`Authorization: Bearer <token>` 发送；权限最终由服务端中间件执行，而不是依赖隐藏菜单。
+
+控制面板令牌属于共享角色凭据，不是主站 session token。两者不要混用。
+
+直接访问控制面板 API 根路径得到的内置 HTML 页面只验证角色令牌，不读取主站用户名。该页面
+保留全部导航项，低权限令牌访问越权接口时会收到服务端 `403 Forbidden`；需要按角色隐藏菜单
+和中英文界面时使用 React 控制面板。
+
+## 权限
+
+| 功能/API | problem_admin | community_admin | super_admin |
+| --- | --- | --- | --- |
+| Dashboard、`/api/stats` | 是 | 是 | 是 |
+| 题目读取、创建、编辑、删除、测试数据上传 | 是 | 否 | 是 |
+| 系统与数据库监控 | 否 | 否 | 是 |
+| 用户列表与删除 | 否 | 否 | 是 |
+| 清空业务数据 | 否 | 否 | 是 |
+
+角色设置方法见 [ADMIN_ROLES.md](ADMIN_ROLES.md)。
+
+## 当前功能
+
+- 最近 30 天的每日及累计统计
+- 数据库、WebSocket 连接数、运行时间、内存监控
+- 用户分页、搜索、统计和删除
+- 题目分页、搜索、创建、编辑、删除
+- Markdown/KaTeX 题面预览
+- 测试数据上传和 testcase 配置编辑
+- 清空业务表，同时保留 `control_panel_` 前缀的控制面板表
+- 中英文界面
+
+尚未实现用户封禁、比赛管理、社区内容审核、管理员管理、备份恢复和审计日志。
+
+## HTTP API
+
+公开但只监听本机回环的端点：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/` | 内置的独立管理页面 |
+| GET | `/api/status` | 返回是否配置了任意角色令牌 |
+| POST | `/api/setup` | 已禁用，固定返回 `501` |
+| POST | `/api/login` | 验证任意已配置角色令牌 |
+| POST | `/api/record-visit` | WebSocket 服务上报访问 |
+| POST | `/api/record-ws-connection` | WebSocket 服务上报连接数变化 |
+
+受 Bearer Token 保护的端点：
+
+| 方法 | 路径 | 最低角色 |
+| --- | --- | --- |
+| POST | `/api/verify-admin` | 任意管理员角色 |
+| POST | `/api/stats` | 任意管理员角色 |
+| POST | `/api/system-status` | super_admin |
+| POST | `/api/database-stats` | super_admin |
+| POST | `/api/users` | super_admin |
+| POST | `/api/users/{id}/delete` | super_admin |
+| POST | `/api/problems` | problem_admin |
+| GET | `/api/problems/{id}` | problem_admin |
+| PUT | `/api/problems/{id}` | problem_admin |
+| POST | `/api/problems/create` | problem_admin |
+| POST | `/api/problems/{id}/delete` | problem_admin |
+| POST | `/api/upload-testdata` | problem_admin |
+| POST | `/api/clear-database` | super_admin |
+
+## 题目和测试数据
+
+难度取值为 `0..7`。题面在数据库中保存为 JSON 字符串数组。每个 testcase 包含：
+
+```json
+{
+  "number": 1,
+  "score": 100,
+  "input": "1.in",
+  "answer": "1.out",
+  "time_limit": 1.0,
+  "memory_limit": 256
+}
+```
+
+`time_limit` 单位为秒，`memory_limit` 单位为 MB。上传文件分别写入
+`problem/<number>/input/` 和 `problem/<number>/answer/`；编辑题目时 testcase 配置还会同步到
+`problem/<number>/problem_testcase_config.json`。
+
+## 端口说明
+
+控制面板若无法绑定 `9990` 会尝试更高端口，但 React 客户端不会自动发现这个变化。开发时应
+保证 `9990` 可用；若实际端口改变，需要同步设置 `VITE_CONTROL_PANEL_URL` 并重启 Vite。

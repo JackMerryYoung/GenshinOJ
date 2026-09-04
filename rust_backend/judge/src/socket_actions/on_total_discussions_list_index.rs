@@ -21,13 +21,11 @@ struct Result_ {
 
 pub async fn on_total_discussions_list_index(msg: SocketJsonMessageWithWsId) {
     if let Ok(content) = serde_json::from_value::<Content>(msg.content) {
-        let guard_pool = MYSQL_DATABASE_POOL.lock().await;
-        let mut conn: mysql_async::Conn = guard_pool.get_conn().await.unwrap();
+        let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
         let results: std::result::Result<Vec<i64>, _> = conn
             .query("SELECT COUNT(*) FROM RsOJ.discussions")
             .await;
         drop(conn);
-        drop(guard_pool);
 
         match results {
             Ok(counts) => {

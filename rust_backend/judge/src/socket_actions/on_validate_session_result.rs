@@ -144,11 +144,25 @@ pub async fn on_validate_session_result(msg: SocketJsonMessage) {
             return;
         }
 
-        let guard_mysql_database_pool: tokio::sync::MutexGuard<
-            '_,
-            mysql_async::Pool
-        > = MYSQL_DATABASE_POOL.lock().await;
-        let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+        let judge_permit = match JUDGE_CONCURRENCY.clone().try_acquire_owned() {
+            Ok(permit) => permit,
+            Err(_) => {
+                let failure_result = SubmissionFailureResult {
+                    r#type: String::from("submission_failure"),
+                    content: ContentInSubmissionFailure {
+                        reason: String::from("judge_busy"),
+                        request_key: pending_request.original_request_key,
+                    },
+                };
+                send_json_msg_to_ws_server(
+                    pending_request.requester_ws_id,
+                    serde_json::to_value(failure_result).unwrap()
+                ).await;
+                return;
+            }
+        };
+
+        let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
         let insert_result = conn
             .exec_drop(
                 "INSERT INTO RsOJ.submissions
@@ -167,7 +181,6 @@ pub async fn on_validate_session_result(msg: SocketJsonMessage) {
 
         if insert_result.is_err() {
             drop(conn);
-            drop(guard_mysql_database_pool);
             println!(
                 "{}",
                 ansi_term::Color::Yellow.paint(
@@ -220,7 +233,6 @@ pub async fn on_validate_session_result(msg: SocketJsonMessage) {
         }
 
         drop(conn);
-        drop(guard_mysql_database_pool);
 
         let submission_id_result = SubmissionIdResult {
             r#type: String::from("submission_id"),
@@ -242,13 +254,10 @@ pub async fn on_validate_session_result(msg: SocketJsonMessage) {
         let requester_ws_id = pending_request.requester_ws_id;
         let original_request_key = pending_request.original_request_key;
         tokio::spawn(async move {
+            let _judge_permit = judge_permit;
             let outcome = crate::judging::judge_submission(problem_number, &language, &code).await;
 
-            let guard_mysql_database_pool: tokio::sync::MutexGuard<
-                '_,
-                mysql_async::Pool
-            > = MYSQL_DATABASE_POOL.lock().await;
-            let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
+            let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
             let update_result = conn
                 .exec_drop(
                     "UPDATE RsOJ.submissions
@@ -266,7 +275,6 @@ pub async fn on_validate_session_result(msg: SocketJsonMessage) {
 
             if update_result.is_err() {
                 drop(conn);
-                drop(guard_mysql_database_pool);
                 println!(
                     "{}",
                     ansi_term::Color::Yellow.paint(
@@ -314,17 +322,18 @@ pub async fn on_validate_session_result(msg: SocketJsonMessage) {
             }
 
             drop(conn);
-            drop(guard_mysql_database_pool);
 
             crate::socket_actions::push_submission_result::push_submission_result(
-                requester_ws_id,
-                submission_id,
-                problem_number,
-                code,
-                language,
-                username,
-                outcome,
-                original_request_key
+                crate::socket_actions::push_submission_result::PushSubmissionResultRequest {
+                    ws_id: requester_ws_id,
+                    submission_id,
+                    problem_number,
+                    code,
+                    language,
+                    username,
+                    outcome,
+                    request_key: original_request_key,
+                },
             ).await;
         });
     } else {

@@ -196,15 +196,12 @@ pub async fn on_username_by_ws_id_result(msg: SocketJsonMessage) {
         let page_index: i64 = std::cmp::max(1, pending_request.page_index);
         let offset: i64 = (page_index - 1) * SUBMISSIONS_LIST_PAGE_SIZE;
 
-        let guard_mysql_database_pool: tokio::sync::MutexGuard<
-            '_,
-            mysql_async::Pool
-        > = MYSQL_DATABASE_POOL.lock().await;
-        let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
-        let results: Result<
+        let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
+        type SubmissionResultType = Result<
             Vec<(i64, String, i64, String, i32, String, String)>,
-            _
-        > = conn
+            mysql_async::Error,
+        >;
+        let results: SubmissionResultType = conn
             .exec(
                 "SELECT submission_id, username, problem_number, result, general_score, statuses, scores
                 FROM RsOJ.submissions
@@ -214,7 +211,6 @@ pub async fn on_username_by_ws_id_result(msg: SocketJsonMessage) {
             )
             .await;
         drop(conn);
-        drop(guard_mysql_database_pool);
 
         match results {
             Ok(rows) => {

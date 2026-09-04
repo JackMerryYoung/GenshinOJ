@@ -1,193 +1,109 @@
-# CLAUDE.md
+# Repository Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project
 
-## Project Overview
+RsOJ is an online judge with a React/TypeScript frontend and a modular Rust backend. The Python
+services under the repository root are migration artifacts; active backend work belongs under
+`rust_backend/`.
 
-RsOJ is an Online Judge platform that uses WebSocket for real-time communication between client and server. The project has migrated from a Python-based backend to a Rust-based modular architecture while maintaining a React/TypeScript frontend.
+## Start And Verify
 
-## Architecture
+Use the root launcher for local development:
 
-### Modular Plugin System
+```bash
+./start.sh
+./start.sh --release
+./start.sh --skip-build
+```
 
-The backend uses a **working load** architecture where modules are compiled as dynamic libraries (.so on Linux, .dll on Windows) and loaded at runtime by `main_backend`. Each module:
+It builds the Rust workspace, deploys module `.so` files to `rust_backend/modules/<id>/`, then
+starts `main_backend` and Vite. The backend must run with `rust_backend/` as its working directory
+because configuration and problem paths are resolved from it.
 
-- Implements a specific protocol (e.g., `std_ws_server@0.1.0`, `std_judge@0.1.0`)
-- Exports `on_init()` and `on_unload()` FFI functions
-- Runs in its own Tokio runtime
-- Can depend on other modules via protocol versioning
+Verification commands:
 
-Module loading follows topological sort based on dependencies defined in `module_config_rs.json`. The system supports:
-- **Restricted mode**: Any module panic shuts down the entire server
-- **Dependency resolution**: Modules load only after their dependencies initialize
-- **Protocol versioning**: Dependencies specify required protocol versions
-
-### Core Modules
-
-Located in `rust_backend/`:
-
-- **main_backend**: Entry point that loads and orchestrates all modules
-- **ws_server**: WebSocket server handling client connections on port 9983
-- **simple_authenticator**: Manages user authentication and session tokens
-- **judge**: Code submission judging, problem management, solutions, discussions
-- **chat_server**: Real-time chat functionality
-- **userish**: User profiles, follow/unfollow, friends list
-- **control_panel**: Administrative interface
-- **db_connector**: MySQL database connection pooling
-
-### WebSocket Message Protocol
-
-Client-server communication follows a convention where incoming messages trigger handlers named `on_<command>`. For example:
-
-- Client sends `{"command": "login", "content": {...}}`
-- Server dispatches to `on_login()` in each module that implements it
-- Modules register external listeners in `ws_server_config_rs.json`
-
-This allows modules to extend functionality without modifying the core WebSocket server.
-
-### Database
-
-MySQL database named `RsOJ` with tables for:
-- Users (authentication managed by `simple_authenticator`)
-- Submissions, problems, solutions
-- Discussions, replies, votes
-- Notifications
-- User relationships (follows, friends)
-
-Tables are auto-created on module initialization via `CREATE TABLE IF NOT EXISTS`.
-
-## Build and Run
-
-### Backend (Rust)
-
-**Build all modules:**
 ```bash
 cd rust_backend
-./build&run.sh
-```
+cargo check --workspace
+cargo test --workspace --no-fail-fast
+cargo clippy --workspace --all-targets -- -D warnings
 
-This script:
-1. Builds each module package (`-p <module_name>`) in release mode
-2. Moves compiled `.so` files to `rust_backend/modules/<module_name>/`
-3. Runs `main_backend` which loads modules from `module_config_rs.json`
-
-**Debug mode:**
-```bash
-cd rust_backend
-./debug.sh
-```
-
-**Module configuration:** Edit `module_config_rs.json` to enable/disable modules or change dependencies.
-
-**Database setup:** MySQL must be running. Default credentials: `root:123456@localhost:3306`. Override with environment variables: `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`.
-
-**Clear database:**
-```bash
-python clear_database.py       # prompts for confirmation
-python clear_database.py -y    # auto-confirm
-```
-
-### Frontend (React + Vite)
-
-**Development server:**
-```bash
-cd client_web
-npm install
-npm run dev
-```
-
-Runs on `http://0.0.0.0:5173` with HMR enabled and proxies:
-- `/wsapi` → `ws://localhost:9983/ws` (WebSocket)
-- `/avatar` → `http://localhost:9983` (static files)
-
-**Production build:**
-```bash
-cd client_web
-npm run build
-npm run preview
-```
-
-**Lint:**
-```bash
-cd client_web
+cd ../client_web
 npm run lint
+npm run build
+npm run test:e2e
 ```
 
-## Development Workflow
+## Backend Architecture
 
-### Adding a New WebSocket Command
+`main_backend` loads dynamic libraries according to `module_config_rs.json`. Enabled modules export:
 
-1. **Register command** in `rust_backend/ws_server/ws_server_config_rs.json`:
-   ```json
-   {"command": "on_your_command", "required_protocol_version": "*"}
-   ```
+```rust
+on_init(...) -> (tokio::runtime::Runtime, AsyncModifiable<ModuleStatus>)
+on_unload(unload_timeout_ms: usize)
+```
 
-2. **Implement handler** in the relevant module (e.g., `judge/src/socket_actions/on_your_command.rs`):
-   ```rust
-   pub async fn on_your_command(
-       ws_id: String,
-       content: serde_json::Value
-   ) -> Result<(), Box<dyn std::error::Error>> {
-       // Implementation
-   }
-   ```
+Each module owns a Tokio runtime. Dependencies load in topological order; shutdown cleanup runs
+while all runtimes are alive, then runtimes stop in reverse order. In restricted mode, a reported
+module panic shuts down the process.
 
-3. **Export from module** in `socket_actions/mod.rs`:
-   ```rust
-   pub mod on_your_command;
-   ```
+Current modules:
 
-4. **Frontend integration** - send message via WebSocket:
-   ```typescript
-   sendJsonMessage({
-       command: "your_command",
-       content: { /* data */ }
-   });
-   ```
+- `main_backend`: loader and lifecycle coordinator
+- `ws_server`: browser WebSocket and avatar HTTP routes, normally port 9983
+- `simple_authenticator`: login, session restore, session validation and connection identity
+- `judge`: problems, submissions, solutions, discussions and notifications
+- `chat_server`: direct messages and chat history
+- `userish`: profiles, search, follows and friends
+- `control_panel`: local Axum administration API, normally port 9990
+- `db_connector`: disabled compatibility module
 
-### Adding a New Module
+## WebSocket Protocol
 
-1. Create module in `rust_backend/<module_name>/`
-2. Implement `on_init()` and `on_unload()` with `#[unsafe(no_mangle)]`
-3. Add to workspace in `rust_backend/Cargo.toml`
-4. Configure in `module_config_rs.json` with appropriate dependencies
-5. Update `build&run.sh` to build and move the module
+The browser sends an envelope using `type`, not `command`:
 
-### Rust Compiler Configuration
+```json
+{
+  "type": "problem_set",
+  "content": { "request_key": "client-generated-id" }
+}
+```
 
-The workspace uses nightly features:
-- `thread_id_value` for logging
-- Cranelift codegen backend in dev mode (`codegen-backend = "cranelift"`)
-- Parallel compilation (`-Zthreads=8`)
-- LTO in release mode
+`ws_server` forwards it internally as `on_<type>` with a server-assigned `ws_id`. Modules bind
+handlers through `rust_backend/ws_server/ws_server_config_rs.json`. Request/response flows must
+preserve the browser's `content.request_key`; the frontend `WebSocketRequestBroker` uses it to pair
+concurrent responses.
 
-## Frontend Stack
+To add a command:
 
-- **React 19** with React Router for routing
-- **Fluent UI** components (`@fluentui/react-components`)
-- **Monaco Editor** for code editing
-- **React Markdown** with KaTeX for math rendering
-- **Redux Toolkit** for state management
-- **WebSocket** via `react-use-websocket`
-- **Vite** (rolldown variant) for bundling
+1. Add `on_<type>` to `ws_server_config_rs.json`.
+2. Implement and export the handler in the owning module.
+3. Include the command in that module's bind/unbind lists.
+4. Use the frontend request broker for request/response operations.
+5. Add protocol and Playwright coverage where practical.
 
-## Code Style
+## Database And Judge
 
-### Rust Modules
+Modules currently connect to `mysql://root:123456@127.0.0.1:3306/`; this is hard-coded and is not
+overridden by `DB_*` environment variables. Tables and additive migrations run during module
+initialization.
 
-- Use `ansi_term::Color` for colorized logging
-- Log format: `[MODULE_NAME] [LEVEL] [THREAD id] [FILE line] message`
-- All async operations use Tokio
-- Wrap shared state in `AsyncModifiable<T>` (type alias for `Arc<Mutex<T>>`)
-- MySQL queries use `mysql_async` with `.ignore()` for DDL statements
+The judge reads testcase files from `problem/<number>/` and runs `gcc`, `g++`, `javac`, `java`, or
+`python3`. It enforces wall-clock, virtual-memory and output limits, but does not provide a security
+sandbox. Do not treat it as safe for arbitrary untrusted code.
 
-### Frontend
+## Frontend
 
-- Components in `client_web/src/router/`
-- Use TypeScript with strict mode
-- WebSocket messages follow `{command: string, content: any}` structure
-- Responsive design with Fluent UI theming
+The frontend uses React 19, TypeScript, Fluent UI, Redux Toolkit, React Router, i18next and
+`react-use-websocket`. Vite proxies `/wsapi` and `/avatar` to the WebSocket service. Control-panel
+requests use `src/controlPanelApi.ts` and `VITE_CONTROL_PANEL_URL`.
 
-## Legacy Python Code
+End-to-end tests live in `client_web/e2e/`. They mock WebSocket and control-panel HTTP traffic so
+they can run without MySQL or the Rust backend.
 
-The repository contains legacy Python modules in the root directory (`ws_server/`, `judge/`, `chat_server/`, etc.) that are no longer used. The active backend is entirely in `rust_backend/`. Do not modify Python backend code unless specifically working on migration artifacts.
+## Control Panel
+
+There is no debug authentication bypass and no browser token-generation flow. Role tokens come
+from `CONTROL_PANEL_ADMIN_TOKEN`, `CONTROL_PANEL_PROBLEM_ADMIN_TOKEN`, and
+`CONTROL_PANEL_COMMUNITY_ADMIN_TOKEN`. See `CONTROL_PANEL.md` before changing routes or roles;
+authorization must be enforced in the backend middleware, not only in React.

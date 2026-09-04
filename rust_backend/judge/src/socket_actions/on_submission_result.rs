@@ -27,15 +27,12 @@ pub async fn on_submission_result(msg: SocketJsonMessageWithWsId) {
             msg.content
         )
     {
-        let guard_mysql_database_pool: tokio::sync::MutexGuard<
-            '_,
-            mysql_async::Pool
-        > = MYSQL_DATABASE_POOL.lock().await;
-        let mut conn: mysql_async::Conn = guard_mysql_database_pool.get_conn().await.unwrap();
-        let row_result: Result<
+        let mut conn: mysql_async::Conn = get_db_conn().await.unwrap();
+        type SubmissionResultType = Result<
             Option<(String, i64, String, i32, String, String, String, String)>,
-            _
-        > = conn
+            mysql_async::Error
+        >;
+        let row_result: SubmissionResultType = conn
             .exec_first(
                 "SELECT username, problem_number, result, general_score, statuses, scores, code, language
                 FROM RsOJ.submissions
@@ -44,7 +41,6 @@ pub async fn on_submission_result(msg: SocketJsonMessageWithWsId) {
             )
             .await;
         drop(conn);
-        drop(guard_mysql_database_pool);
 
         match row_result {
             Ok(Some((owner_username, problem_number, result, general_score, statuses, scores, code, language))) => {
@@ -65,6 +61,7 @@ pub async fn on_submission_result(msg: SocketJsonMessageWithWsId) {
                     original_request_key: content.request_key,
                 });
                 drop(guard_pending_requests);
+                expire_pending(&*PENDING_SUBMISSION_RESULT_FETCH_REQUESTS, rpc_request_key.clone());
 
                 #[derive(serde::Serialize)]
                 struct ContentOnUsernameByWsId {

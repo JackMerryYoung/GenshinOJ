@@ -17,9 +17,9 @@ set_admin() {
     if [ -z "$role" ]; then
         echo "❌ Error: Role is required"
         echo "Available roles:"
-        echo "  - problem_admin: Manage problems, contests, and solutions"
-        echo "  - community_admin: Manage discussions and community"
-        echo "  - super_admin: Full system access and admin management"
+        echo "  - problem_admin: Dashboard and problem management"
+        echo "  - community_admin: Dashboard only (moderation APIs are not implemented yet)"
+        echo "  - super_admin: All currently implemented control-panel APIs"
         exit 1
     fi
 
@@ -81,13 +81,13 @@ list_admins() {
 
     # Problem Admins
     echo ""
-    echo "🟢 Problem Administrators (Problems, Contests, Solutions):"
+    echo "🟢 Problem Administrators (Dashboard and Problems):"
     echo "------------------------------------------------------------"
     mysql -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT id, username, FROM_UNIXTIME(created_at/1000) AS created_at FROM users WHERE admin_role='problem_admin' ORDER BY id" 2>/dev/null
 
     # Community Admins
     echo ""
-    echo "🔵 Community Administrators (Discussions, Moderation):"
+    echo "🔵 Community Administrators (Dashboard; moderation pending):"
     echo "------------------------------------------------------------"
     mysql -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "SELECT id, username, FROM_UNIXTIME(created_at/1000) AS created_at FROM users WHERE admin_role='community_admin' ORDER BY id" 2>/dev/null
 
@@ -104,9 +104,9 @@ Usage:
   $0 list                      - List all administrators
 
 Admin Roles:
-  problem_admin     - Manage problems, contests, and solutions
-  community_admin   - Manage discussions and community moderation
-  super_admin       - Full system access including admin management
+  problem_admin     - Dashboard and problem management
+  community_admin   - Dashboard only; moderation APIs are not implemented yet
+  super_admin       - All currently implemented control-panel APIs
 
 Examples:
   $0 add alice super_admin

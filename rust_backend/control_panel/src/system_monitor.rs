@@ -10,7 +10,19 @@ pub fn increment_ws_connections() {
 }
 
 pub fn decrement_ws_connections() {
-    ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
+    // A missed/duplicated disconnect notification must not wrap the unsigned counter.
+    let mut current = ACTIVE_WS_CONNECTIONS.load(Ordering::Relaxed);
+    while current > 0 {
+        match ACTIVE_WS_CONNECTIONS.compare_exchange_weak(
+            current,
+            current - 1,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => return,
+            Err(next) => current = next,
+        }
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -22,26 +34,17 @@ pub struct SystemStatus {
     pub memory_usage_mb: Option<f64>,
 }
 
-#[derive(serde::Serialize)]
-pub struct ModuleInfo {
-    pub name: String,
-    pub status: String,
-    pub port: u16,
-}
-
 lazy_static::lazy_static! {
     static ref START_TIME: std::time::Instant = std::time::Instant::now();
 }
 
 pub async fn get_system_status() -> Result<SystemStatus, String> {
     // Test database connection
-    let guard_mysql_database_pool = MYSQL_DATABASE_POOL.lock().await;
-    let database_connected = guard_mysql_database_pool.get_conn().await.is_ok();
+    let database_connected = MYSQL_DATABASE_POOL.get_conn().await.is_ok();
 
     // Note: mysql_async Pool doesn't expose a status() method in this version
     // We'll use a fixed value for now
     let database_pool_size = 10; // Default pool size
-    drop(guard_mysql_database_pool);
 
     // Get memory usage (Linux-specific via /proc/self/statm)
     let memory_usage_mb = get_memory_usage();
@@ -63,21 +66,14 @@ fn get_memory_usage() -> Option<f64> {
     {
         if let Ok(content) = std::fs::read_to_string("/proc/self/statm") {
             let parts: Vec<&str> = content.split_whitespace().collect();
-            if let Some(rss_pages) = parts.get(1) {
-                if let Ok(pages) = rss_pages.parse::<u64>() {
+            if let Some(rss_pages) = parts.get(1)
+                && let Ok(pages) = rss_pages.parse::<u64>() {
                     // Convert pages to MB (page size is typically 4KB)
                     return Some((pages * 4096) as f64 / 1024.0 / 1024.0);
                 }
-            }
         }
     }
     None
-}
-
-pub async fn get_recent_errors(limit: usize) -> Result<Vec<String>, String> {
-    // This is a placeholder - you'd need to implement error logging first
-    // For now, return empty array
-    Ok(vec![])
 }
 
 #[derive(serde::Serialize)]
@@ -90,8 +86,7 @@ pub struct DatabaseStats {
 }
 
 pub async fn get_database_stats() -> Result<DatabaseStats, String> {
-    let guard_mysql_database_pool = MYSQL_DATABASE_POOL.lock().await;
-    let mut conn = guard_mysql_database_pool
+    let mut conn = MYSQL_DATABASE_POOL
         .get_conn().await
         .map_err(|e| e.to_string())?;
 
@@ -122,7 +117,6 @@ pub async fn get_database_stats() -> Result<DatabaseStats, String> {
         .await.unwrap_or(None);
 
     drop(conn);
-    drop(guard_mysql_database_pool);
 
     Ok(DatabaseStats {
         total_users: total_users.unwrap_or(0),

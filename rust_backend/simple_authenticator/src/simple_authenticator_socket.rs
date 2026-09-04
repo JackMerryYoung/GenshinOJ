@@ -27,7 +27,8 @@ pub async fn connect_to_ws_server() {
                     String::from("on_login"),
                     String::from("on_online_user"),
                     String::from("on_quit"),
-                    String::from("on_register")
+                    String::from("on_register"),
+                    String::from("on_session_restore")
                 ],
             })
             .unwrap(),
@@ -50,7 +51,8 @@ pub async fn disconnect_from_ws_server() {
                     String::from("on_login"),
                     String::from("on_online_user"),
                     String::from("on_quit"),
-                    String::from("on_register")
+                    String::from("on_register"),
+                    String::from("on_session_restore")
                 ],
             })
             .unwrap(),

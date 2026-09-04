@@ -29,8 +29,7 @@ pub async fn on_problem_statement(msg: SocketJsonMessageWithWsId) {
         )
     {
         // Read problem statement from database instead of JSON file
-        let guard = MYSQL_DATABASE_POOL.lock().await;
-        match guard.get_conn().await {
+        match get_db_conn().await {
             Ok(mut conn) => {
                 let query = format!(
                     "SELECT problem_number, problem_name, difficulty, problem_statement
@@ -140,7 +139,6 @@ pub async fn on_problem_statement(msg: SocketJsonMessageWithWsId) {
                 );
             }
         }
-        drop(guard);
     } else {
         println!(
             "{}",
